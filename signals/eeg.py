@@ -5,7 +5,7 @@ import numpy as np
 bp = Blueprint("eeg", __name__, template_folder="../templates")
 
 # Load EDF once
-edf_file = r"c:\Yasmeen\3RD YEAR 1ST TERM\DSP\Task_1_DSP\data\S001R01.edf"
+edf_file = r"data\S001R01.edf"
 print(f"Extracting EDF parameters from {edf_file}...")
 raw = mne.io.read_raw_edf(edf_file, preload=True)
 fs = int(raw.info["sfreq"])
