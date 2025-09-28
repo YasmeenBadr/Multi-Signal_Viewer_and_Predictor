@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Signal Viewer Home</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+  <style>
+    body { background:#000; color:#e0e0e0; text-align:center; font-family:"Times New Roman"; }
+    .card { background:#1e1e1e; border:none; color:#00eaff; margin:20px; cursor:pointer; }
+    .card:hover { background:#00eaff; color:#000; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1 class="mt-4">Choose a Signal</h1>
+    <div class="row mt-5">
+      <div class="col-md-3">
+        <a href="/ecg"><div class="card p-5">ECG</div></a>
+      </div>
+      <div class="col-md-3">
+        <a href="/eeg"><div class="card p-5">EEG</div></a>
+      </div>
+      <div class="col-md-3">
+        <a href="/radar"><div class="card p-5">RADAR</div></a>
+      </div>
+      <div class="col-md-3">
+        <a href="/doppler"><div class="card p-5">DOPPLER</div></a>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
