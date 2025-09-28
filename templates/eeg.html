@@ -32,6 +32,8 @@
           <select id="graphMode" class="form-select bg-dark text-light">
             <option value="time">Time Graph</option>
             <option value="polar">Polar Graph</option>
+            <option value="recurrence">Recurrence Graph</option>
+            <option value="cycle">Cycle Based Analysis (Band Power)</option>
           </select>
         </div>
 
@@ -67,6 +69,11 @@
     let mode = "time";
     const fs = 160;
     let channelDataBuffers = {};
+    let globalTime = 0; 
+    
+    let bandPowerBuffer = {};
+    // FINAL: Initial range set large to ensure the 10^10 scaled data is visible
+    let currentYRange = 500000; 
 
     const colors = [
       "#FF5733","#33FF57","#3357FF","#F3FF33","#FF33EC",
@@ -86,41 +93,118 @@
         return;
       }
 
-      const traces = selected.map((ch, i) => {
-        const name = document.querySelector(`input[value="${ch}"]`).nextElementSibling.innerText;
-        return mode === "time"
-          ? { x: [], y: [], mode: "lines", line: { color: colors[i % colors.length] }, name }
-          : { r: [], theta: [], mode: "lines", line: { color: colors[i % colors.length] }, name, type: 'scatterpolar' };
-      });
-
-      // Reset buffers
+      // Reset buffers and time
       channelDataBuffers = {};
-      selected.forEach(chIndex => channelDataBuffers[chIndex] = []);
+      selected.forEach(chIndex => channelDataBuffers[chIndex] = { data: [], time: [] }); 
+      globalTime = 0;
+      bandPowerBuffer = {}; 
+      currentYRange = 500000; // Reset initial Y range
 
-      const layout = {
-        title: `EEG Real-Time Viewer - ${mode === 'time' ? 'Time Graph' : 'Polar Graph'} - Window: ${width}s`,
-        paper_bgcolor: "#000000",
-        plot_bgcolor: "#000000",
-        font: { color: "#e0e0e0", family: "Times New Roman" },
-        showlegend: true,
-        ...(mode === 'time'
-          ? { xaxis: { title: "Time (s)", color: "#e0e0e0", gridcolor: '#333' },
-              yaxis: { title: "Amplitude (µV)", color: "#e0e0e0", gridcolor: '#333' } }
-          : { polar: { radialaxis: { title: "Amplitude (µV)", color: "#e0e0e0", gridcolor: '#333' },
-                       angularaxis: { direction: "clockwise", rotation: 90, color: "#e0e0e0", gridcolor: '#333' } } })
-      };
+      let traces, layout;
+      // ... (Time Graph Setup) ...
+      if (mode === "time") {
+        traces = selected.map((ch, i) => {
+          const name = document.querySelector(`input[value="${ch}"]`).nextElementSibling.innerText;
+          return { x: [], y: [], mode: "lines", line: { color: colors[i % colors.length] }, name };
+        });
+        layout = {
+          title: `EEG - Time Graph - Window: ${width}s`,
+          paper_bgcolor: "#000", plot_bgcolor: "#000",
+          font: { color: "#e0e0e0", family: "Times New Roman" },
+          xaxis: { title: "Time (s)", color: "#e0e0e0", gridcolor: "#333", range: [0, width] },
+          yaxis: { title: "Amplitude (µV)", color: "#e0e0e0", gridcolor: "#333" }
+        };
+      // ... (Polar Graph Setup) ...
+      } else if (mode === "polar") {
+        traces = selected.map((ch, i) => {
+          const name = document.querySelector(`input[value="${ch}"]`).nextElementSibling.innerText;
+          return { r: [], theta: [], mode: "lines", line: { color: colors[i % colors.length] }, name, type: "scatterpolar" };
+        });
+        layout = {
+          title: `EEG - Polar Graph - Window: ${width}s`,
+          paper_bgcolor: "#000", font: { color: "#e0e0e0", family: "Times New Roman" },
+          polar: {
+            radialaxis: { title: "Amplitude (µV)", color: "#e0e0e0", gridcolor: "#333" },
+            angularaxis: { direction: "clockwise", rotation: 90, color: "#e0e0e0", gridcolor: "#333" }
+          }
+        };
+      // ... (Recurrence Graph Setup) ...
+      } else if (mode === "recurrence") {
+        traces = [{
+          z: [[0]], type: "heatmap", colorscale: "Viridis", showscale: true
+        }];
+        layout = {
+          title: `EEG - Recurrence Graph - Window: ${width}s`,
+          paper_bgcolor: "#000", font: { color: "#e0e0e0", family: "Times New Roman" },
+          xaxis: { title: "Time Index", color: "#e0e0e0", gridcolor: "#333" },
+          yaxis: { title: "Time Index", color: "#e0e0e0", gridcolor: "#333" }
+        };
+      // --- Cycle Graph Setup (Final) ---
+      } else if (mode === "cycle") {
+        const bands = ['Delta', 'Theta', 'Alpha', 'Beta', 'Gamma'];
+        bandPowerBuffer = { bands: bands, power: Array(bands.length).fill(0) }; 
+        
+        // Logic to determine title for one channel vs. averaged channels
+        const channelTitle = selected.length > 1 
+            ? `Channels ${selected.map(ch => ch + 1).join(', ')} (Averaged)` 
+            : `Channel ${selected.length > 0 ? selected[0] + 1 : 'N/A'}`;
+        
+        traces = [{
+            x: bands,
+            y: bandPowerBuffer.power,
+            type: 'bar',
+            marker: { color: ['#FF5733', '#33FF57', '#3357FF', '#F3FF33', '#FF33EC'] }
+        }];
+        layout = {
+          // FINAL TITLE: Shows if it's averaged
+          title: `EEG - Scaled Band Power: ${channelTitle}`,
+          paper_bgcolor: "#000", plot_bgcolor: "#1e1e1e",
+          font: { color: "#e0e0e0", family: "Times New Roman" },
+          xaxis: { title: "Frequency Band", color: "#e0e0e0", gridcolor: "#333" },
+          yaxis: { 
+              // FINAL LABEL: Indicates the massive scaling
+              title: `Scaled Average Power (x10^10)`, 
+              color: "#e0e0e0", 
+              gridcolor: "#333", 
+              range: [0, currentYRange] 
+          } 
+        };
+      }
 
       Plotly.newPlot("plot", traces, layout);
       streaming = true;
       if (intervalId) clearInterval(intervalId);
-      intervalId = setInterval(fetchData, 500);
+      intervalId = setInterval(fetchData, 100); 
     });
+
+    // --- Helper functions (updateBuffer, updateDataBuffer) ---
+    function updateBuffer(chIndex, newSignals, newTime) {
+      const buffer = channelDataBuffers[chIndex];
+      const maxPoints = width * fs;
+      buffer.data.push(...newSignals);
+      buffer.time.push(...newTime);
+      if (buffer.data.length > maxPoints) {
+        const excess = buffer.data.length - maxPoints;
+        buffer.data.splice(0, excess);
+        buffer.time.splice(0, excess);
+      }
+    }
+
+    function updateDataBuffer(chIndex, newSignals) {
+      const buffer = channelDataBuffers[chIndex].data;
+      const maxPoints = width * fs;
+      buffer.push(...newSignals);
+      if (buffer.length > maxPoints) {
+        buffer.splice(0, buffer.length - maxPoints);
+      }
+    }
+
 
     async function fetchData() {
       if (!streaming) return;
 
       try {
-        const response = await fetch("/eeg/update", {   // ✅ FIXED ENDPOINT
+        const response = await fetch("/eeg/update", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ channels: selected, width })
@@ -128,32 +212,107 @@
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         const result = await response.json();
 
+        if (!result.signals || typeof result.n_samples === 'undefined' || result.n_samples === 0) {
+             return;
+        }
+
+        const N_samples = result.n_samples;
+        const dt = 1 / fs; 
+
+        // ... (Time Graph Logic) ...
         if (mode === "time") {
-          const xUpdate = [];
-          const yUpdate = [];
-          Object.values(result.signals).forEach(sig => { xUpdate.push(result.time); yUpdate.push(sig); });
-          Plotly.extendTraces("plot", { x: xUpdate, y: yUpdate }, selected.map((_, i) => i), width * fs);
-        } else {
-          const maxPoints = width * fs;
-          const rUpdate = [];
-          const thetaUpdate = [];
+            const xUpdates = [], yUpdates = [];
+            const timeChunk = [];
+            for (let i = 0; i < N_samples; i++) {
+                globalTime += dt;
+                timeChunk.push(globalTime);
+            }
+            selected.forEach((chIndex, i) => {
+                const newSignals = result.signals[chIndex.toString()]; 
+                if (!newSignals || newSignals.length === 0) return;
+                updateBuffer(chIndex, newSignals, timeChunk);
+                xUpdates.push(channelDataBuffers[chIndex].time);
+                yUpdates.push(channelDataBuffers[chIndex].data);
+            });
+            Plotly.restyle("plot", { x: xUpdates, y: yUpdates });
+            const xmin = globalTime - width;
+            const xmax = globalTime;
+            if (xUpdates.length > 0) {
+                Plotly.relayout("plot", { 
+                    'xaxis.range': [xmin, xmax], 
+                    'title': `EEG - Time Graph - Window: ${width}s (Time: ${globalTime.toFixed(2)}s)` 
+                });
+            }
+        // ... (Polar/Recurrence Logic) ...
+        } else if (mode === "polar") {
+            const rUpdate = [], thetaUpdate = [];
+            selected.forEach((chIndex, i) => {
+                const newSignals = result.signals[chIndex.toString()];
+                if (!newSignals || newSignals.length === 0) return;
+                updateDataBuffer(chIndex, newSignals);
+                const buffer = channelDataBuffers[chIndex].data;
+                const N = buffer.length;
+                const theta = buffer.map((_, idx) => (idx / (N - 1)) * 360);
+                const minVal = Math.min(...buffer); 
+                const r = buffer.map(v => v - minVal); 
+                rUpdate.push(r); 
+                thetaUpdate.push(theta);
+            });
+            if (rUpdate.length > 0) Plotly.restyle("plot", { r: rUpdate, theta: thetaUpdate });
+        } else if (mode === "recurrence") {
+            const chIndex = selected[0];
+            const newSignals = result.signals[chIndex.toString()];
+            if (!newSignals || newSignals.length === 0) return;
+            updateDataBuffer(chIndex, newSignals);
+            const data = channelDataBuffers[chIndex].data;
+            const N = data.length;
+            const recurrence = Array.from({ length: N }, (_, i) =>
+                Array.from({ length: N }, (_, j) => Math.abs(data[i] - data[j]))
+            );
+            Plotly.react("plot", [{
+                z: recurrence, type: "heatmap", colorscale: "Viridis", showscale: true
+            }], {
+                title: `EEG - Recurrence Graph - Window: ${width}s`,
+                paper_bgcolor: "#000", font: { color: "#e0e0e0", family: "Times New Roman" },
+                xaxis: { title: "Time Index", color: "#e0e0e0", gridcolor: "#333" },
+                yaxis: { title: "Time Index", color: "#e0e0e0", gridcolor: "#333" }
+            });
+        // --- Cycle Based Analysis (Band Power) Mode (Final) ---
+        } else if (mode === "cycle") {
+            const bandPower = result.band_power;
+            
+            if (Object.keys(bandPower).length === 0 || !Object.values(bandPower).some(p => p > 0)) {
+                return;
+            }
 
-          Object.values(result.signals).forEach((chunk, i) => {
-            const chIndex = selected[i];
-            const buffer = channelDataBuffers[chIndex];
-            buffer.push(...chunk);
-            if (buffer.length > maxPoints) buffer.splice(0, buffer.length - maxPoints);
+            bandPowerBuffer.power = bandPowerBuffer.bands.map(band => bandPower[band] || 0);
 
-            const N = buffer.length;
-            const theta = buffer.map((_, idx) => (idx / (N - 1)) * 360);
-            const minVal = Math.min(...buffer);
-            const r = buffer.map(v => v - minVal);
+            // Dynamic Y-axis scaling
+            const maxPower = Math.max(...bandPowerBuffer.power) * 1.1; // 10% buffer
+            
+            if (maxPower > currentYRange || maxPower < currentYRange * 0.5) {
+                // FINAL RANGE ADJUSTMENT: Round up to the nearest 100,000
+                currentYRange = Math.max(100000, Math.ceil(maxPower / 100000) * 100000); 
+                
+                Plotly.relayout("plot", {
+                    'yaxis.range': [0, currentYRange],
+                    'yaxis.title': `Scaled Average Power (x10^10)`
+                });
+            }
 
-            rUpdate.push(r);
-            thetaUpdate.push(theta);
-          });
+            // Update the chart using Plotly.restyle
+            Plotly.restyle("plot", {
+                y: [bandPowerBuffer.power]
+            }, [0]); 
 
-          if(rUpdate.length > 0) Plotly.restyle("plot", { r: rUpdate, theta: thetaUpdate });
+            // Update title (Handle single vs. multiple channels)
+            const channelTitle = selected.length > 1 
+                ? `Channels ${selected.map(ch => ch + 1).join(', ')} (Averaged)` 
+                : document.querySelector(`input[value="${selected[0]}"]`).nextElementSibling.innerText;
+
+            Plotly.relayout("plot", {
+                title: `EEG - Scaled Band Power: ${channelTitle}`
+            });
         }
 
       } catch (error) {
