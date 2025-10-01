@@ -3,6 +3,9 @@ from signals import eeg, ecg, radar, doppler
 
 app = Flask(__name__)
 
+# 🛑 CRITICAL FIX: Set a secret key for session management
+app.secret_key = 'a_secure_and_random_string_of_your_choice_1234567890' 
+
 @app.route("/")
 def home():
     return render_template("home.html")
