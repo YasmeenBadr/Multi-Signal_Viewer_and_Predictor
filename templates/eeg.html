@@ -1,327 +1,413 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>EEG Real-Time Viewer</title>
-  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
-  <style>
-    body { background: #000000; color: #e0e0e0; font-family: "Times New Roman", Times, serif; }
-    h4, h1 { color: #00eaff; }
-    .sidebar { background: #1e1e1e; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.8); }
-    .plot-container { background: #1e1e1e; padding: 15px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.8); }
-    .form-check-label { color: #e0e0e0; }
-    .channel-list { max-height: 300px; overflow-y: auto; border: 1px solid #333; padding: 10px; border-radius: 5px; background: #2a2a2a; }
-    .btn-primary { background: #00eaff; border: none; color: #000; font-weight: bold; }
-    .btn-primary:hover { background: #00bcd4; color: #fff; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EEG Real-Time Viewer</title>
+    <!-- Plotly.js for charting -->
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        // Configure Tailwind to use Inter font and a dark theme palette
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'primary-bg': '#0a0a0a',
+                        'secondary-bg': '#1f2937',
+                        'accent': '#00eaff',
+                        'accent-hover': '#00bcd4',
+                        'text-light': '#e5e7eb',
+                        'text-dark': '#030712',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Base styling overrides for the dark theme and Inter font */
+        body { font-family: 'Inter', sans-serif; }
+        /* Style for the Plotly graph area */
+        .plot-container { min-height: 600px; }
+        /* Scrollbar styling for the channel list */
+        .channel-list::-webkit-scrollbar { width: 8px; }
+        .channel-list::-webkit-scrollbar-track { background: #1f2937; }
+        .channel-list::-webkit-scrollbar-thumb { background-color: #374151; border-radius: 4px; }
+        .channel-list::-webkit-scrollbar-thumb:hover { background-color: #4b5563; }
+    </style>
 </head>
-<body class="container-fluid p-4">
+<body class="min-h-screen bg-primary-bg text-text-light p-4">
 
-  <div class="row">
-    <div class="col-md-3 sidebar">
-      <h4 class="mb-3">EEG Controls</h4>
-      <form id="channelForm">
-        <div class="mb-3">
-          <label for="width" class="form-label">Window width (seconds)</label>
-          <input type="number" id="width" name="width" class="form-control bg-dark text-light" value="5" min="1" step="1">
+    <div class="container mx-auto">
+        <h1 class="text-3xl font-extrabold text-accent mb-6 text-center">Real-Time EEG Signal Analyzer</h1>
+
+        <div class="flex flex-col md:flex-row gap-6">
+            
+            <!-- Control Panel (Sidebar) -->
+            <div class="md:w-1/4 bg-secondary-bg p-6 rounded-xl shadow-2xl sidebar">
+                <h4 class="text-xl font-semibold text-accent mb-4">EEG Controls</h4>
+                <form id="channelForm">
+                    <div class="mb-4">
+                        <label for="width" class="block text-sm font-medium mb-1">Window width (seconds)</label>
+                        <input type="number" id="width" name="width" 
+                               class="w-full p-2 bg-gray-700 text-text-light border border-gray-600 rounded-lg focus:ring-accent focus:border-accent" 
+                               value="5" min="1" step="1">
+                    </div>
+
+                    <div class="mb-4">
+                        <label for="graphMode" class="block text-sm font-medium mb-1">Graph Mode</label>
+                        <select id="graphMode" 
+                                class="w-full p-2 bg-gray-700 text-text-light border border-gray-600 rounded-lg focus:ring-accent focus:border-accent">
+                            <option value="time">Time Graph</option>
+                            <option value="polar">Polar Graph</option>
+                            <option value="recurrence">Recurrence Graph</option>
+                            <option value="cycle">Cycle Based Analysis (Band Power)</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium mb-2">Select Channels</label>
+                        <div class="channel-list p-3 rounded-lg border border-gray-700 bg-gray-800">
+                            <div class="flex items-center mb-1"><input class="form-check-input h-4 w-4 text-accent bg-gray-700 border-gray-600 rounded focus:ring-accent" type="checkbox" name="channels" value="0" id="ch0"><label class="ml-2 text-sm" for="ch0">Channel 1 (Fp1)</label></div>
+                            <div class="flex items-center mb-1"><input class="form-check-input h-4 w-4 text-accent bg-gray-700 border-gray-600 rounded focus:ring-accent" type="checkbox" name="channels" value="1" id="ch1"><label class="ml-2 text-sm" for="ch1">Channel 2 (Fp2)</label></div>
+                            <div class="flex items-center mb-1"><input class="form-check-input h-4 w-4 text-accent bg-gray-700 border-gray-600 rounded focus:ring-accent" type="checkbox" name="channels" value="2" id="ch2"><label class="ml-2 text-sm" for="ch2">Channel 3 (C3)</label></div>
+                            <div class="flex items-center mb-1"><input class="form-check-input h-4 w-4 text-accent bg-gray-700 border-gray-600 rounded focus:ring-accent" type="checkbox" name="channels" value="3" id="ch3"><label class="ml-2 text-sm" for="ch3">Channel 4 (C4)</label></div>
+                            <div class="flex items-center mb-1"><input class="form-check-input h-4 w-4 text-accent bg-gray-700 border-gray-600 rounded focus:ring-accent" type="checkbox" name="channels" value="4" id="ch4"><label class="ml-2 text-sm" for="ch4">Channel 5 (P7)</label></div>
+                            <div class="flex items-center mb-1"><input class="form-check-input h-4 w-4 text-accent bg-gray-700 border-gray-600 rounded focus:ring-accent" type="checkbox" name="channels" value="5" id="ch5"><label class="ml-2 text-sm" for="ch5">Channel 6 (P8)</label></div>
+                            <div class="flex items-center mb-1"><input class="form-check-input h-4 w-4 text-accent bg-gray-700 border-gray-600 rounded focus:ring-accent" type="checkbox" name="channels" value="6" id="ch6"><label class="ml-2 text-sm" for="ch6">Channel 7 (O1)</label></div>
+                            <div class="flex items-center mb-1"><input class="form-check-input h-4 w-4 text-accent bg-gray-700 border-gray-600 rounded focus:ring-accent" type="checkbox" name="channels" value="7" id="ch7"><label class="ml-2 text-sm" for="ch7">Channel 8 (O2)</label></div>
+                        </div>
+                    </div>
+
+                    <!-- NEW: Two buttons side-by-side -->
+                    <div class="flex gap-2">
+                        <button type="submit" id="startButton" class="btn-primary w-1/2 bg-accent hover:bg-accent-hover text-text-dark font-extrabold py-2 rounded-lg transition duration-200 shadow-lg hover:shadow-xl">
+                            Start Streaming
+                        </button>
+                        <button type="button" id="stopButton" class="w-1/2 bg-red-700 hover:bg-red-600 text-text-light font-extrabold py-2 rounded-lg transition duration-200 shadow-lg opacity-50 cursor-not-allowed" disabled onclick="stopStreaming()">
+                            Stop Streaming
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Plot Area -->
+            <div class="md:w-3/4 bg-secondary-bg p-4 rounded-xl shadow-2xl plot-container">
+                <h4 class="text-xl font-semibold text-accent mb-4">EEG Signal Viewer</h4>
+                <div id="plot" style="width:100%;height:600px;"></div>
+            </div>
         </div>
-
-        <div class="mb-3">
-          <label for="graphMode" class="form-label">Graph Mode</label>
-          <select id="graphMode" class="form-select bg-dark text-light">
-            <option value="time">Time Graph</option>
-            <option value="polar">Polar Graph</option>
-            <option value="recurrence">Recurrence Graph</option>
-            <option value="cycle">Cycle Based Analysis (Band Power)</option>
-          </select>
-        </div>
-
-        <div class="mb-3">
-          <label class="form-label">Select Channels</label>
-          <div class="channel-list">
-            <div class="form-check"><input class="form-check-input" type="checkbox" name="channels" value="0"><label class="form-check-label">Channel 1 (Fp1)</label></div>
-            <div class="form-check"><input class="form-check-input" type="checkbox" name="channels" value="1"><label class="form-check-label">Channel 2 (Fp2)</label></div>
-            <div class="form-check"><input class="form-check-input" type="checkbox" name="channels" value="2"><label class="form-check-label">Channel 3 (C3)</label></div>
-            <div class="form-check"><input class="form-check-input" type="checkbox" name="channels" value="3"><label class="form-check-label">Channel 4 (C4)</label></div>
-            <div class="form-check"><input class="form-check-input" type="checkbox" name="channels" value="4"><label class="form-check-label">Channel 5 (P7)</label></div>
-            <div class="form-check"><input class="form-check-input" type="checkbox" name="channels" value="5"><label class="form-check-label">Channel 6 (P8)</label></div>
-            <div class="form-check"><input class="form-check-input" type="checkbox" name="channels" value="6"><label class="form-check-label">Channel 7 (O1)</label></div>
-            <div class="form-check"><input class="form-check-input" type="checkbox" name="channels" value="7"><label class="form-check-label">Channel 8 (O2)</label></div>
-          </div>
-        </div>
-
-        <button type="submit" class="btn btn-primary w-100">Start Streaming</button>
-      </form>
     </div>
 
-    <div class="col-md-9 plot-container">
-      <h4 class="mb-3">EEG Signal Viewer</h4>
-      <div id="plot" style="width:100%;height:600px;"></div>
-    </div>
-  </div>
+    <script>
+        let streaming = false;
+        let intervalId;
+        let selected = [];
+        let width = 5;
+        let mode = "time";
+        const fs = 160;
+        let channelDataBuffers = {};
+        let globalTime = 0; 
+        let bandPowerBuffer = {};
+        let currentYRange = 500000; 
 
-  <script>
-    let streaming = false;
-    let intervalId;
-    let selected = [];
-    let width = 5;
-    let mode = "time";
-    const fs = 160;
-    let channelDataBuffers = {};
-    let globalTime = 0; 
-    
-    let bandPowerBuffer = {};
-    // FINAL: Initial range set large to ensure the 10^10 scaled data is visible
-    let currentYRange = 500000; 
-
-    const colors = [
-      "#FF5733","#33FF57","#3357FF","#F3FF33","#FF33EC",
-      "#33FFF6","#FF8F33","#8F33FF","#33FF99","#FF3333",
-      "#FFD700","#00CED1","#ADFF2F","#FF69B4","#FFA07A",
-      "#40E0D0","#DC143C","#7FFF00","#8A2BE2","#00FF7F"
-    ];
-
-    document.getElementById("channelForm").addEventListener("submit", (e) => {
-      e.preventDefault();
-      selected = Array.from(document.querySelectorAll("input[name=channels]:checked")).map(ch => parseInt(ch.value));
-      width = parseFloat(document.getElementById("width").value);
-      mode = document.getElementById("graphMode").value;
-
-      if (selected.length === 0) {
-        alert("Please select at least one channel!");
-        return;
-      }
-
-      // Reset buffers and time
-      channelDataBuffers = {};
-      selected.forEach(chIndex => channelDataBuffers[chIndex] = { data: [], time: [] }); 
-      globalTime = 0;
-      bandPowerBuffer = {}; 
-      currentYRange = 500000; // Reset initial Y range
-
-      let traces, layout;
-      // ... (Time Graph Setup) ...
-      if (mode === "time") {
-        traces = selected.map((ch, i) => {
-          const name = document.querySelector(`input[value="${ch}"]`).nextElementSibling.innerText;
-          return { x: [], y: [], mode: "lines", line: { color: colors[i % colors.length] }, name };
-        });
-        layout = {
-          title: `EEG - Time Graph - Window: ${width}s`,
-          paper_bgcolor: "#000", plot_bgcolor: "#000",
-          font: { color: "#e0e0e0", family: "Times New Roman" },
-          xaxis: { title: "Time (s)", color: "#e0e0e0", gridcolor: "#333", range: [0, width] },
-          yaxis: { title: "Amplitude (µV)", color: "#e0e0e0", gridcolor: "#333" }
-        };
-      // ... (Polar Graph Setup) ...
-      } else if (mode === "polar") {
-        traces = selected.map((ch, i) => {
-          const name = document.querySelector(`input[value="${ch}"]`).nextElementSibling.innerText;
-          return { r: [], theta: [], mode: "lines", line: { color: colors[i % colors.length] }, name, type: "scatterpolar" };
-        });
-        layout = {
-          title: `EEG - Polar Graph - Window: ${width}s`,
-          paper_bgcolor: "#000", font: { color: "#e0e0e0", family: "Times New Roman" },
-          polar: {
-            radialaxis: { title: "Amplitude (µV)", color: "#e0e0e0", gridcolor: "#333" },
-            angularaxis: { direction: "clockwise", rotation: 90, color: "#e0e0e0", gridcolor: "#333" }
-          }
-        };
-      // ... (Recurrence Graph Setup) ...
-      } else if (mode === "recurrence") {
-        traces = [{
-          z: [[0]], type: "heatmap", colorscale: "Viridis", showscale: true
-        }];
-        layout = {
-          title: `EEG - Recurrence Graph - Window: ${width}s`,
-          paper_bgcolor: "#000", font: { color: "#e0e0e0", family: "Times New Roman" },
-          xaxis: { title: "Time Index", color: "#e0e0e0", gridcolor: "#333" },
-          yaxis: { title: "Time Index", color: "#e0e0e0", gridcolor: "#333" }
-        };
-      // --- Cycle Graph Setup (Final) ---
-      } else if (mode === "cycle") {
-        const bands = ['Delta', 'Theta', 'Alpha', 'Beta', 'Gamma'];
-        bandPowerBuffer = { bands: bands, power: Array(bands.length).fill(0) }; 
+        const colors = [
+            "#FF5733","#33FF57","#3357FF","#F3FF33","#FF33EC",
+            "#33FFF6","#FF8F33","#8F33FF","#33FF99","#FF3333",
+            "#FFD700","#00CED1","#ADFF2F","#FF69B4","#FFA07A",
+            "#40E0D0","#DC143C","#7FFF00","#8A2BE2","#00FF7F"
+        ];
         
-        // Logic to determine title for one channel vs. averaged channels
-        const channelTitle = selected.length > 1 
-            ? `Channels ${selected.map(ch => ch + 1).join(', ')} (Averaged)` 
-            : `Channel ${selected.length > 0 ? selected[0] + 1 : 'N/A'}`;
-        
-        traces = [{
-            x: bands,
-            y: bandPowerBuffer.power,
-            type: 'bar',
-            marker: { color: ['#FF5733', '#33FF57', '#3357FF', '#F3FF33', '#FF33EC'] }
-        }];
-        layout = {
-          // FINAL TITLE: Shows if it's averaged
-          title: `EEG - Scaled Band Power: ${channelTitle}`,
-          paper_bgcolor: "#000", plot_bgcolor: "#1e1e1e",
-          font: { color: "#e0e0e0", family: "Times New Roman" },
-          xaxis: { title: "Frequency Band", color: "#e0e0e0", gridcolor: "#333" },
-          yaxis: { 
-              // FINAL LABEL: Indicates the massive scaling
-              title: `Scaled Average Power (x10^10)`, 
-              color: "#e0e0e0", 
-              gridcolor: "#333", 
-              range: [0, currentYRange] 
-          } 
-        };
-      }
+        const startButton = document.getElementById('startButton');
+        const stopButton = document.getElementById('stopButton');
 
-      Plotly.newPlot("plot", traces, layout);
-      streaming = true;
-      if (intervalId) clearInterval(intervalId);
-      intervalId = setInterval(fetchData, 100); 
-    });
+        // Function to stop streaming
+        function stopStreaming() {
+            if (intervalId) {
+                clearInterval(intervalId);
+                intervalId = null;
+            }
+            streaming = false;
+            // Update button states
+            startButton.disabled = false;
+            startButton.classList.remove('opacity-50', 'cursor-not-allowed');
+            stopButton.disabled = true;
+            stopButton.classList.add('opacity-50', 'cursor-not-allowed');
+            console.log("Streaming stopped.");
 
-    // --- Helper functions (updateBuffer, updateDataBuffer) ---
-    function updateBuffer(chIndex, newSignals, newTime) {
-      const buffer = channelDataBuffers[chIndex];
-      const maxPoints = width * fs;
-      buffer.data.push(...newSignals);
-      buffer.time.push(...newTime);
-      if (buffer.data.length > maxPoints) {
-        const excess = buffer.data.length - maxPoints;
-        buffer.data.splice(0, excess);
-        buffer.time.splice(0, excess);
-      }
-    }
-
-    function updateDataBuffer(chIndex, newSignals) {
-      const buffer = channelDataBuffers[chIndex].data;
-      const maxPoints = width * fs;
-      buffer.push(...newSignals);
-      if (buffer.length > maxPoints) {
-        buffer.splice(0, buffer.length - maxPoints);
-      }
-    }
-
-
-    async function fetchData() {
-      if (!streaming) return;
-
-      try {
-        const response = await fetch("/eeg/update", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ channels: selected, width })
-        });
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        const result = await response.json();
-
-        if (!result.signals || typeof result.n_samples === 'undefined' || result.n_samples === 0) {
-             return;
+            // Optional: Display a stopped message
+            Plotly.relayout("plot", {
+                title: Plotly.d3.select('#plot').node().layout.title.text + " (STOPPED)"
+            });
         }
 
-        const N_samples = result.n_samples;
-        const dt = 1 / fs; 
 
-        // ... (Time Graph Logic) ...
-        if (mode === "time") {
-            const xUpdates = [], yUpdates = [];
-            const timeChunk = [];
-            for (let i = 0; i < N_samples; i++) {
-                globalTime += dt;
-                timeChunk.push(globalTime);
-            }
-            selected.forEach((chIndex, i) => {
-                const newSignals = result.signals[chIndex.toString()]; 
-                if (!newSignals || newSignals.length === 0) return;
-                updateBuffer(chIndex, newSignals, timeChunk);
-                xUpdates.push(channelDataBuffers[chIndex].time);
-                yUpdates.push(channelDataBuffers[chIndex].data);
-            });
-            Plotly.restyle("plot", { x: xUpdates, y: yUpdates });
-            const xmin = globalTime - width;
-            const xmax = globalTime;
-            if (xUpdates.length > 0) {
-                Plotly.relayout("plot", { 
-                    'xaxis.range': [xmin, xmax], 
-                    'title': `EEG - Time Graph - Window: ${width}s (Time: ${globalTime.toFixed(2)}s)` 
-                });
-            }
-        // ... (Polar/Recurrence Logic) ...
-        } else if (mode === "polar") {
-            const rUpdate = [], thetaUpdate = [];
-            selected.forEach((chIndex, i) => {
-                const newSignals = result.signals[chIndex.toString()];
-                if (!newSignals || newSignals.length === 0) return;
-                updateDataBuffer(chIndex, newSignals);
-                const buffer = channelDataBuffers[chIndex].data;
-                const N = buffer.length;
-                const theta = buffer.map((_, idx) => (idx / (N - 1)) * 360);
-                const minVal = Math.min(...buffer); 
-                const r = buffer.map(v => v - minVal); 
-                rUpdate.push(r); 
-                thetaUpdate.push(theta);
-            });
-            if (rUpdate.length > 0) Plotly.restyle("plot", { r: rUpdate, theta: thetaUpdate });
-        } else if (mode === "recurrence") {
-            const chIndex = selected[0];
-            const newSignals = result.signals[chIndex.toString()];
-            if (!newSignals || newSignals.length === 0) return;
-            updateDataBuffer(chIndex, newSignals);
-            const data = channelDataBuffers[chIndex].data;
-            const N = data.length;
-            const recurrence = Array.from({ length: N }, (_, i) =>
-                Array.from({ length: N }, (_, j) => Math.abs(data[i] - data[j]))
-            );
-            Plotly.react("plot", [{
-                z: recurrence, type: "heatmap", colorscale: "Viridis", showscale: true
-            }], {
-                title: `EEG - Recurrence Graph - Window: ${width}s`,
-                paper_bgcolor: "#000", font: { color: "#e0e0e0", family: "Times New Roman" },
-                xaxis: { title: "Time Index", color: "#e0e0e0", gridcolor: "#333" },
-                yaxis: { title: "Time Index", color: "#e0e0e0", gridcolor: "#333" }
-            });
-        // --- Cycle Based Analysis (Band Power) Mode (Final) ---
-        } else if (mode === "cycle") {
-            const bandPower = result.band_power;
+        document.getElementById("channelForm").addEventListener("submit", (e) => {
+            e.preventDefault();
             
-            if (Object.keys(bandPower).length === 0 || !Object.values(bandPower).some(p => p > 0)) {
+            // If already streaming, stop the current stream before starting a new one
+            if (streaming) {
+                stopStreaming();
+            }
+
+            selected = Array.from(document.querySelectorAll("input[name=channels]:checked")).map(ch => parseInt(ch.value));
+            width = parseFloat(document.getElementById("width").value);
+            mode = document.getElementById("graphMode").value;
+
+            if (selected.length === 0) {
+                document.getElementById('plot').innerHTML = '<div class="text-center p-10 text-xl text-red-400">Please select at least one channel to start streaming.</div>';
+                stopStreaming(); // Ensure buttons are in the correct state
                 return;
             }
 
-            bandPowerBuffer.power = bandPowerBuffer.bands.map(band => bandPower[band] || 0);
+            // Reset buffers and state for the new stream
+            channelDataBuffers = {};
+            selected.forEach(chIndex => channelDataBuffers[chIndex] = { data: [], time: [] }); 
+            globalTime = 0;
+            bandPowerBuffer = {}; 
+            currentYRange = 500000; 
 
-            // Dynamic Y-axis scaling
-            const maxPower = Math.max(...bandPowerBuffer.power) * 1.1; // 10% buffer
-            
-            if (maxPower > currentYRange || maxPower < currentYRange * 0.5) {
-                // FINAL RANGE ADJUSTMENT: Round up to the nearest 100,000
-                currentYRange = Math.max(100000, Math.ceil(maxPower / 100000) * 100000); 
-                
-                Plotly.relayout("plot", {
-                    'yaxis.range': [0, currentYRange],
-                    'yaxis.title': `Scaled Average Power (x10^10)`
+            let traces, layout;
+            const plotDiv = document.getElementById("plot");
+
+            // --- Plotly Configuration based on Mode (Same as previous version) ---
+            if (mode === "time") {
+                traces = selected.map((ch, i) => {
+                    const name = document.querySelector(`input[value="${ch}"]`).nextElementSibling.innerText;
+                    return { x: [], y: [], mode: "lines", line: { color: colors[i % colors.length] }, name };
                 });
+                layout = {
+                    title: `EEG - Time Graph - Window: ${width}s`,
+                    paper_bgcolor: "#0a0a0a", plot_bgcolor: "#000000", 
+                    font: { color: "#e5e7eb", family: "Inter" },
+                    xaxis: { title: "Time (s)", color: "#e5e7eb", gridcolor: "#374151", range: [0, width] },
+                    yaxis: { title: "Amplitude (µV)", color: "#e5e7eb", gridcolor: "#374151" }
+                };
+            } else if (mode === "polar") {
+                traces = selected.map((ch, i) => {
+                    const name = document.querySelector(`input[value="${ch}"]`).nextElementSibling.innerText;
+                    return { r: [], theta: [], mode: "lines", line: { color: colors[i % colors.length] }, name, type: "scatterpolar" };
+                });
+                layout = {
+                    title: `EEG - Polar Graph - Window: ${width}s`,
+                    paper_bgcolor: "#0a0a0a", font: { color: "#e5e7eb", family: "Inter" },
+                    polar: {
+                        bgcolor: "#000000",
+                        radialaxis: { title: "Amplitude (µV)", color: "#e5e7eb", gridcolor: "#374151" },
+                        angularaxis: { direction: "clockwise", rotation: 90, color: "#e5e7eb", gridcolor: "#374151" }
+                    }
+                };
+            } else if (mode === "recurrence") {
+                 if (selected.length > 1) {
+                    plotDiv.innerHTML = '<div class="text-center p-10 text-xl text-yellow-400">Recurrence Plot only supports visualization of a single channel. Please select only one.</div>';
+                    stopStreaming();
+                    return;
+                }
+                traces = [{
+                    z: [[0]], type: "heatmap", colorscale: "Viridis", showscale: true
+                }];
+                layout = {
+                    title: `EEG - Recurrence Graph - Channel ${selected[0] + 1} - Window: ${width}s`,
+                    paper_bgcolor: "#0a0a0a", plot_bgcolor: "#000000",
+                    font: { color: "#e5e7eb", family: "Inter" },
+                    xaxis: { title: "Time Index", color: "#e5e7eb", gridcolor: "#374151" },
+                    yaxis: { title: "Time Index", color: "#e5e7eb", gridcolor: "#374151" }
+                };
+            } else if (mode === "cycle") {
+                const bands = ['Delta (0.5-4Hz)', 'Theta (4-8Hz)', 'Alpha (8-13Hz)', 'Beta (13-30Hz)', 'Gamma (>30Hz)'];
+                bandPowerBuffer = { bands: bands, power: Array(bands.length).fill(0) }; 
+                
+                const channelTitle = selected.length > 1 
+                    ? `Channels ${selected.map(ch => ch + 1).join(', ')} (Averaged)` 
+                    : document.querySelector(`input[value="${selected[0]}"]`).nextElementSibling.innerText;
+                
+                traces = [{
+                    x: bands,
+                    y: bandPowerBuffer.power,
+                    type: 'bar',
+                    marker: { color: ['#FF5733', '#33FF57', '#3357FF', '#F3FF33', '#FF33EC'] }
+                }];
+                layout = {
+                    title: `EEG - Scaled Band Power: ${channelTitle}`,
+                    paper_bgcolor: "#0a0a0a", plot_bgcolor: "#000000",
+                    font: { color: "#e5e7eb", family: "Inter" },
+                    xaxis: { title: "Frequency Band", color: "#e5e7eb", gridcolor: "#374151" },
+                    yaxis: { 
+                        title: `Scaled Average Power (x10^10)`, 
+                        color: "#e5e7eb", 
+                        gridcolor: "#374151", 
+                        range: [0, currentYRange] 
+                    } 
+                };
             }
+            // --- End Plotly Configuration ---
 
-            // Update the chart using Plotly.restyle
-            Plotly.restyle("plot", {
-                y: [bandPowerBuffer.power]
-            }, [0]); 
+            // Start the stream
+            Plotly.newPlot("plot", traces, layout);
+            streaming = true;
+            intervalId = setInterval(fetchData, 100); 
 
-            // Update title (Handle single vs. multiple channels)
-            const channelTitle = selected.length > 1 
-                ? `Channels ${selected.map(ch => ch + 1).join(', ')} (Averaged)` 
-                : document.querySelector(`input[value="${selected[0]}"]`).nextElementSibling.innerText;
+            // Update button states
+            startButton.disabled = true;
+            startButton.classList.add('opacity-50', 'cursor-not-allowed');
+            stopButton.disabled = false;
+            stopButton.classList.remove('opacity-50', 'cursor-not-allowed');
+        });
 
-            Plotly.relayout("plot", {
-                title: `EEG - Scaled Band Power: ${channelTitle}`
-            });
+        // --- Helper functions for data buffering (Unchanged) ---
+        function updateBuffer(chIndex, newSignals, newTime) {
+            const buffer = channelDataBuffers[chIndex];
+            const maxPoints = width * fs;
+            buffer.data.push(...newSignals);
+            buffer.time.push(...newTime);
+            if (buffer.data.length > maxPoints) {
+                const excess = buffer.data.length - maxPoints;
+                buffer.data.splice(0, excess);
+                buffer.time.splice(0, excess);
+            }
         }
 
-      } catch (error) {
-        console.error("Failed to fetch data:", error);
-        streaming = false;
-        clearInterval(intervalId);
-        alert("Connection to data stream failed. Please check the backend and refresh.");
-      }
-    }
-  </script>
+        function updateDataBuffer(chIndex, newSignals) {
+            const buffer = channelDataBuffers[chIndex].data;
+            const maxPoints = width * fs;
+            buffer.push(...newSignals);
+            if (buffer.length > maxPoints) {
+                buffer.splice(0, buffer.length - maxPoints);
+            }
+        }
+
+
+        // --- Main data fetching and plotting logic (Updated error handling) ---
+        async function fetchData() {
+            if (!streaming) return;
+
+            try {
+                // Mock API call to fetch data 
+                const response = await fetch("/eeg/update", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ channels: selected, width })
+                });
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                const result = await response.json();
+
+                if (!result.signals || typeof result.n_samples === 'undefined' || result.n_samples === 0) {
+                      return;
+                }
+
+                const N_samples = result.n_samples;
+                const dt = 1 / fs; 
+
+                // Plotting logic (Time, Polar, Recurrence, Cycle) - logic remains the same
+                if (mode === "time") {
+                    const xUpdates = [], yUpdates = [];
+                    const timeChunk = [];
+                    for (let i = 0; i < N_samples; i++) {
+                        globalTime += dt;
+                        timeChunk.push(globalTime);
+                    }
+                    selected.forEach((chIndex) => {
+                        const newSignals = result.signals[chIndex.toString()]; 
+                        if (!newSignals || newSignals.length === 0) return;
+                        updateBuffer(chIndex, newSignals, timeChunk);
+                        xUpdates.push(channelDataBuffers[chIndex].time);
+                        yUpdates.push(channelDataBuffers[chIndex].data);
+                    });
+                    
+                    Plotly.restyle("plot", { x: xUpdates, y: yUpdates });
+                    
+                    const xmin = globalTime - width;
+                    const xmax = globalTime;
+                    if (xUpdates.length > 0) {
+                        Plotly.relayout("plot", { 
+                            'xaxis.range': [xmin, xmax], 
+                            'title': `EEG - Time Graph - Window: ${width}s (Time: ${globalTime.toFixed(2)}s)` 
+                        });
+                    }
+                } else if (mode === "polar") {
+                    const rUpdate = [], thetaUpdate = [];
+                    selected.forEach((chIndex) => {
+                        const newSignals = result.signals[chIndex.toString()];
+                        if (!newSignals || newSignals.length === 0) return;
+                        updateDataBuffer(chIndex, newSignals);
+                        const buffer = channelDataBuffers[chIndex].data;
+                        const N = buffer.length;
+                        const theta = buffer.map((_, idx) => (idx / (N - 1)) * 360);
+                        const minVal = Math.min(...buffer); 
+                        const r = buffer.map(v => v - minVal); 
+                        rUpdate.push(r); 
+                        thetaUpdate.push(theta);
+                    });
+                    if (rUpdate.length > 0) Plotly.restyle("plot", { r: rUpdate, theta: thetaUpdate });
+                } else if (mode === "recurrence") {
+                    const chIndex = selected[0];
+                    const newSignals = result.signals[chIndex.toString()];
+                    if (!newSignals || newSignals.length === 0) return;
+                    updateDataBuffer(chIndex, newSignals);
+                    const data = channelDataBuffers[chIndex].data;
+                    const N = data.length;
+                    
+                    const recurrence = Array.from({ length: N }, (_, i) =>
+                        Array.from({ length: N }, (_, j) => Math.abs(data[i] - data[j]))
+                    );
+
+                    Plotly.react("plot", [{
+                        z: recurrence, type: "heatmap", colorscale: "Viridis", showscale: true
+                    }], {
+                        title: `EEG - Recurrence Graph - Channel ${chIndex + 1} - Window: ${width}s`,
+                        paper_bgcolor: "#0a0a0a", plot_bgcolor: "#000000",
+                        font: { color: "#e5e7eb", family: "Inter" },
+                        xaxis: { title: "Time Index", color: "#e5e7eb", gridcolor: "#374151" },
+                        yaxis: { title: "Time Index", color: "#e5e7eb", gridcolor: "#374151" }
+                    });
+                } else if (mode === "cycle") {
+                    const bandPower = result.band_power;
+                    
+                    if (Object.keys(bandPower).length === 0 || !Object.values(bandPower).some(p => p > 0)) {
+                        return;
+                    }
+
+                    bandPowerBuffer.power = bandPowerBuffer.bands.map(bandKey => bandPower[bandKey.split(' ')[0]] || 0);
+
+                    const maxPower = Math.max(...bandPowerBuffer.power) * 1.1; 
+                    
+                    if (maxPower > currentYRange || maxPower < currentYRange * 0.7) { 
+                        currentYRange = Math.max(100000, Math.ceil(maxPower / 100000) * 100000); 
+                        
+                        Plotly.relayout("plot", {
+                            'yaxis.range': [0, currentYRange],
+                            'yaxis.title': `Scaled Average Power (x10^10)`
+                        });
+                    }
+
+                    Plotly.restyle("plot", {
+                        y: [bandPowerBuffer.power]
+                    }, [0]); 
+
+                    const channelTitle = selected.length > 1 
+                        ? `Channels ${selected.map(ch => ch + 1).join(', ')} (Averaged)` 
+                        : document.querySelector(`input[value="${selected[0]}"]`).nextElementSibling.innerText;
+
+                    Plotly.relayout("plot", {
+                        title: `EEG - Scaled Band Power: ${channelTitle}`
+                    });
+                }
+                // End Plotting Logic
+
+            } catch (error) {
+                console.error("Failed to fetch data:", error);
+                // Stop streaming and update UI if an error occurs
+                stopStreaming();
+                const plotDiv = document.getElementById('plot');
+                if (plotDiv) {
+                    plotDiv.innerHTML = '<div class="text-center p-10 text-xl text-red-500 bg-red-900/20 rounded-xl">Connection to data stream failed. Please ensure the backend is running and refresh the page to retry.</div>';
+                }
+            }
+        }
+    </script>
 </body>
 </html>

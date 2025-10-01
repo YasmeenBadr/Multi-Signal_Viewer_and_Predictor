@@ -64,7 +64,7 @@ def calculate_band_power(data, fs):
     """
     band_powers = {}
     # FINAL SCALING FACTOR: Ensures visibility on the plot
-    SCALING_FACTOR = 10000000000.0 
+    SCALING_FACTOR = 10000000000000.0 
     
     for band, (low, high) in BANDS.items():
         if high <= low or low >= fs/2:
