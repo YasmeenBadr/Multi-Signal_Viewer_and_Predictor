@@ -1,19 +1,140 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <title>RADAR Viewer</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
   <style>
-    body { background:#000; color:#e0e0e0; text-align:center; font-family:"Times New Roman"; }
-    h1 { color:#00eaff; }
+    body {
+      background: #121212;
+      color: #e0e0e0;
+      font-family: 'Inter', sans-serif;
+    }
+
+    h1,
+    h2 {
+      color: #00eaff;
+    }
+
+
+
+    .card {
+      background-color: #1f1f1f;
+      border: 1px solid #00eaff20;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+    }
+
+    .nav-tabs .nav-link.active {
+      background-color: #00eaff;
+      color: #121212;
+      font-weight: bold;
+    }
+
+    .btn-custom {
+      background-color: #00eaff;
+      color: #121212;
+      font-weight: bold;
+    }
+
+    .btn-custom:hover {
+      background-color: #00c0cc;
+      color: white;
+    }
   </style>
 </head>
+
 <body>
   <div class="container mt-5">
-    <h1>RADAR Viewer (Coming Soon)</h1>
-    <p>This is a placeholder page for RADAR visualization.</p>
-    <a href="/" class="btn btn-primary mt-3">Back to Home</a>
+
+    <!-- Title -->
+    <h1 class="mb-4 text-center">RADAR Signal Analysis</h1>
+    <p class="text-center mb-5">Select a category below to analyze signals related to Radar systems.</p>
+
+    <!-- Tabs -->
+    <ul class="nav nav-tabs mb-4" id="radarTabs" role="tablist">
+      <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="drone-tab" data-bs-toggle="tab" data-bs-target="#drone" type="button"
+          role="tab">Drone Detection</button>
+      </li>
+
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="sar-tab" data-bs-toggle="tab" data-bs-target="#sar" type="button" role="tab">SAR
+          Analysis</button>
+      </li>
+    </ul>
+
+    <!-- Tab Content -->
+    <div class="tab-content" id="radarTabsContent">
+
+      <!-- Drone Detection -->
+      <div class="tab-pane fade show active" id="drone" role="tabpanel">
+        <div class="card p-4">
+          <h2>Drone Detection</h2>
+          <p>Upload an audio recording to detect whether a drone is present.</p>
+          <form id="droneForm" enctype="multipart/form-data">
+            <input type="file" name="file" class="form-control mb-3" accept=".wav,.mp3" required>
+            <button type="submit" class="btn btn-custom">Analyze Drone Audio</button>
+          </form>
+
+          <!-- Results will appear here -->
+          <div id="resultBox" class="mt-4"></div>
+        </div>
+
+      </div>
+
+
+
+
+      <!-- SAR -->
+      <div class="tab-pane fade" id="sar" role="tabpanel">
+        <div class="card p-4">
+          <h2>SAR (Synthetic Aperture Radar)</h2>
+          <p>Coming soon: visualization and classification of SAR images.</p>
+          <button class="btn btn-secondary" disabled>Feature Coming Soon</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Back Button -->
+    <div class="text-center mt-5">
+      <a href="/" class="btn btn-outline-light">⬅ Back to Home</a>
+    </div>
+
   </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+  <script>
+    document.getElementById("droneForm").addEventListener("submit", async function (e) {
+      e.preventDefault();
+
+      const formData = new FormData(this);
+
+      // Send to Flask backend
+      const response = await fetch("/radar/analyze", {
+        method: "POST",
+        body: formData
+      });
+
+      const resultBox = document.getElementById("resultBox");
+
+      if (!response.ok) {
+        resultBox.innerHTML = `<div class="alert alert-danger">Error: Could not analyze file.</div>`;
+        return;
+      }
+
+      const data = await response.json();
+      resultBox.innerHTML = `
+    <div class="alert alert-info">
+      <h4>Prediction: <strong>${data.predicted_class}</strong></h4>
+      <p>Confidence: <strong>${(data.confidence * 100).toFixed(2)}%</strong></p>
+    </div>
+  `;
+    });
+  </script>
+
+
 </body>
+
 </html>
