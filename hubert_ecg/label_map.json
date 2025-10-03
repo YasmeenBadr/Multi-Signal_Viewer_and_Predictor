@@ -1,0 +1,22 @@
+{
+  "0": "Normal ECG",
+  "1": "Anterior Myocardial Infarction",
+  "2": "Inferior Myocardial Infarction",
+  "3": "Lateral Myocardial Infarction",
+  "4": "Posterior Myocardial Infarction",
+  "5": "ST Elevation",
+  "6": "ST Depression",
+  "7": "T-wave Inversion",
+  "8": "Left Ventricular Hypertrophy",
+  "9": "Right Ventricular Hypertrophy",
+  "10": "Biatrial Enlargement",
+  "11": "Left Bundle Branch Block",
+  "12": "Right Bundle Branch Block",
+  "13": "Atrioventricular Block (1st degree)",
+  "14": "Atrioventricular Block (2nd degree)",
+  "15": "Atrioventricular Block (3rd degree)",
+  "16": "Premature Ventricular Contractions",
+  "17": "Premature Atrial Contractions",
+  "18": "Ventricular Tachycardia",
+  "19": "Atrial Fibrillation / Flutter"
+}

@@ -14,7 +14,7 @@ def home():
 app.register_blueprint(eeg.bp, url_prefix="/eeg")
 
 # ECG routes
-app.register_blueprint(ecg.bp, url_prefix="/ecg")
+app.register_blueprint(ecg.ECG_BP, url_prefix="/ecg")
 
 # RADAR routes
 app.register_blueprint(radar.bp, url_prefix="/radar")

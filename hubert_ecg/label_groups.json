@@ -1,0 +1,24 @@
+{
+  "normal": ["Normal ECG"],
+  "abnormal": [
+    "Anterior Myocardial Infarction",
+    "Inferior Myocardial Infarction",
+    "Lateral Myocardial Infarction",
+    "Posterior Myocardial Infarction",
+    "ST Elevation",
+    "ST Depression",
+    "T-wave Inversion",
+    "Left Ventricular Hypertrophy",
+    "Right Ventricular Hypertrophy",
+    "Biatrial Enlargement",
+    "Left Bundle Branch Block",
+    "Right Bundle Branch Block",
+    "Atrioventricular Block (1st degree)",
+    "Atrioventricular Block (2nd degree)",
+    "Atrioventricular Block (3rd degree)",
+    "Premature Ventricular Contractions",
+    "Premature Atrial Contractions",
+    "Ventricular Tachycardia",
+    "Atrial Fibrillation / Flutter"
+  ]
+}
