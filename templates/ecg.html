@@ -1,372 +1,157 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ECG Real-Time Viewer</title>
-    <!-- Plotly.js for charting -->
-    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        // Configure Tailwind to use Inter font and a dark theme palette
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        'primary-bg': '#0a0a0a',
-                        'secondary-bg': '#1f2937',
-                        'accent': '#00eaff',
-                        'accent-hover': '#00bcd4',
-                        'text-light': '#e5e7eb',
-                        'text-dark': '#030712',
-                    },
-                    fontFamily: {
-                        sans: ['Inter', 'sans-serif'],
-                    }
-                }
-            }
-        }
-    </script>
-    <style>
-        /* Base styling overrides for the dark theme and Inter font */
-        body { font-family: 'Inter', sans-serif; }
-        /* Style for the Plotly graph area */
-        .plot-container { min-height: 600px; }
-        /* Scrollbar styling for the channel list (copied from EEG style) */
-        .channel-list::-webkit-scrollbar { width: 8px; }
-        .channel-list::-webkit-scrollbar-track { background: #1f2937; }
-        .channel-list::-webkit-scrollbar-thumb { background-color: #374151; border-radius: 4px; }
-        .channel-list::-webkit-scrollbar-thumb:hover { background-color: #4b5563; }
-    </style>
+  <meta charset="UTF-8">
+  <title>ECG Real-Time Viewer</title>
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+  <style>
+    body { background: #000000; color: #e0e0e0; font-family: "Times New Roman", Times, serif; }
+    h4, h1 { color: #00eaff; }
+    .sidebar { background: #1e1e1e; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.8); }
+    .plot-container { background: #1e1e1e; padding: 15px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.8); }
+    .form-check-label { color: #e0e0e0; }
+    .btn-primary { background: #00eaff; border: none; color: #000; font-weight: bold; }
+    .btn-primary:hover { background: #00bcd4; color: #fff; }
+  </style>
 </head>
-<body class="min-h-screen bg-primary-bg text-text-light p-4">
+<body class="container-fluid p-4">
 
-    <div class="container mx-auto">
-        <h1 class="text-3xl font-extrabold text-accent mb-6 text-center">Real-Time ECG Signal Viewer</h1>
-
-        <div class="flex flex-col md:flex-row gap-6">
-            
-            <!-- Control Panel (Sidebar) -->
-            <div class="md:w-1/4 bg-secondary-bg p-6 rounded-xl shadow-2xl sidebar">
-                <h4 class="text-xl font-semibold text-accent mb-4">ECG Controls</h4>
-                <form id="channelForm">
-                    
-                    <!-- Cycles to Display -->
-                    <div class="mb-4">
-                        <label for="cycles" class="block text-sm font-medium mb-1">Cycles to Display</label>
-                        <input type="number" id="cycles" name="cycles" 
-                                class="w-full p-2 bg-gray-700 text-text-light border border-gray-600 rounded-lg focus:ring-accent focus:border-accent" 
-                                value="5" min="1" step="1">
-                    </div>
-
-                    <!-- Estimated R-R Interval (seconds) -->
-                    <div class="mb-4">
-                        <label for="rrInterval" class="block text-sm font-medium mb-1">Estimated R-R Interval (s)</label>
-                        <input type="number" id="rrInterval" name="rrInterval" 
-                                class="w-full p-2 bg-gray-700 text-text-light border border-gray-600 rounded-lg focus:ring-accent focus:border-accent" 
-                                value="1.0" min="0.1" step="0.1">
-                    </div>
-
-                    <div class="mb-4">
-                        <label for="graphMode" class="block text-sm font-medium mb-1">Graph Mode</label>
-                        <select id="graphMode" 
-                                class="w-full p-2 bg-gray-700 text-text-light border border-gray-600 rounded-lg focus:ring-accent focus:border-accent">
-                            <option value="time">Time Graph</option>
-                            <option value="polar">Polar Graph</option>
-                            <option value="recurrence">Recurrence Plot</option>
-                        </select>
-                    </div>
-
-                    <div class="mb-6">
-                        <label class="block text-sm font-medium mb-2">Select Channels</label>
-                        <!-- Updated channel list using Tailwind styles -->
-                        <div id="channelList" class="channel-list max-h-48 overflow-y-auto p-3 rounded-lg border border-gray-700 bg-gray-800">
-                            <div class="flex items-center mb-1"><input class="form-check-input h-4 w-4 text-accent bg-gray-700 border-gray-600 rounded focus:ring-accent" type="checkbox" name="channels" value="0" id="ch0"><label class="ml-2 text-sm" for="ch0">ECG Lead I</label></div>
-                            <div class="flex items-center mb-1"><input class="form-check-input h-4 w-4 text-accent bg-gray-700 border-gray-600 rounded focus:ring-accent" type="checkbox" name="channels" value="1" id="ch1"><label class="ml-2 text-sm" for="ch1">ECG Lead II</label></div>
-                            <div class="flex items-center mb-1"><input class="form-check-input h-4 w-4 text-accent bg-gray-700 border-gray-600 rounded focus:ring-accent" type="checkbox" name="channels" value="2" id="ch2"><label class="ml-2 text-sm" for="ch2">ECG Lead III</label></div>
-                        </div>
-                    </div>
-
-                    <!-- Start/Stop Buttons -->
-                    <div class="flex gap-2">
-                        <button type="submit" id="startButton" class="w-1/2 bg-accent hover:bg-accent-hover text-text-dark font-extrabold py-2 rounded-lg transition duration-200 shadow-lg hover:shadow-xl">
-                            Start Streaming
-                        </button>
-                        <button type="button" id="stopButton" class="w-1/2 bg-red-700 hover:bg-red-600 text-text-light font-extrabold py-2 rounded-lg transition duration-200 shadow-lg opacity-50 cursor-not-allowed" disabled onclick="stopStreaming()">
-                            Stop Streaming
-                        </button>
-                    </div>
-                </form>
-            </div>
-
-            <!-- Plot Area -->
-            <div class="md:w-3/4 bg-secondary-bg p-4 rounded-xl shadow-2xl plot-container">
-                <h4 class="text-xl font-semibold text-accent mb-4">ECG Signal Viewer</h4>
-                <div id="plot" style="width:100%;height:600px;"></div>
-                <div id="messageBox" class="text-center text-sm mt-3" style="display:none;"></div>
-            </div>
+  <div class="row">
+    <!-- Sidebar Controls -->
+    <div class="col-md-3 sidebar">
+      <h4 class="mb-3">ECG Controls</h4>
+      <form id="channelForm">
+        <div class="mb-3">
+          <label for="width" class="form-label">Window width (seconds)</label>
+          <input type="number" id="width" name="width" class="form-control bg-dark text-light" value="5" min="1" step="1">
         </div>
+
+        <div class="mb-3">
+          <label for="graphMode" class="form-label">Graph Mode</label>
+          <select id="graphMode" class="form-select bg-dark text-light">
+            <option value="time">Time Graph</option>
+            <option value="polar">Polar Graph</option>
+            <option value="recurrence">Recurrence Plot</option>
+          </select>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Select Channels</label>
+          <div id="channelList" class="channel-list">
+            <!-- Channels will be injected dynamically if needed -->
+            <div class="form-check"><input class="form-check-input" type="checkbox" name="channels" value="0"><label class="form-check-label">ECG Lead I</label></div>
+            <div class="form-check"><input class="form-check-input" type="checkbox" name="channels" value="1"><label class="form-check-label">ECG Lead II</label></div>
+            <div class="form-check"><input class="form-check-input" type="checkbox" name="channels" value="2"><label class="form-check-label">ECG Lead III</label></div>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary w-100">Start Streaming</button>
+      </form>
     </div>
 
-    <script>
-        let streaming = false;
-        let intervalId;
-        let selected = [];
-        let cycles = 5; // New variable for cycles
-        let rrInterval = 1.0; // New variable for R-R interval
-        let width = 5; // Calculated width in seconds
-        let mode = "time";
-        const fs = 360; // ECG sample rate
-        // Buffers are now just storage for the latest full window for non-time plots
-        let channelDataBuffers = {}; 
+    <!-- Plot Area -->
+    <div class="col-md-9 plot-container">
+      <h4 class="mb-3">ECG Signal Viewer</h4>
+      <div id="plot" style="width:100%;height:600px;"></div>
+    </div>
+  </div>
 
-        const colors = [
-            "#FF5733","#33FF57","#3357FF", // Use a few colors for ECG leads
-        ];
+  <script>
+    let streaming = false;
+    let intervalId;
+    let selected = [];
+    let width = 5;
+    let mode = "time";
+    const fs = 360;   // ECG sample rate (can adjust)
+    let channelDataBuffers = {};
 
-        const startButton = document.getElementById('startButton');
-        const stopButton = document.getElementById('stopButton');
-        const messageBox = document.getElementById('messageBox');
-        const plotDiv = document.getElementById("plot");
-
-        function updateMessageBox(message, type = 'error') {
-            messageBox.style.display = 'block';
-            if (type === 'error') {
-                messageBox.className = 'text-center text-sm mt-3 text-red-400 bg-red-900/20 p-2 rounded';
-            } else {
-                 messageBox.className = 'text-center text-sm mt-3 text-yellow-400 bg-yellow-900/20 p-2 rounded';
-            }
-            messageBox.textContent = message;
-        }
-
-        function clearMessageBox() {
-            messageBox.style.display = 'none';
-            messageBox.textContent = '';
-        }
-
-        // Function to stop streaming
-        function stopStreaming() {
-            if (intervalId) {
-                clearInterval(intervalId);
-                intervalId = null;
-            }
-            streaming = false;
-            // Update button states
-            startButton.disabled = false;
-            startButton.classList.remove('opacity-50', 'cursor-not-allowed');
-            stopButton.disabled = true;
-            stopButton.classList.add('opacity-50', 'cursor-not-allowed');
-            console.log("Streaming stopped.");
-
-            // Optional: Display a stopped message
-            try {
-                const currentLayout = Plotly.d3.select('#plot').node().layout;
-                Plotly.relayout("plot", {
-                    title: (currentLayout?.title?.text || "ECG Signal Viewer") + " (STOPPED)"
-                });
-            } catch (e) {
-                // Ignore if plot hasn't been initialized
-            }
-        }
-
-
-        document.getElementById("channelForm").addEventListener("submit", (e) => {
-            e.preventDefault();
-            
-            // If already streaming, stop the current stream before starting a new one
-            if (streaming) {
-                stopStreaming();
-            }
-
-            selected = Array.from(document.querySelectorAll("input[name=channels]:checked")).map(ch => parseInt(ch.value));
-            
-            // --- NEW: Calculate window width based on cycles and R-R interval ---
-            cycles = parseFloat(document.getElementById("cycles").value);
-            rrInterval = parseFloat(document.getElementById("rrInterval").value);
-            width = cycles * rrInterval;
-            if (width <= 0) width = 5; // Fallback to 5 seconds if calculated width is invalid
-            // -----------------------------------------------------------------
-
-            mode = document.getElementById("graphMode").value;
+    document.getElementById("channelForm").addEventListener("submit", (e) => {
+      e.preventDefault();
+      selected = Array.from(document.querySelectorAll("input[name=channels]:checked")).map(ch => parseInt(ch.value));
+      width = parseFloat(document.getElementById("width").value);
+      mode = document.getElementById("graphMode").value;
 
             if (selected.length === 0) {
-                updateMessageBox("Please select at least one channel to start streaming.");
-                stopStreaming(); // Ensure buttons are in the correct state
+                showMessage("Please select at least one channel!");
                 return;
             }
 
-            if (mode === "recurrence" && selected.length > 1) {
-                updateMessageBox("Recurrence Plot only supports visualization of a single channel. Please select only one.", 'warning');
-                stopStreaming();
-                return;
-            }
+      channelDataBuffers = {};
+      selected.forEach(ch => channelDataBuffers[ch] = []);
 
-            clearMessageBox();
+      let traces;
+      if (mode === "time") {
+        traces = selected.map((ch, i) => ({
+          x: [], y: [], mode: "lines", name: `Channel ${ch+1}`
+        }));
+      } else if (mode === "polar") {
+        traces = selected.map((ch, i) => ({
+          r: [], theta: [], mode: "lines", type: "scatterpolar", name: `Channel ${ch+1}`
+        }));
+      } else if (mode === "recurrence") {
+        traces = [{ z: [[]], type: "heatmap", colorscale: "Viridis", name: "Recurrence Plot" }];
+      }
 
-            // Reset buffers and state for the new stream
-            channelDataBuffers = {};
-            selected.forEach(chIndex => channelDataBuffers[chIndex] = { data: [], time: [] }); 
-            
-            let traces, layout;
+      Plotly.newPlot("plot", traces, { 
+        paper_bgcolor: "#000", plot_bgcolor: "#000", font: { color: "#e0e0e0" } 
+      });
 
-            // --- Plotly Configuration with black background and dark theme styles ---
-            const baseLayout = {
-                paper_bgcolor: "#0a0a0a", // Primary background color from Tailwind config
-                plot_bgcolor: "#000000", // Pure black for the graph area
-                font: { color: "#e5e7eb", family: "Inter" },
-            };
+      streaming = true;
+      if (intervalId) clearInterval(intervalId);
+      intervalId = setInterval(fetchData, 500);
+    });
 
-            if (mode === "time") {
-                traces = selected.map((ch, i) => {
-                    const label = document.querySelector(`#ch${ch}`).nextElementSibling.innerText;
-                    return { x: [], y: [], mode: "lines", line: { color: colors[i % colors.length] }, name: label };
-                });
-                layout = {
-                    ...baseLayout,
-                    // Updated title to show the cycles and R-R interval used
-                    title: `ECG - Time Graph - ${cycles.toFixed(0)} Cycles (R-R: ${rrInterval.toFixed(1)}s)`,
-                    xaxis: { title: "Time (s)", color: "#e5e7eb", gridcolor: "#374151", range: [0, width] },
-                    yaxis: { title: "Amplitude (mV)", color: "#e5e7eb", gridcolor: "#374151" }
-                };
-            } else if (mode === "polar") {
-                traces = selected.map((ch, i) => {
-                    const label = document.querySelector(`#ch${ch}`).nextElementSibling.innerText;
-                    return { r: [], theta: [], mode: "lines", line: { color: colors[i % colors.length] }, name: label, type: "scatterpolar" };
-                });
-                layout = {
-                    ...baseLayout,
-                    title: `ECG - Polar Graph - Window: ${width.toFixed(1)}s`,
-                    polar: {
-                        bgcolor: "#000000",
-                        radialaxis: { title: "Amplitude (mV)", color: "#e5e7eb", gridcolor: "#374151" },
-                        angularaxis: { direction: "clockwise", rotation: 90, color: "#e5e7eb", gridcolor: "#374151" }
-                    }
-                };
-            } else if (mode === "recurrence") {
-                traces = [{
-                    z: [[0]], type: "heatmap", colorscale: "Viridis", showscale: true
-                }];
-                const label = document.querySelector(`#ch${selected[0]}`).nextElementSibling.innerText;
-                layout = {
-                    ...baseLayout,
-                    title: `ECG - Recurrence Plot - ${label} - Window: ${width.toFixed(1)}s`,
-                    xaxis: { title: "Time Index", color: "#e5e7eb", gridcolor: "#374151" },
-                    yaxis: { title: "Time Index", color: "#e5e7eb", gridcolor: "#374151" }
-                };
-            }
-            // --- End Plotly Configuration ---
-
-            // Start the stream
-            Plotly.newPlot("plot", traces, layout);
-            streaming = true;
-            // Increased interval to 200ms to slow down the visual scrolling speed
-            intervalId = setInterval(fetchData, 200);
-
-            // Update button states
-            startButton.disabled = true;
-            startButton.classList.add('opacity-50', 'cursor-not-allowed');
-            stopButton.disabled = false;
-            stopButton.classList.remove('opacity-50', 'cursor-not-allowed');
+    async function fetchData() {
+      if (!streaming) return;
+      try {
+        const response = await fetch("/ecg/update", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ channels: selected, width })
         });
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        const result = await response.json();
 
-        // --- Main data fetching and plotting logic ---
-        async function fetchData() {
-            if (!streaming) return;
-
-            try {
-                // Mock API call to fetch data 
-                // NOTE: This URL/Endpoint is a mock for a demonstration environment.
-                const response = await fetch("/ecg/update", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ channels: selected, width })
-                });
-                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-                const result = await response.json();
-
-                if (!result.signals || result.time.length === 0) {
-                     return;
-                }
-                
-                // The API sends the full data window, so we overwrite the local buffers for non-time plots
-                selected.forEach((chIndex) => {
-                    const newSignals = result.signals[chIndex.toString()]; 
-                    if (newSignals) {
-                        // Overwrite the buffer completely with the full window data
-                        channelDataBuffers[chIndex] = { data: newSignals, time: result.time };
-                    }
-                });
-
-                const timeAxis = result.time; 
-                let globalTime = timeAxis[timeAxis.length - 1]; // Use the end of the time axis as global time
-
-                if (mode === "time") {
-                    const xUpdates = [], yUpdates = [];
-                    let traceIndices = [];
-
-                    selected.forEach((chIndex, i) => {
-                        const newSignals = result.signals[chIndex.toString()]; 
-                        if (!newSignals || newSignals.length === 0) return;
-                        
-                        // Use the data directly from the API response for plotting
-                        xUpdates.push(timeAxis); 
-                        yUpdates.push(newSignals);
-                        traceIndices.push(i);
-                    });
-                    
-                    if (xUpdates.length > 0) {
-                        Plotly.restyle("plot", { x: xUpdates, y: yUpdates }, traceIndices);
-                        
-                        // Update x-axis range dynamically based on the received time axis
-                        const xmin = timeAxis[0];
-                        const xmax = globalTime;
-                        
-                        Plotly.relayout("plot", { 
-                            'xaxis.range': [xmin, xmax], 
-                            // Updated title to include cycle info
-                            'title': `ECG - Time Graph - ${cycles.toFixed(0)} Cycles (R-R: ${rrInterval.toFixed(1)}s) (Time: ${xmax.toFixed(2)}s)` 
-                        });
-                    }
-                } else if (mode === "polar") {
-                    const rUpdate = [], thetaUpdate = [];
-                    selected.forEach((chIndex) => {
-                        // Read from the overwritten buffer
-                        const buffer = channelDataBuffers[chIndex].data;
-                        if (buffer.length === 0) return;
-                        
-                        const N = buffer.length;
-                        const theta = buffer.map((_, idx) => (idx / (N - 1)) * 360);
-                        const minVal = Math.min(...buffer); 
-                        const r = buffer.map(v => v - minVal); // Scale amplitude to radial axis
-                        rUpdate.push(r); 
-                        thetaUpdate.push(theta);
-                    });
-                    if (rUpdate.length > 0) Plotly.restyle("plot", { r: rUpdate, theta: thetaUpdate });
-                } else if (mode === "recurrence") {
-                    const chIndex = selected[0];
-                    // Read from the overwritten buffer
-                    const data = channelDataBuffers[chIndex].data;
-                    if (data.length === 0) return;
-                    
-                    const N = data.length;
-                    
-                    const recurrence = Array.from({ length: N }, (_, i) =>
-                        Array.from({ length: N }, (_, j) => Math.abs(data[i] - data[j]))
-                    );
-
-                    Plotly.react("plot", [{
-                        z: recurrence, type: "heatmap", colorscale: "Viridis", showscale: true
-                    }], Plotly.d3.select('#plot').node().layout); // Use current layout to retain black background
-                }
-
-            } catch (error) {
-                console.error("Failed to fetch data:", error);
-                // Stop streaming and update UI if an error occurs
-                stopStreaming();
-                updateMessageBox("Connection to data stream failed. Please ensure the backend is running and refresh the page to retry.");
-            }
+        if (mode === "time") {
+          const xUpdate = [], yUpdate = [];
+          Object.values(result.signals).forEach(sig => {
+            xUpdate.push(result.time); 
+            yUpdate.push(sig);
+          });
+          Plotly.extendTraces("plot", { x: xUpdate, y: yUpdate }, selected.map((_, i) => i), width*fs);
+        } 
+        else if (mode === "polar") {
+          const rUpdate = [], thetaUpdate = [];
+          Object.values(result.signals).forEach((chunk) => {
+            const N = chunk.length;
+            const theta = chunk.map((_, idx) => (idx / (N-1)) * 360);
+            const minVal = Math.min(...chunk);
+            const r = chunk.map(v => v - minVal);
+            rUpdate.push(r);
+            thetaUpdate.push(theta);
+          });
+          Plotly.restyle("plot", { r: rUpdate, theta: thetaUpdate });
+        } 
+        else if (mode === "recurrence") {
+          const signal = Object.values(result.signals)[0]; // just first channel
+          const N = signal.length;
+          const recurrence = [];
+          for (let i=0; i<N; i++) {
+            const row = [];
+            for (let j=0; j<N; j++) row.push(Math.abs(signal[i] - signal[j]));
+            recurrence.push(row);
+          }
+          Plotly.react("plot", [{ z: recurrence, type: "heatmap", colorscale: "Viridis" }]);
         }
-    </script>
+
+      } catch (error) {
+        console.error("Fetch error:", error);
+        streaming = false;
+        clearInterval(intervalId);
+        alert("Connection lost. Restart backend and refresh.");
+      }
+    }
+  </script>
 </body>
 </html>
