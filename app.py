@@ -9,7 +9,7 @@ app.secret_key = 'a_secure_and_random_string_of_your_choice_1234567890'
 @app.route("/")
 def home():
     return render_template("home.html")
-
+#
 # EEG routes
 app.register_blueprint(eeg.bp, url_prefix="/eeg")
 
