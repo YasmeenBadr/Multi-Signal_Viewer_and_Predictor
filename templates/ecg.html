@@ -1,241 +1,210 @@
+<!-- templates/ecg.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ECG Real-Time Viewer</title>
-<!-- Plotly for charting -->
-<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
-<!-- Bootstrap for styling -->
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
-<style>
-    body { background: #000; color: #e0e0e0; font-family: 'Inter', sans-serif; min-height: 100vh; }
-    h1, h4 { color: #00eaff; font-weight: 700; }
-    .sidebar { background: #1e1e1e; padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
-    .plot-container { background: #1e1e1e; padding: 15px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); margin-bottom: 20px; overflow: hidden; }
-    .form-check-label { color: #e0e0e0; }
-    .form-control, .form-check-input { border-radius: 6px; }
-    .btn-primary { background: #00eaff; border: none; color: #000; font-weight: bold; border-radius: 8px; transition: all 0.3s; }
-    .btn-primary:hover { background: #00bcd4; color: #fff; transform: translateY(-1px); }
-    .btn-secondary { background: #333; border: none; color: #ccc; border-radius: 8px; }
-    .prediction-box { background: #111; padding: 20px; border-radius: 12px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.8); }
-    .prediction-result { font-size: 1.5rem; font-weight: bold; color: #00ff88; margin-top: 10px; }
-</style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>ECG Real-Time Viewer</title>
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"/>
+  <style>
+    body { background:#000; color:#e0e0e0; font-family: Inter, sans-serif; }
+    .sidebar { background:#1e1e1e; padding:18px; border-radius:10px; }
+    .plot-container { background:#111; padding:12px; border-radius:10px; margin-bottom:16px; }
+    .prediction-box { background:#111; padding:12px; border-radius:10px; text-align:center; }
+    .prediction-result { font-weight:700; color:#00ff88; }
+    .disease-name { color:#ff6666; font-weight:600; margin-top:6px; }
+  </style>
 </head>
 <body class="container-fluid p-4">
-
-<div class="row">
-    <!-- Sidebar -->
+  <div class="row">
     <div class="col-md-3 sidebar">
-        <h4 class="mb-3">ECG Controls</h4>
-        <form id="channelForm">
-            <div class="mb-3">
-                <label for="width" class="form-label">Window width (seconds)</label>
-                <input type="number" id="width" name="width" class="form-control bg-dark text-light border-secondary" value="5" min="0.5" step="0.5">
-            </div>
-            <div class="mb-3">
-                <label class="form-label">Select Channels (First checked is used for prediction)</label>
-                <div id="channelList" style="max-height: 250px; overflow-y: auto;">
-                    Loading channels...
-                </div>
-            </div>
-            <button type="submit" id="startBtn" class="btn btn-primary w-100">Start Streaming</button>
-            <button id="stopBtn" type="button" class="btn btn-secondary w-100 mt-2">Stop</button>
-        </form>
+      <h5>ECG Controls</h5>
+      <form id="channelForm">
+        <div class="mb-2">
+          <label class="form-label">Window width (seconds)</label>
+          <input id="width" class="form-control bg-dark text-white" type="number" min="0.5" step="0.5" value="5"/>
+        </div>
+        <div class="mb-2">
+          <label class="form-label">Select Channels (first selected used for prediction)</label>
+          <div id="channelList" style="max-height:240px; overflow:auto;">Loading...</div>
+        </div>
+        <button class="btn btn-primary w-100" type="submit">Start Streaming</button>
+        <button id="stopBtn" class="btn btn-secondary w-100 mt-2" type="button">Stop</button>
+      </form>
     </div>
 
-    <!-- Main Content -->
     <div class="col-md-9">
-        <div class="plot-container">
-            <h4 class="mb-3">Real-Time ECG Signal (Time Domain)</h4>
-            <div id="timePlot" style="width:100%;height:400px;"></div>
-        </div>
+      <div class="plot-container">
+        <h5>Real-time ECG (time domain)</h5>
+        <div id="timePlot" style="width:100%;height:380px;"></div>
+      </div>
 
-        <div class="row">
-            <div class="col-lg-6">
-                <div class="plot-container">
-                    <h4 class="mb-3">Polar Plot</h4>
-                    <div id="polarPlot" style="width:100%;height:400px;"></div>
-                </div>
-            </div>
-            <div class="col-lg-6">
-                <div class="plot-container">
-                    <h4 class="mb-3">Recurrence Plot</h4>
-                    <div id="recurrencePlot" style="width:100%;height:400px;"></div>
-                </div>
-            </div>
+      <div class="row">
+        <div class="col-md-6 plot-container">
+          <h5>Polar</h5>
+          <div id="polarPlot" style="width:100%;height:300px;"></div>
         </div>
+        <div class="col-md-6 plot-container">
+          <h5>Recurrence</h5>
+          <div id="recurrencePlot" style="width:100%;height:300px;"></div>
+        </div>
+      </div>
 
-        <div class="prediction-box mt-4">
-            <h4>HuBERT Model Prediction</h4>
-            <p id="predictionResult" class="prediction-result">Waiting for data...</p>
-        </div>
+      <div class="prediction-box mt-3">
+        <h5>Prediction</h5>
+        <div id="predictionResult" class="prediction-result">Waiting for data...</div>
+        <div id="diseaseName" class="disease-name"></div>
+        <div id="predictionDescription" style="margin-top:8px; color:#ccc; font-size:0.95rem;"></div>
+      </div>
     </div>
-</div>
+  </div>
 
-<script>
-const predictionBox = document.getElementById("predictionResult");
-let streaming = false, intervalId;
-let selectedChannels = [], width = 5;
-let fs = 360, displayFs = 200;
-let channelDataBuffers = {}, globalStartTime = 0;
+  <script>
+    let streaming=false, intervalId=null;
+    let selectedChannels=[], widthSec=5;
+    let fs=360, displayFs=200;
+    let channelData = {};
+    let globalStart=0;
 
-// Utility
-function showMessage(msg, color="#ffc107") {
-    predictionBox.innerText = msg;
-    predictionBox.style.color = color;
-    setTimeout(() => predictionBox.style.color = "#00ff88", 3000);
-}
-
-// Initialize channels & config from backend
-(async function initConfig() {
-    const channelListDiv = document.getElementById("channelList");
-    try {
-        const cfg = await fetch("/ecg/config").then(r => r.json());
+    async function initConfig(){
+      try{
+        const cfg = await fetch("/ecg/config").then(r=>r.json());
         fs = cfg.fs || fs;
         displayFs = cfg.display_fs || displayFs;
-
-        channelListDiv.innerHTML = "";
-        (cfg.channels || ["Lead 1","Lead 2","Lead 3"]).forEach((name, i) => {
-            const isChecked = i < 2;
-            channelListDiv.innerHTML += `
-                <div class="form-check">
-                    <input class="form-check-input" type="checkbox" name="channels" value="${i}" ${isChecked ? 'checked' : ''}>
-                    <label class="form-check-label">${name}</label>
-                </div>
-            `;
+        const channels = cfg.channels || [];
+        const cdiv = document.getElementById("channelList");
+        cdiv.innerHTML = "";
+        channels.forEach((name,i)=>{
+          const checked = i<2 ? "checked" : "";
+          cdiv.insertAdjacentHTML("beforeend",
+            `<div class="form-check">
+              <input class="form-check-input" type="checkbox" name="channels" value="${i}" ${checked}>
+              <label class="form-check-label">${name}</label>
+            </div>`
+          );
         });
-    } catch(e) {
-        console.error("Error fetching config:", e);
-        channelListDiv.innerHTML = "Failed to load channels. Using defaults.";
+      }catch(e){
+        console.warn("config fetch failed", e);
+        const cdiv = document.getElementById("channelList");
+        cdiv.innerHTML =
+          `<div class="form-check">
+            <input class="form-check-input" type="checkbox" name="channels" value="0" checked>
+            <label class="form-check-label">Lead 1</label>
+          </div>`;
+      }
     }
-})();
+    initConfig();
 
-// Start streaming
-document.getElementById("channelForm").addEventListener("submit", (e) => {
-    e.preventDefault();
-    selectedChannels = Array.from(document.querySelectorAll("input[name=channels]:checked")).map(ch => parseInt(ch.value));
-    width = parseFloat(document.getElementById("width").value);
+    document.getElementById("channelForm").addEventListener("submit", (ev)=>{
+      ev.preventDefault();
+      selectedChannels = Array.from(document.querySelectorAll("input[name=channels]:checked")).map(n=>parseInt(n.value));
+      widthSec = parseFloat(document.getElementById("width").value) || 5;
+      if(selectedChannels.length===0){ alert("Select channel(s)"); return; }
+      channelData={};
+      selectedChannels.forEach(ch=>channelData[ch]=[]);
+      globalStart=0;
+      initPlots();
+      streaming=true;
+      if(intervalId) clearInterval(intervalId);
+      intervalId = setInterval(fetchData, 900);
+    });
 
-    if (selectedChannels.length === 0) { showMessage("Please select at least one channel!"); return; }
+    document.getElementById("stopBtn").addEventListener("click", ()=>{
+      streaming=false;
+      if(intervalId) clearInterval(intervalId);
+    });
 
-    // Reset buffers & time
-    channelDataBuffers = {}; selectedChannels.forEach(ch => channelDataBuffers[ch]=[]); globalStartTime=0;
-
-    // Initialize plots
-    initializeTimePlot();
-    initializePolarPlot();
-    initializeRecurrencePlot();
-
-    streaming = true;
-    if(intervalId) clearInterval(intervalId);
-    intervalId = setInterval(fetchData, 1000);
-});
-
-// Stop streaming
-document.getElementById("stopBtn").addEventListener("click", () => {
-    streaming = false;
-    if(intervalId) clearInterval(intervalId);
-    showMessage("Streaming stopped.", "#ff5555");
-});
-
-// Plot initializers
-function initializeTimePlot() {
-    const traces = selectedChannels.map((ch, idx)=>({
-        x:[], y:[], mode:"lines", name:`Channel ${ch+1}`, line:{color: idx===0?'#00eaff':'#ff8800'}
-    }));
-    Plotly.newPlot("timePlot", traces, {
+    function initPlots(){
+      const traces = selectedChannels.map((ch, idx)=>({
+        x:[], y:[], mode:"lines", name:`Ch ${ch+1}`, line:{width:1.5}
+      }));
+      Plotly.newPlot("timePlot", traces, {
         paper_bgcolor:"#000", plot_bgcolor:"#000", font:{color:"#e0e0e0"},
-        xaxis:{title:'Time (s)', range:[0,width], gridcolor:'#333'},
-        yaxis:{title:'Amplitude', gridcolor:'#333'}
-    });
-}
+        xaxis:{title:"Time (s)", range:[0,widthSec], gridcolor:"#333"},
+        yaxis:{title:"Amplitude", gridcolor:"#333"}
+      });
 
-function initializePolarPlot() {
-    const traces = selectedChannels.map(ch=>({r:[], theta:[], mode:"lines", type:"scatterpolar", name:`Channel ${ch+1}`}));
-    Plotly.newPlot("polarPlot", traces, {
-        paper_bgcolor:"#111", plot_bgcolor:"#111", font:{color:"#e0e0e0"},
-        polar:{bgcolor:"#1e1e1e", angularaxis:{linewidth:2, linecolor:'#333', gridcolor:'#333'},
-               radialaxis:{linewidth:2, linecolor:'#333', gridcolor:'#333'}}
-    });
-}
+      const polar = selectedChannels.map(ch=>({
+        r:[], theta:[], mode:"lines", type:"scatterpolar", name:`Ch ${ch+1}`
+      }));
+      Plotly.newPlot("polarPlot", polar, {paper_bgcolor:"#000", font:{color:"#e0e0e0"}});
+      Plotly.newPlot("recurrencePlot", [{z:[[]], type:"heatmap", colorscale:"Viridis"}],
+        {paper_bgcolor:"#000", font:{color:"#e0e0e0"}});
+    }
 
-function initializeRecurrencePlot() {
-    Plotly.newPlot("recurrencePlot", [{ z:[[]], type:"heatmap", colorscale:"Viridis", showscale:false }],
-                   {paper_bgcolor:"#111", plot_bgcolor:"#1e1e1e", font:{color:"#e0e0e0"}, margin:{l:50,r:50,b:50,t:50}});
-}
-
-// Fetch & update data
-async function fetchData() {
-    if(!streaming) return;
-    try {
-        const response = await fetch("/ecg/update", {
-            method:"POST",
-            headers:{"Content-Type":"application/json"},
-            body: JSON.stringify({channels:selectedChannels, width})
+    async function fetchData(){
+      if(!streaming) return;
+      try{
+        const body = { channels: selectedChannels, width: widthSec };
+        const resp = await fetch("/ecg/update", {
+          method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body: JSON.stringify(body)
         });
-        if(!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-        const result = await response.json();
+        if(!resp.ok) throw new Error("HTTP " + resp.status);
+        const result = await resp.json();
         if(!result.time || result.time.length===0) return;
 
-        updateTimePlot(result);
-        updatePolarPlot(result);
-        updateRecurrencePlot(result);
-        predictionBox.innerText = result.prediction || "Analyzing...";
-    } catch(error) {
-        console.error("Fetch error:", error);
-        streaming=false; if(intervalId) clearInterval(intervalId);
-        showMessage("Connection lost or backend error. Check console.", "#ff5555");
-    }
-}
+        const plotFs = displayFs;
+        const maxSamples = Math.round(widthSec * plotFs);
 
-// Update functions
-function updateTimePlot(result) {
-    const plotFs = displayFs;
-    const maxSamples = Math.round(width * plotFs);
-    const newSamplesCount = result.time.length;
+        selectedChannels.forEach((ch, idx)=>{
+          const chunk = result.signals[String(ch)] || [];
+          if(!channelData[ch]) channelData[ch]=[];
+          channelData[ch].push(...chunk);
+          if(channelData[ch].length > maxSamples){
+            const drop = channelData[ch].length - maxSamples;
+            channelData[ch] = channelData[ch].slice(drop);
+            globalStart += drop / plotFs;
+          }else{
+            if(globalStart===0){ globalStart = result.time[0]; }
+          }
+          const xvals = channelData[ch].map((_,i)=>globalStart + i/plotFs);
+          Plotly.restyle("timePlot", { x:[xvals], y:[channelData[ch]] }, [idx]);
+        });
+        Plotly.relayout("timePlot", { "xaxis.range":[globalStart, globalStart + widthSec] });
 
-    let bufferBefore = channelDataBuffers[selectedChannels[0]]?.length || 0;
+        const rArr=[], thetaArr=[];
+        selectedChannels.forEach(ch=>{
+          const chunk = result.signals[String(ch)] || [];
+          if(chunk.length>0){
+            const N = chunk.length;
+            const theta = chunk.map((_,i)=> (i/(Math.max(1,N-1))) * 360 );
+            const minv = Math.min(...chunk);
+            const r = chunk.map(v=> v-minv );
+            rArr.push(r); thetaArr.push(theta);
+          } else { rArr.push([]); thetaArr.push([]); }
+        });
+        Plotly.restyle("polarPlot", { r: rArr, theta: thetaArr });
 
-    selectedChannels.forEach((ch, idx) => {
-        if(!channelDataBuffers[ch]) channelDataBuffers[ch]=[];
-        const chunk = result.signals[ch];
-        channelDataBuffers[ch].push(...chunk);
-        if(channelDataBuffers[ch].length>maxSamples) {
-            const drop = channelDataBuffers[ch].length - maxSamples;
-            channelDataBuffers[ch] = channelDataBuffers[ch].slice(drop);
-            globalStartTime += drop/plotFs;
-        } else if(bufferBefore===0) {
-            const oldSamples = channelDataBuffers[ch].length - newSamplesCount;
-            globalStartTime = result.time[0] - oldSamples/plotFs;
+        const first = selectedChannels[0];
+        const fsig = result.signals[String(first)] || [];
+        if(fsig.length>0){
+          const N = fsig.length;
+          const rec = new Array(N).fill(0).map((_,i)=> fsig.map(v=> Math.abs(v - fsig[i]) ));
+          Plotly.react("recurrencePlot", [{ z: rec, type:"heatmap", colorscale:"Viridis" }]);
         }
-        const xVals = channelDataBuffers[ch].map((_,i)=>globalStartTime+i/plotFs);
-        Plotly.restyle("timePlot",{x:[xVals],y:[channelDataBuffers[ch]]}, [idx]);
-    });
 
-    Plotly.relayout("timePlot", {'xaxis.range':[globalStartTime, globalStartTime+width]});
-}
+        // ----- Prediction display -----
+        const pred = result.prediction || result || {};
+        const label = pred.label || "N/A";
+        const prob = pred.prob !== undefined ? (pred.prob * 100).toFixed(1) + "%" : "";
+        const desc = pred.description || "";
+        const disease = pred.disease_name || "";
 
-function updatePolarPlot(result) {
-    const rUpdate = [], thetaUpdate = [];
-    selectedChannels.forEach(ch=>{
-        const chunk = result.signals[ch];
-        const N = chunk.length;
-        const theta = chunk.map((_,i)=>(i/(N-1))*360);
-        const minVal = Math.min(...chunk);
-        const r = chunk.map(v=>v-minVal);
-        rUpdate.push(r); thetaUpdate.push(theta);
-    });
-    Plotly.restyle("polarPlot",{r:rUpdate, theta:thetaUpdate});
-}
+        document.getElementById("predictionResult").innerText = `${label} ${prob}`;
+        document.getElementById("predictionDescription").innerText = desc;
+        document.getElementById("diseaseName").innerText =
+          disease ? `Disease: ${disease}` : "";
 
-function updateRecurrencePlot(result) {
-    const firstSignal = result.signals[selectedChannels[0]]||[];
-    const N = firstSignal.length;
-    if(N===0) return;
-    const recurrence = firstSignal.map((v,i)=>firstSignal.map(w=>Math.abs(v-w)));
-    Plotly.react("recurrencePlot", [{ z:recurrence, type:"heatmap", colorscale:"Viridis", showscale:false }]);
-}
-</script>
+      }catch(err){
+        console.error(err);
+        streaming=false;
+        if(intervalId) clearInterval(intervalId);
+        alert("Connection lost or server error — check console.");
+      }
+    }
+  </script>
 </body>
 </html>
