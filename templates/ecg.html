@@ -26,8 +26,17 @@
           <input id="width" class="form-control bg-dark text-white" type="number" min="0.5" step="0.5" value="5"/>
         </div>
         <div class="mb-2">
-          <label class="form-label">Select Channels (first selected used for prediction)</label>
+          <label class="form-label">Select Channels</label>
           <div id="channelList" style="max-height:240px; overflow:auto;">Loading...</div>
+        </div>
+        <div class="mb-2">
+          <label class="form-label">2D Colormap</label>
+          <select id="colormap" class="form-select bg-dark text-white">
+            <option value="Viridis">Viridis</option>
+            <option value="Cividis">Cividis</option>
+            <option value="Plasma">Plasma</option>
+            <option value="Jet">Jet</option>
+          </select>
         </div>
         <button class="btn btn-primary w-100" type="submit">Start Streaming</button>
         <button id="stopBtn" class="btn btn-secondary w-100 mt-2" type="button">Stop</button>
@@ -37,16 +46,21 @@
     <div class="col-md-9">
       <div class="plot-container">
         <h5>Real-time ECG (time domain)</h5>
-        <div id="timePlot" style="width:100%;height:380px;"></div>
+        <div id="timePlot" style="width:100%;height:300px;"></div>
+      </div>
+
+      <div class="plot-container">
+        <h5>XOR Graph</h5>
+        <div id="xorPlot" style="width:100%;height:300px;"></div>
       </div>
 
       <div class="row">
         <div class="col-md-6 plot-container">
-          <h5>Polar</h5>
+          <h5>Polar Plot</h5>
           <div id="polarPlot" style="width:100%;height:300px;"></div>
         </div>
         <div class="col-md-6 plot-container">
-          <h5>Recurrence</h5>
+          <h5>Pairwise Recurrence Plot</h5>
           <div id="recurrencePlot" style="width:100%;height:300px;"></div>
         </div>
       </div>
@@ -60,151 +74,172 @@
     </div>
   </div>
 
-  <script>
-    let streaming=false, intervalId=null;
-    let selectedChannels=[], widthSec=5;
-    let fs=360, displayFs=200;
-    let channelData = {};
-    let globalStart=0;
+<script>
+let streaming=false, intervalId=null;
+let selectedChannels=[], widthSec=5;
+let fs=360, displayFs=200;
+let channelData={}, xorChunks=[];
+let globalStart=0;
+let colormap="Viridis";
 
-    async function initConfig(){
-      try{
-        const cfg = await fetch("/ecg/config").then(r=>r.json());
-        fs = cfg.fs || fs;
-        displayFs = cfg.display_fs || displayFs;
-        const channels = cfg.channels || [];
-        const cdiv = document.getElementById("channelList");
-        cdiv.innerHTML = "";
-        channels.forEach((name,i)=>{
-          const checked = i<2 ? "checked" : "";
-          cdiv.insertAdjacentHTML("beforeend",
-            `<div class="form-check">
-              <input class="form-check-input" type="checkbox" name="channels" value="${i}" ${checked}>
-              <label class="form-check-label">${name}</label>
-            </div>`
-          );
-        });
-      }catch(e){
-        console.warn("config fetch failed", e);
-        const cdiv = document.getElementById("channelList");
-        cdiv.innerHTML =
-          `<div class="form-check">
-            <input class="form-check-input" type="checkbox" name="channels" value="0" checked>
-            <label class="form-check-label">Lead 1</label>
-          </div>`;
+async function initConfig(){
+  try{
+    const cfg = await fetch("/ecg/config").then(r=>r.json());
+    fs = cfg.fs || fs;
+    displayFs = cfg.display_fs || displayFs;
+    const channels = cfg.channels || [];
+    const cdiv = document.getElementById("channelList");
+    cdiv.innerHTML="";
+    channels.forEach((name,i)=>{
+      const checked=i<2?"checked":"";
+      cdiv.insertAdjacentHTML("beforeend",
+        `<div class="form-check">
+          <input class="form-check-input" type="checkbox" name="channels" value="${i}" ${checked}>
+          <label class="form-check-label">${name}</label>
+        </div>`
+      );
+    });
+  }catch(e){
+    console.warn("config fetch failed", e);
+    const cdiv=document.getElementById("channelList");
+    cdiv.innerHTML=`<div class="form-check">
+      <input class="form-check-input" type="checkbox" name="channels" value="0" checked>
+      <label class="form-check-label">Lead 1</label>
+    </div>`;
+  }
+}
+initConfig();
+
+document.getElementById("channelForm").addEventListener("submit",(ev)=>{
+  ev.preventDefault();
+  selectedChannels=Array.from(document.querySelectorAll("input[name=channels]:checked")).map(n=>parseInt(n.value));
+  widthSec=parseFloat(document.getElementById("width").value)||5;
+  colormap=document.getElementById("colormap").value;
+  if(selectedChannels.length===0){ alert("Select channel(s)"); return; }
+  channelData={}; xorChunks=[];
+  selectedChannels.forEach(ch=>channelData[ch]=[]);
+  globalStart=0;
+  initPlots();
+  streaming=true;
+  if(intervalId) clearInterval(intervalId);
+  intervalId=setInterval(fetchData, 900);
+});
+
+document.getElementById("stopBtn").addEventListener("click", ()=>{
+  streaming=false;
+  if(intervalId) clearInterval(intervalId);
+});
+
+function initPlots(){
+  const traces=selectedChannels.map((ch,idx)=>({x:[],y:[],mode:"lines",name:`Ch ${ch+1}`,line:{width:1.5}}));
+  Plotly.newPlot("timePlot",traces,{
+    paper_bgcolor:"#000", plot_bgcolor:"#000", font:{color:"#e0e0e0"},
+    xaxis:{title:"Time (s)", range:[0,widthSec], gridcolor:"#333"},
+    yaxis:{title:"Amplitude", gridcolor:"#333"}
+  });
+
+  Plotly.newPlot("xorPlot",traces.map(t=>({...t,x:[],y:[]})) ,{
+    paper_bgcolor:"#000", plot_bgcolor:"#000", font:{color:"#e0e0e0"},
+    xaxis:{title:"Time (s)", range:[0,widthSec]}, yaxis:{title:"Amplitude"}
+  });
+
+  const polar=selectedChannels.map(ch=>({r:[],theta:[],mode:"lines",type:"scatterpolar",name:`Ch ${ch+1}`}));
+  Plotly.newPlot("polarPlot",polar,{paper_bgcolor:"#000",font:{color:"#e0e0e0"}});
+
+  Plotly.newPlot("recurrencePlot",[{
+    z:[[0]], type:"heatmap", colorscale:colormap
+  }],{paper_bgcolor:"#000",font:{color:"#e0e0e0"}});
+}
+
+async function fetchData(){
+  if(!streaming) return;
+  try{
+    const body={channels:selectedChannels,width:widthSec};
+    const resp=await fetch("/ecg/update",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+    if(!resp.ok) throw new Error("HTTP "+resp.status);
+    const result=await resp.json();
+    if(!result.time || result.time.length===0) return;
+
+    const plotFs=displayFs, maxSamples=Math.round(widthSec*plotFs);
+
+    selectedChannels.forEach((ch,idx)=>{
+      const chunk=result.signals[String(ch)]||[];
+      if(!channelData[ch]) channelData[ch]=[];
+      channelData[ch].push(...chunk);
+      if(channelData[ch].length>maxSamples){
+        const drop=channelData[ch].length-maxSamples;
+        channelData[ch]=channelData[ch].slice(drop);
+        globalStart+=drop/plotFs;
+      }else{
+        if(globalStart===0) globalStart=result.time[0];
       }
-    }
-    initConfig();
+      const xvals=channelData[ch].map((_,i)=>globalStart+i/plotFs);
+      Plotly.restyle("timePlot",{x:[xvals],y:[channelData[ch]]},[idx]);
+    });
+    Plotly.relayout("timePlot",{"xaxis.range":[globalStart,globalStart+widthSec]});
 
-    document.getElementById("channelForm").addEventListener("submit", (ev)=>{
-      ev.preventDefault();
-      selectedChannels = Array.from(document.querySelectorAll("input[name=channels]:checked")).map(n=>parseInt(n.value));
-      widthSec = parseFloat(document.getElementById("width").value) || 5;
-      if(selectedChannels.length===0){ alert("Select channel(s)"); return; }
-      channelData={};
-      selectedChannels.forEach(ch=>channelData[ch]=[]);
-      globalStart=0;
-      initPlots();
-      streaming=true;
-      if(intervalId) clearInterval(intervalId);
-      intervalId = setInterval(fetchData, 900);
+    // ----- XOR plot -----
+    selectedChannels.forEach((ch,idx)=>{
+      const chunk=result.signals[String(ch)]||[];
+      if(chunk.length>0){
+        if(xorChunks[idx]===undefined) xorChunks[idx]=[];
+        let xorChunk=chunk.map((v,i)=>v ^ (xorChunks[idx][i]||0));
+        xorChunks[idx]=chunk.slice(); // store last chunk
+        const xvals=chunk.map((_,i)=>globalStart+i/plotFs);
+        Plotly.restyle("xorPlot",{x:[xvals],y:[xorChunk]},[idx]);
+      }
     });
 
-    document.getElementById("stopBtn").addEventListener("click", ()=>{
-      streaming=false;
-      if(intervalId) clearInterval(intervalId);
+    // ----- Polar plot -----
+    const rArr=[],thetaArr=[];
+    selectedChannels.forEach(ch=>{
+      const chunk=result.signals[String(ch)]||[];
+      if(chunk.length>0){
+        const N=chunk.length;
+        const theta=chunk.map((_,i)=>i/(Math.max(1,N-1))*360);
+        const minv=Math.min(...chunk);
+        const r=chunk.map(v=>v-minv);
+        rArr.push(r); thetaArr.push(theta);
+      }else{ rArr.push([]); thetaArr.push([]);}
     });
+    Plotly.restyle("polarPlot",{r:rArr,theta:thetaArr});
 
-    function initPlots(){
-      const traces = selectedChannels.map((ch, idx)=>({
-        x:[], y:[], mode:"lines", name:`Ch ${ch+1}`, line:{width:1.5}
-      }));
-      Plotly.newPlot("timePlot", traces, {
-        paper_bgcolor:"#000", plot_bgcolor:"#000", font:{color:"#e0e0e0"},
-        xaxis:{title:"Time (s)", range:[0,widthSec], gridcolor:"#333"},
-        yaxis:{title:"Amplitude", gridcolor:"#333"}
-      });
-
-      const polar = selectedChannels.map(ch=>({
-        r:[], theta:[], mode:"lines", type:"scatterpolar", name:`Ch ${ch+1}`
-      }));
-      Plotly.newPlot("polarPlot", polar, {paper_bgcolor:"#000", font:{color:"#e0e0e0"}});
-      Plotly.newPlot("recurrencePlot", [{z:[[]], type:"heatmap", colorscale:"Viridis"}],
-        {paper_bgcolor:"#000", font:{color:"#e0e0e0"}});
-    }
-
-    async function fetchData(){
-      if(!streaming) return;
-      try{
-        const body = { channels: selectedChannels, width: widthSec };
-        const resp = await fetch("/ecg/update", {
-          method:"POST",
-          headers:{"Content-Type":"application/json"},
-          body: JSON.stringify(body)
-        });
-        if(!resp.ok) throw new Error("HTTP " + resp.status);
-        const result = await resp.json();
-        if(!result.time || result.time.length===0) return;
-
-        const plotFs = displayFs;
-        const maxSamples = Math.round(widthSec * plotFs);
-
-        selectedChannels.forEach((ch, idx)=>{
-          const chunk = result.signals[String(ch)] || [];
-          if(!channelData[ch]) channelData[ch]=[];
-          channelData[ch].push(...chunk);
-          if(channelData[ch].length > maxSamples){
-            const drop = channelData[ch].length - maxSamples;
-            channelData[ch] = channelData[ch].slice(drop);
-            globalStart += drop / plotFs;
-          }else{
-            if(globalStart===0){ globalStart = result.time[0]; }
-          }
-          const xvals = channelData[ch].map((_,i)=>globalStart + i/plotFs);
-          Plotly.restyle("timePlot", { x:[xvals], y:[channelData[ch]] }, [idx]);
-        });
-        Plotly.relayout("timePlot", { "xaxis.range":[globalStart, globalStart + widthSec] });
-
-        const rArr=[], thetaArr=[];
-        selectedChannels.forEach(ch=>{
-          const chunk = result.signals[String(ch)] || [];
-          if(chunk.length>0){
-            const N = chunk.length;
-            const theta = chunk.map((_,i)=> (i/(Math.max(1,N-1))) * 360 );
-            const minv = Math.min(...chunk);
-            const r = chunk.map(v=> v-minv );
-            rArr.push(r); thetaArr.push(theta);
-          } else { rArr.push([]); thetaArr.push([]); }
-        });
-        Plotly.restyle("polarPlot", { r: rArr, theta: thetaArr });
-
-        const first = selectedChannels[0];
-        const fsig = result.signals[String(first)] || [];
-        if(fsig.length>0){
-          const N = fsig.length;
-          const rec = new Array(N).fill(0).map((_,i)=> fsig.map(v=> Math.abs(v - fsig[i]) ));
-          Plotly.react("recurrencePlot", [{ z: rec, type:"heatmap", colorscale:"Viridis" }]);
+    // ----- Pairwise recurrence -----
+    const recMatrix=[];
+    selectedChannels.forEach((chX,i)=>{
+      recMatrix[i]=[];
+      const xArr=result.signals[String(chX)]||[];
+      selectedChannels.forEach((chY,j)=>{
+        const yArr=result.signals[String(chY)]||[];
+        let val=0;
+        if(xArr.length>0 && yArr.length>0){
+          for(let k=0;k<xArr.length;k++) val+=Math.abs(xArr[k]-yArr[k]);
         }
+        recMatrix[i][j]=val;
+      });
+    });
+    Plotly.react("recurrencePlot",[{
+      z:recMatrix,type:"heatmap",colorscale:colormap
+    }]);
 
-        // ----- Prediction display -----
-        const pred = result.prediction || result || {};
-        const label = pred.label || "N/A";
-        const prob = pred.prob !== undefined ? (pred.prob * 100).toFixed(1) + "%" : "";
-        const desc = pred.description || "";
-        const disease = pred.disease_name || "";
+    // ----- Prediction display -----
+    const pred=result.prediction||{};
+    const label=pred.label||"N/A";
+    const prob=pred.prob!==undefined ? (pred.prob*100).toFixed(1)+"%" : "";
+    const desc=pred.description||"";
+    const disease=pred.disease_name||"";
 
-        document.getElementById("predictionResult").innerText = `${label} ${prob}`;
-        document.getElementById("predictionDescription").innerText = desc;
-        document.getElementById("diseaseName").innerText =
-          disease ? `Disease: ${disease}` : "";
+    document.getElementById("predictionResult").innerText=`${label} ${prob}`;
+    document.getElementById("predictionDescription").innerText=desc;
+    document.getElementById("diseaseName").innerText=disease?`Disease: ${disease}`:"";
 
-      }catch(err){
-        console.error(err);
-        streaming=false;
-        if(intervalId) clearInterval(intervalId);
-        alert("Connection lost or server error — check console.");
-      }
-    }
-  </script>
+  }catch(err){
+    console.error(err);
+    streaming=false;
+    if(intervalId) clearInterval(intervalId);
+    alert("Connection lost or server error — check console.");
+  }
+}
+</script>
 </body>
 </html>

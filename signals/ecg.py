@@ -1,33 +1,21 @@
 # signals/ecg.py
-# Flask blueprint that streams ECG signals (12 leads) and predicts disease names.
-# It supports WFDB records in data1/ and uses the patient record defined in simple_ecg.py.
-
 import os
 import numpy as np
 import torch
 import torch.nn as nn
 from flask import Blueprint, request, jsonify, render_template
 
-# Try WFDB import
 try:
     import wfdb
 except Exception:
     wfdb = None
 
-# -------------------------
-# Import patient data path from simple_ecg.py
-# -------------------------
 try:
     from simple_ecg import DATA_PATH
 except ImportError:
     DATA_PATH = None
 
-# -------------------------
-# Blueprint setup
-# -------------------------
 ECG_BP = Blueprint("ecg", __name__, url_prefix="/ecg", template_folder="../templates")
-bp = ECG_BP
-
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 SIMPLE_MODEL_PATH = os.path.join(os.getcwd(), "simple_ecg_model.pt")
 
@@ -49,7 +37,8 @@ _stream = {
     "channels": None,
     "fs": 360,
     "pos": 0,
-    "record_path": None
+    "record_path": None,
+    "prev_chunk": None
 }
 
 DISPLAY_FS = 200
@@ -57,7 +46,7 @@ STREAMING_CHUNK_DURATION = 1.0
 _model_seq_len = 5000
 
 # -------------------------
-# Simple model
+# 1D model
 # -------------------------
 class SimpleECG(nn.Module):
     def __init__(self):
@@ -77,7 +66,6 @@ class SimpleECG(nn.Module):
     def forward(self, x):
         return self.net(x)
 
-print("Loading simple ECG model...")
 model = SimpleECG().to(DEVICE)
 if os.path.exists(SIMPLE_MODEL_PATH):
     try:
@@ -91,7 +79,7 @@ else:
 model.eval()
 
 # -------------------------
-# Load ECG record (from DATA_PATH or fallback)
+# Load record
 # -------------------------
 def load_wfdb_record(record_base):
     rec = wfdb.rdrecord(record_base)
@@ -137,24 +125,19 @@ if not _stream["loaded"]:
     })
 
 # -------------------------
-# Extract diagnosis from .hea
+# Helpers
 # -------------------------
 def extract_diagnosis_from_hea(record_base):
     hea_path = record_base + ".hea"
-    if not os.path.exists(hea_path):
-        return None
+    if not os.path.exists(hea_path): return None
     try:
-        with open(hea_path, "r", encoding="latin-1") as f:
+        with open(hea_path,"r",encoding="latin-1") as f:
             for line in f:
                 if line.startswith("#") and ("diagnosis" in line.lower() or "reason" in line.lower()):
-                    return line.strip("#").split(":", 1)[-1].strip()
-    except Exception:
-        return None
+                    return line.strip("#").split(":",1)[-1].strip()
+    except: return None
     return None
 
-# -------------------------
-# Prediction helpers
-# -------------------------
 def _prepare_for_model(sig, target_len=_model_seq_len):
     arr = np.asarray(sig, dtype=np.float32).flatten()
     if len(arr) < target_len:
@@ -177,9 +160,8 @@ def predict_signal(sig):
             "prob": float(probs[idx]),
             "description": desc
         }
-
         rec_base = _stream.get("record_path")
-        if label == "Abnormal" and rec_base:
+        if label=="Abnormal" and rec_base:
             disease_text = extract_diagnosis_from_hea(rec_base)
             result["disease_name"] = disease_text if disease_text else "Unknown (check .hea)"
         else:
@@ -207,36 +189,49 @@ def update():
     channels = req.get("channels", list(range(12)))
     fs = _stream["fs"]
     N = int(STREAMING_CHUNK_DURATION * fs)
-
     start = _stream["pos"]
     end = start + N
     total_len = _stream["signals"].shape[0]
+    
     if end <= total_len:
-        seg_block = _stream["signals"][start:end, :]
+        seg_block = _stream["signals"][start:end,:]
     else:
-        part1 = _stream["signals"][start:, :]
-        part2 = _stream["signals"][:end - total_len, :]
+        part1 = _stream["signals"][start:,:]
+        part2 = _stream["signals"][:end-total_len,:]
         seg_block = np.vstack([part1, part2])
     _stream["pos"] = end % total_len
 
-    # ✅ Combine selected leads for prediction (not just first)
-    if channels:
-        arr = np.mean(seg_block[:, channels], axis=1)
-    else:
-        arr = seg_block.mean(axis=1)
-
+    # 1D Prediction
+    arr = np.mean(seg_block[:, channels], axis=1) if channels else seg_block.mean(axis=1)
     prediction = predict_signal(arr)
 
-    # prepare output for plotting
-    downsample_factor = max(1, int(fs / DISPLAY_FS))
-    time_axis = (np.arange(0, seg_block.shape[0]) / fs)[::downsample_factor].tolist()
-    signals_out = {}
-    for ch in channels:
-        if 0 <= ch < seg_block.shape[1]:
-            signals_out[str(ch)] = seg_block[::downsample_factor, ch].tolist()
+    # ----------------- Prepare plots -----------------
+    downsample_factor = max(1,int(fs/DISPLAY_FS))
+    time_axis = (np.arange(seg_block.shape[0])/fs)[::downsample_factor].tolist()
+    signals_out = {str(ch): seg_block[::downsample_factor,ch].astype(float).tolist() for ch in channels if 0<=ch<seg_block.shape[1]}
+
+    # --------- XOR plot ---------
+    prev_chunk = _stream.get("prev_chunk")
+    xor_out = {}
+    if prev_chunk is not None:
+        xor_chunk = np.bitwise_xor((seg_block*100).astype(np.int32), (prev_chunk*100).astype(np.int32))
+        xor_out = {str(ch): xor_chunk[::downsample_factor,ch].astype(float).tolist() for ch in channels}
+    _stream["prev_chunk"] = seg_block.copy()
+
+    # --------- Recurrence plot (cumulative) ---------
+    rec_matrix = []
+    for chx in channels:
+        row = []
+        for chy in channels:
+            diff = seg_block[:,chx,None] - seg_block[:,chy,None].T
+            mat = np.abs(diff)
+            row.append(float(mat.mean()))
+        rec_matrix.append(row)
 
     return jsonify({
         "time": time_axis,
         "signals": signals_out,
-        "prediction": prediction
+        "prediction": prediction,
+        "xor": xor_out,
+        "recurrence": rec_matrix
     })
