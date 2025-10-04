@@ -172,12 +172,8 @@ def update():
         # Check if "cycle" mode is *requested* by the frontend (optional optimization)
         # Since we don't have the mode here, we compute if it's a single channel,
         # but the frontend's main use for band power is "cycle" mode.
-        # However, the Topomap mode uses raw signals, so we only need band power for 'cycle'.
         # Since the 'cycle' mode only selects one channel, we can optimize by only running the calc if 1 channel is selected.
         # But for robustness, the code returns averaged band power if multiple channels are selected.
-        
-        # If the Topomap mode is using band power, this logic would need adjustment.
-        # Based on the plan, Topomap uses raw signal amplitude, so this part is fine as is.
         
         all_channel_powers = [calculate_band_power(picked[i], eeg_data.fs) for i in range(picked.shape[0])]
         

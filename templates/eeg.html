@@ -36,6 +36,15 @@
         .hidden { display: none; } 
         /* NEW: Class for disabled channel selection area */
         .disabled-input { opacity: 0.6; pointer-events: none; }
+        /* Added button styles */
+        .btn-secondary {
+            background-color: #374151; /* Gray-700 equivalent */
+            color: #e5e7eb; /* text-light */
+            transition: background-color 0.2s;
+        }
+        .btn-secondary:hover:enabled {
+            background-color: #4b5563; /* Gray-600 equivalent */
+        }
     </style>
 </head>
 <body class="min-h-screen bg-primary-bg text-text-light p-4">
@@ -49,7 +58,7 @@
                 <h4 class="text-xl font-semibold text-accent mb-4">EEG Controls</h4>
                 
                 <div class="mb-6 border-2 border-dashed border-gray-600 rounded-lg p-4 text-center hover:border-accent transition duration-300" 
-                     id="dropZone">
+                    id="dropZone">
                     <input type="file" id="edfFile" accept=".edf" class="hidden">
                     <label for="edfFile" class="cursor-pointer">
                         <svg class="mx-auto h-8 w-8 text-accent mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -71,12 +80,11 @@
                     <div class="mb-4">
                         <label for="graphMode" class="block text-sm font-medium mb-1">Graph Mode</label>
                         <select id="graphMode" 
-                                 class="w-full p-2 bg-gray-700 text-text-light border border-gray-600 rounded-lg focus:ring-accent focus:border-accent">
+                                class="w-full p-2 bg-gray-700 text-text-light border border-gray-600 rounded-lg focus:ring-accent focus:border-accent">
                             <option value="time">Time Graph (Multi-Channel)</option>
                             <option value="polar">Polar Graph (Multi-Channel)</option>
                             <option value="recurrence">Recurrence Graph (Single Channel)</option>
                             <option value="cycle">Cycle Based Analysis (Single/Averaged)</option>
-                            <option value="topomap">Topographic Map (Spatial)</option>
                         </select>
                     </div>
 
@@ -104,14 +112,18 @@
                         </div>
                     </div>
 
-                    <div class="flex gap-2">
-                        <button type="submit" id="startButton" class="btn-primary w-1/2 bg-accent hover:bg-accent-hover text-text-dark font-extrabold py-2 rounded-lg transition duration-200 shadow-lg hover:shadow-xl">
+                    <div class="flex gap-2 mb-2">
+                        <button type="submit" id="startContinueButton" class="w-1/2 bg-accent hover:bg-accent-hover text-text-dark font-extrabold py-2 rounded-lg transition duration-200 shadow-lg" >
                             Start Streaming
                         </button>
-                        <button type="button" id="stopButton" class="w-1/2 bg-red-700 hover:bg-red-600 text-text-light font-extrabold py-2 rounded-lg transition duration-200 shadow-lg opacity-50 cursor-not-allowed" disabled onclick="stopStreaming()">
-                            Stop Streaming
+                        <button type="button" id="pauseButton" onclick="pauseStreaming()" class="w-1/2 btn-secondary font-extrabold py-2 rounded-lg transition duration-200 shadow-lg opacity-50 cursor-not-allowed" disabled>
+                            Pause
                         </button>
                     </div>
+
+                    <button type="button" id="stopButton" class="w-full bg-red-700 hover:bg-red-600 text-text-light font-extrabold py-2 rounded-lg transition duration-200 shadow-lg opacity-50 cursor-not-allowed" disabled onclick="stopStreaming()">
+                            Stop Streaming (Reset)
+                    </button>
                 </form>
             </div>
 
@@ -126,753 +138,640 @@
         </div>
     </div>
     
-    <script>
-        // --- GLOBAL VARIABLES ---
-        let streaming = false;
-        let intervalId;
-        let selected = [];
-        let width = 5;
-        let fs = 160; 
-        let channelDataBuffers = {};
-        let globalTime = 0; 
-        let bandPowerBuffer = {};
-        let currentYRange = 500000; 
-        const colors = ["#FF5733","#33FF57","#3357FF","#F3FF33","#FF33EC","#33FFF6","#FF8F33","#8F33FF","#33FF99","#FF3333"];
-        
-        const startButton = document.getElementById('startButton');
-        const stopButton = document.getElementById('stopButton');
-        const channelListDiv = document.getElementById('channelList');
-        const channelForm = document.getElementById('channelForm');
-        const plotDiv = document.getElementById('plot');
-        const graphModeSelector = document.getElementById('graphMode');
-        const montageSelector = document.getElementById('montageSelector');
-        const montageSelectorContainer = document.getElementById('montageSelectorContainer');
-        const channelInstructions = document.getElementById('channelInstructions');
-        const channelSelectionContainer = document.getElementById('channelSelectionContainer'); 
-        
-        let channelNameMap = {}; // Map of Cleaned Name -> Channel Index
-        let channelIndexToOriginalName = {}; // Map of Index -> Original Name
-        let allAvailableChannels = {}; // Index -> Original Name map of all channels in the loaded EDF
+<script>
+    // --- GLOBAL VARIABLES ---
+    let isStreaming = false; // Indicates if the app is in an active streaming session (started)
+    let isPaused = false; // Indicates if streaming is paused (interval is cleared, but buffers/graph exist)
+    let intervalId;
+    let selected = [];
+    let width = 5;
+    let fs = 160; 
+    let channelDataBuffers = {};
+    let globalTime = 0; 
+    let bandPowerBuffer = {};
+    let currentYRange = 500000; 
+    const colors = ["#FF5733","#33FF57","#3357FF","#F3FF33","#FF33EC","#33FFF6","#FF8F33","#8F33FF","#33FF99","#FF3333"];
+    
+    const startContinueButton = document.getElementById('startContinueButton');
+    const pauseButton = document.getElementById('pauseButton'); // NEW
+    const stopButton = document.getElementById('stopButton');
+    const channelListDiv = document.getElementById('channelList');
+    const channelForm = document.getElementById('channelForm');
+    const plotContainerDiv = document.getElementById('plot'); 
+    const graphModeSelector = document.getElementById('graphMode');
+    const montageSelector = document.getElementById('montageSelector');
+    const montageSelectorContainer = document.getElementById('montageSelectorContainer');
+    const channelInstructions = document.getElementById('channelInstructions');
+    const channelSelectionContainer = document.getElementById('channelSelectionContainer'); 
+    
+    let channelNameMap = {}; 
+    let channelIndexToOriginalName = {}; 
+    let allAvailableChannels = {}; 
 
-        // --- Standard 10-20 Channel Locations (Normalized to a circle of radius 0.5) ---
-        const channelLocations = {
-            'FP1': {x: 0.25, y: 0.45}, 'FP2': {x: -0.25, y: 0.45}, 
-            'AF3': {x: 0.35, y: 0.35}, 'AF4': {x: -0.35, y: 0.35},
-            'F7': {x: 0.45, y: 0.15}, 'F3': {x: 0.35, y: 0.25}, 'FZ': {x: 0, y: 0.3}, 'F4': {x: -0.35, y: 0.25}, 'F8': {x: -0.45, y: 0.15}, 
-            'FC5': {x: 0.4, y: 0.05}, 'FC1': {x: 0.2, y: 0.1}, 'FC2': {x: -0.2, y: 0.1}, 'FC6': {x: -0.4, y: 0.05},
-            'T7': {x: 0.5, y: 0}, 'C3': {x: 0.3, y: 0}, 'CZ': {x: 0, y: 0}, 'C4': {x: -0.3, y: 0}, 'T8': {x: -0.5, y: 0}, 
-            'CP5': {x: 0.4, y: -0.05}, 'CP1': {x: 0.2, y: -0.1}, 'CP2': {x: -0.2, y: -0.1}, 'CP6': {x: -0.4, y: -0.05},
-            'P7': {x: 0.45, y: -0.15}, 'P3': {x: 0.35, y: -0.25}, 'PZ': {x: 0, y: -0.3}, 'P4': {x: -0.35, y: -0.25}, 'P8': {x: -0.45, y: -0.15}, 
-            'O1': {x: 0.25, y: -0.45}, 'OZ': {x: 0, y: -0.5}, 'O2': {x: -0.25, y: -0.45},
-            // Added points for better contour interpolation (boundary)
-            'TP9': {x: 0.55, y: -0.05}, 'TP10': {x: -0.55, y: -0.05}, 
-            'FT9': {x: 0.55, y: 0.05}, 'FT10': {x: -0.55, y: 0.05} 
-        };
-        const STANDARD_TOPOMAP_CHANNELS = [
-            'FP1', 'FP2', 'F7', 'F3', 'FZ', 'F4', 'F8', 'T7', 'C3', 'CZ', 'C4', 'T8', 
-            'P7', 'P3', 'PZ', 'P4', 'P8', 'O1', 'OZ', 'O2'
-        ];
+    
+    // Define standard 10-20 channel names (cleaned/uppercase)
+    const montages = {
+        'standard': ['FP1', 'FP2', 'F3', 'F4', 'C3', 'C4', 'P3', 'P4', 'O1', 'O2', 'FZ', 'CZ', 'PZ'], 
+        'frontal': ['FP1', 'FP2', 'F3', 'F4', 'F7', 'F8', 'FZ'],
+        'occipital': ['P3', 'P4', 'O1', 'O2', 'OZ'],
+        'all': [] 
+    };
+
+    // --- NEW: Button State Management ---
+    function updateButtonStates() {
+        // Start/Continue Button
+        startContinueButton.disabled = isStreaming && !isPaused;
+        startContinueButton.classList.toggle('opacity-50', isStreaming && !isPaused);
+        startContinueButton.classList.toggle('cursor-not-allowed', isStreaming && !isPaused);
+        startContinueButton.textContent = isStreaming ? (isPaused ? 'Continue Streaming' : 'Running...') : 'Start Streaming';
         
-        // Define standard 10-20 channel names (cleaned/uppercase)
-        const montages = {
-            'standard': ['FP1', 'FP2', 'F3', 'F4', 'C3', 'C4', 'P3', 'P4', 'O1', 'O2', 'FZ', 'CZ', 'PZ'], 
-            'frontal': ['FP1', 'FP2', 'F3', 'F4', 'F7', 'F8', 'FZ'],
-            'occipital': ['P3', 'P4', 'O1', 'O2', 'OZ'],
-            'all': [] // Special case handled by showing all channels
-        };
+        // Pause Button
+        pauseButton.disabled = !isStreaming || isPaused;
+        pauseButton.classList.toggle('opacity-50', !isStreaming || isPaused);
+        pauseButton.classList.toggle('cursor-not-allowed', !isStreaming || isPaused);
 
-        // --- CORE LOGIC FOR DYNAMIC CHANNEL LIST RENDERING (Unchanged) ---
+        // Stop Button
+        stopButton.disabled = !isStreaming;
+        stopButton.classList.toggle('opacity-50', !isStreaming);
+        stopButton.classList.toggle('cursor-not-allowed', !isStreaming);
+    }
 
-        /**
-         * Cleans a channel name for reliable key lookups (simplified).
-         */
-        function cleanChannelName(name) {
-            return name.trim().toUpperCase().split(/[-_/\s().]/)[0].replace(/[^A-Z0-9]/g, '');
+    // --- CORE LOGIC FOR DYNAMIC CHANNEL LIST RENDERING (Unchanged) ---
+
+    function cleanChannelName(name) {
+        return name.trim().toUpperCase().split(/[-_/\s().]/)[0].replace(/[^A-Z0-9]/g, '');
+    }
+
+    function renderChannelCheckboxes(channelsToShow) {
+        channelListDiv.innerHTML = ''; 
+        
+        const sortedIndices = Object.keys(channelsToShow).sort((a, b) => parseInt(a) - parseInt(b));
+
+        if (sortedIndices.length === 0 && Object.keys(allAvailableChannels).length > 0) {
+             channelListDiv.innerHTML = '<p class="text-center text-red-400">No channels found for this montage!</p>';
+             return;
         }
 
-        /**
-         * Renders the channel checkboxes in the UI based on the provided list of channels.
-         */
-        function renderChannelCheckboxes(channelsToShow) {
-            channelListDiv.innerHTML = ''; 
-            
-            const sortedIndices = Object.keys(channelsToShow).sort((a, b) => parseInt(a) - parseInt(b));
+        if (sortedIndices.length === 0) {
+            channelListDiv.innerHTML = '<p class="text-center text-gray-500">Channels load after file upload.</p>';
+            return;
+        }
 
-            if (sortedIndices.length === 0 && Object.keys(allAvailableChannels).length > 0) {
-                 channelListDiv.innerHTML = '<p class="text-center text-red-400">No channels found for this montage!</p>';
-                 return;
-            }
-
-            if (sortedIndices.length === 0) {
-                channelListDiv.innerHTML = '<p class="text-center text-gray-500">Channels load after file upload.</p>';
-                return;
-            }
-
-            sortedIndices.forEach(index => {
-                const name = channelsToShow[index];
-                const div = document.createElement('div');
-                div.className = 'flex items-center mb-1';
-                div.innerHTML = `<input class="topo-channel-cb form-check-input h-4 w-4 text-accent bg-gray-700 border-gray-600 rounded focus:ring-accent" 
-                                       type="checkbox" name="channels" value="${index}" id="ch${index}">
+        sortedIndices.forEach(index => {
+            const name = channelsToShow[index];
+            const div = document.createElement('div');
+            div.className = 'flex items-center mb-1';
+            div.innerHTML = `<input class="form-check-input h-4 w-4 text-accent bg-gray-700 border-gray-600 rounded focus:ring-accent" 
+                                 type="checkbox" name="channels" value="${index}" id="ch${index}">
                                  <label class="ml-2 text-sm" for="ch${index}">${name} (${parseInt(index) + 1})</label>`;
-                channelListDiv.appendChild(div);
-            });
+            channelListDiv.appendChild(div);
+        });
+    }
+    
+    function applyMontage(montageKey) {
+        const channelsToShow = {};
+        let selectedMontageNames = [];
+
+        if (montageKey === 'none' || montageKey === 'all') {
+            Object.assign(channelsToShow, allAvailableChannels);
+        } else {
+            selectedMontageNames = montages[montageKey] || [];
         }
         
-        /**
-         * Updates the channel list based on the chosen montage.
-         */
-        function applyMontage(montageKey, enforceTopoMap = false) {
-            const channelsToShow = {};
-            let selectedMontageNames = [];
+        if (selectedMontageNames.length > 0) {
+            selectedMontageNames.forEach(standardName => {
+                const cleanedName = cleanChannelName(standardName);
+                const index = channelNameMap[cleanedName];
+                if (index !== undefined) {
+                    channelsToShow[index] = channelIndexToOriginalName[index];
+                }
+            });
+        }
 
-            if (enforceTopoMap) {
-                selectedMontageNames = STANDARD_TOPOMAP_CHANNELS;
-            } else if (montageKey === 'none' || montageKey === 'all') {
-                Object.assign(channelsToShow, allAvailableChannels);
+        renderChannelCheckboxes(channelsToShow);
+        
+        document.querySelectorAll("input[name=channels]").forEach(cb => {
+            cb.disabled = false;
+            if (montageKey === 'all') {
+                cb.checked = true;
             } else {
-                selectedMontageNames = montages[montageKey] || [];
+                cb.checked = false;
             }
-            
-            if (enforceTopoMap || selectedMontageNames.length > 0) {
-                 (enforceTopoMap ? STANDARD_TOPOMAP_CHANNELS : selectedMontageNames).forEach(standardName => {
-                    const cleanedName = cleanChannelName(standardName);
-                    const index = channelNameMap[cleanedName];
-                    if (index !== undefined) {
-                        channelsToShow[index] = channelIndexToOriginalName[index];
-                    }
+        });
+    }
+    
+    function toggleChannelListDisplay() {
+        const currentMode = graphModeSelector.value;
+        
+        if (currentMode !== 'time') {
+            montageSelectorContainer.classList.remove('hidden');
+            channelSelectionContainer.classList.remove('disabled-input');
+        } else {
+            montageSelectorContainer.classList.remove('hidden');
+            channelInstructions.classList.add('hidden');
+            channelSelectionContainer.classList.remove('disabled-input');
+        }
+        
+        if (currentMode === 'recurrence' || currentMode === 'cycle') {
+            channelInstructions.classList.remove('hidden');
+            channelInstructions.innerHTML = '⚠️ **SINGLE CHANNEL MODE:** Please select only **one** channel for this graph type.';
+        } else {
+             channelInstructions.classList.add('hidden');
+        }
+        
+        montageSelector.value = 'none';
+        applyMontage('none'); 
+    }
+
+    // Event Listeners
+    montageSelector.addEventListener('change', (e) => {
+        applyMontage(e.target.value);
+    });
+    
+    graphModeSelector.addEventListener('change', () => {
+        toggleChannelListDisplay(); 
+    });
+
+    // --- FILE UPLOAD HANDLERS (Unchanged) ---
+    function handleFileUpload(file) {
+        if (!file || file.name.split('.').pop().toLowerCase() !== 'edf') {
+            alert("Please select a valid EDF file.");
+            return;
+        }
+        
+        document.getElementById('fileNameDisplay').textContent = `Uploading: ${file.name}...`;
+        stopStreaming(); 
+        channelForm.classList.add('hidden'); 
+        updateButtonStates(); // Reset buttons
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        fetch("/eeg/upload", {
+            method: "POST",
+            body: formData
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`Server returned status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(result => {
+            if (result.success) {
+                fs = result.fs;
+                
+                channelNameMap = {};
+                channelIndexToOriginalName = {};
+                allAvailableChannels = {};
+                
+                Object.entries(result.channels).forEach(([index, name]) => {
+                    const cleanedName = cleanChannelName(name); 
+                    channelNameMap[cleanedName] = index; 
+                    channelIndexToOriginalName[index] = name; 
+                    allAvailableChannels[index] = name; 
                 });
-            }
-
-            renderChannelCheckboxes(channelsToShow);
-            
-            document.querySelectorAll(".topo-channel-cb").forEach(cb => {
-                if (enforceTopoMap) {
-                    cb.checked = true;
-                    cb.disabled = true;
-                } else {
-                    cb.disabled = false;
-                    if (montageKey === 'all') {
-                        cb.checked = true;
-                    } else {
-                        cb.checked = false;
-                    }
-                }
-            });
-        }
-        
-        /**
-         * Toggles the channel selection UI based on Graph Mode.
-         */
-        function toggleChannelListDisplay() {
-            const currentMode = graphModeSelector.value;
-            
-            if (currentMode === 'topomap') {
-                montageSelectorContainer.classList.add('hidden');
-                channelInstructions.classList.remove('hidden');
-                channelInstructions.innerHTML = '✨ **TOPOMAP MODE:** Standard 10-20 channels are **automatically** selected for accurate, professional interpolation.';
-                channelSelectionContainer.classList.add('disabled-input'); 
-                applyMontage(null, true); 
-
-            } else {
-                montageSelectorContainer.classList.remove('hidden');
-                channelSelectionContainer.classList.remove('disabled-input');
                 
-                if (currentMode === 'recurrence' || currentMode === 'cycle') {
-                    channelInstructions.classList.remove('hidden');
-                    channelInstructions.innerHTML = '⚠️ **SINGLE CHANNEL MODE:** Please select only **one** channel for this graph type.';
-                } else {
-                    channelInstructions.classList.add('hidden');
-                }
+                document.getElementById('fileNameDisplay').textContent = `File Loaded: ${file.name} (FS: ${fs} Hz, ${Object.keys(result.channels).length} Ch)`;
+                channelForm.classList.remove('hidden');
                 
+                graphModeSelector.value = 'time'; 
                 montageSelector.value = 'none';
-                applyMontage('none'); 
-            }
-        }
-
-        // Event Listeners
-        montageSelector.addEventListener('change', (e) => {
-            applyMontage(e.target.value);
-        });
-        
-        graphModeSelector.addEventListener('change', () => {
-            toggleChannelListDisplay(); 
-        });
-
-        // --- FILE UPLOAD HANDLERS (Unchanged) ---
-        function handleFileUpload(file) {
-            if (!file || file.name.split('.').pop().toLowerCase() !== 'edf') {
-                alert("Please select a valid EDF file.");
-                return;
-            }
-            
-            document.getElementById('fileNameDisplay').textContent = `Uploading: ${file.name}...`;
-            stopStreaming(); 
-            channelForm.classList.add('hidden'); 
-
-            const formData = new FormData();
-            formData.append('file', file);
-
-            fetch("/eeg/upload", {
-                method: "POST",
-                body: formData
-            })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`Server returned status: ${response.status}`);
-                }
-                return response.json();
-            })
-            .then(result => {
-                if (result.success) {
-                    fs = result.fs;
-                    
-                    channelNameMap = {};
-                    channelIndexToOriginalName = {};
-                    allAvailableChannels = {};
-                    
-                    Object.entries(result.channels).forEach(([index, name]) => {
-                        const cleanedName = cleanChannelName(name); 
-                        channelNameMap[cleanedName] = index; 
-                        channelIndexToOriginalName[index] = name; 
-                        allAvailableChannels[index] = name; 
-                    });
-                    
-                    document.getElementById('fileNameDisplay').textContent = `File Loaded: ${file.name} (FS: ${fs} Hz, ${Object.keys(result.channels).length} Ch)`;
-                    channelForm.classList.remove('hidden');
-                    
-                    graphModeSelector.value = 'topomap'; 
-                    montageSelector.value = 'none';
-                    toggleChannelListDisplay(); 
-                    
-                    plotDiv.innerHTML = '';
-                    Plotly.newPlot("plot", [], { 
-                        title: "File Loaded. Click 'Start Streaming'.",
-                        paper_bgcolor: "#0a0a0a", plot_bgcolor: "#000000", font: { color: "#e5e7eb", family: "Inter" }
-                    });
-
-                } else {
-                    document.getElementById('fileNameDisplay').textContent = `Error: ${result.message}`;
-                    alert(`File upload failed: ${result.message}`);
-                }
-            })
-            .catch(error => {
-                console.error("Upload error:", error);
-                document.getElementById('fileNameDisplay').textContent = `Upload failed: Network or Server Error.`;
-            });
-        }
-        
-        // --- Drag and Drop Listeners (Unchanged) ---
-        const dropZone = document.getElementById('dropZone');
-        const edfFileInput = document.getElementById('edfFile');
-
-        edfFileInput.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (file) handleFileUpload(file);
-        });
-        
-        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-            dropZone.addEventListener(eventName, preventDefaults, false);
-            document.body.addEventListener(eventName, preventDefaults, false);
-        });
-
-        function preventDefaults (e) {
-            e.preventDefault();
-            e.stopPropagation();
-        }
-
-        ['dragenter', 'dragover'].forEach(eventName => {
-            dropZone.addEventListener(eventName, () => dropZone.classList.add('border-accent'), false);
-        });
-
-        ['dragleave', 'drop'].forEach(eventName => {
-            dropZone.addEventListener(eventName, () => dropZone.classList.remove('border-accent'), false);
-        });
-
-        dropZone.addEventListener('drop', (e) => {
-            const dt = e.dataTransfer;
-            const file = dt.files[0];
-            handleFileUpload(file);
-        }, false);
-
-
-        // --- STREAMING CONTROLS (Unchanged) ---
-
-        function stopStreaming() {
-            if (intervalId) {
-                clearInterval(intervalId);
-                intervalId = null;
-            }
-            streaming = false;
-            startButton.disabled = false;
-            startButton.classList.remove('opacity-50', 'cursor-not-allowed');
-            stopButton.disabled = true;
-            stopButton.classList.add('opacity-50', 'cursor-not-allowed');
-            console.log("Streaming stopped.");
-            try {
-                const currentTitle = Plotly.d3.select('#plot').node().layout.title.text;
-                if (currentTitle && !currentTitle.includes("(STOPPED)")) {
-                    Plotly.relayout("plot", { title: currentTitle + " (STOPPED)" });
-                }
-            } catch (e) { /* Ignore error if plot isn't initialized */ } 
-        }
-
-        // --- NEW/UPDATED: Persistent Clip Function (FOR PERFECT CIRCLE) ---
-        function applyTopomapClip() {
-            const plotElement = document.getElementById('plot');
-            if (!plotElement) return; 
-            
-            // Find the trace group corresponding to the CONTOUR plot (Trace 2, which is the 3rd trace group in SVG)
-            const traceG = Plotly.d3.select(plotElement).select('.trace:nth-child(3)'); 
-            
-            // CRITICAL: Check for the correct clip path URL
-            if (traceG.node() && traceG.attr('clip-path') !== 'url(#head-clip-circle)') { 
-                // Find or create the <defs> section in the SVG
-                let svgDefs = Plotly.d3.select(plotElement).select('svg defs');
-                if (svgDefs.empty()) {
-                    svgDefs = Plotly.d3.select(plotElement).select('svg').insert('defs', ':first-child');
-                }
+                toggleChannelListDisplay(); 
                 
-                // Find or create the clipPath
-                let clipPath = svgDefs.select('clipPath#head-clip-circle');
-                if (clipPath.empty()) {
-                    clipPath = svgDefs.append('clipPath').attr('id', 'head-clip-circle');
+                // Clear the main container and show instructions
+                Plotly.purge('plot'); // Clear any existing plots
+                plotContainerDiv.innerHTML = '<div id="plot"><div class="text-center p-10 text-xl text-gray-500">Select channels and click \'Start Streaming\'.</div></div>';
+                updateButtonStates(); // Set initial button states
 
-                    // Clip circle must be slightly larger than the R=0.5 head outline (R=0.51)
-                    clipPath.append('circle')
-                        .attr('cx', '0')
-                        .attr('cy', '0')
-                        .attr('r', '0.51'); 
-                }
-                
-                // Apply the clip-path to the contour trace group
-                traceG.attr('clip-path', 'url(#head-clip-circle)');
-            }
-        }
-        // --- END NEW/UPDATED ---
-
-
-        document.getElementById("channelForm").addEventListener("submit", (e) => {
-            e.preventDefault();
-            
-            if (streaming) {
-                stopStreaming();
-            }
-
-            let rawSelected = Array.from(document.querySelectorAll("#channelList input[name=channels]:checked")).map(ch => parseInt(ch.value));
-            
-            width = parseFloat(document.getElementById("width").value);
-            mode = graphModeSelector.value;
-
-            
-            // --- MODE-SPECIFIC CHANNEL ENFORCEMENT ---
-            if (rawSelected.length === 0) {
-                document.getElementById('plot').innerHTML = '<div class="text-center p-10 text-xl text-red-400">Please select at least one channel to start streaming.</div>';
-                stopStreaming(); 
-                return;
-            }
-
-            if (mode === "recurrence" || mode === "cycle") {
-                if (rawSelected.length > 1) {
-                    document.getElementById('plot').innerHTML = `<div class="text-center p-10 text-xl text-yellow-400">
-                        Mode Warning: ${mode === "recurrence" ? "Recurrence Plot" : "Cycle Analysis (Band Power)"} only supports **one channel**. 
-                        Visualizing data from the **first selected channel** (Channel ${rawSelected[0] + 1}) only.
-                    </div>`;
-                }
-                selected = [rawSelected[0]];
             } else {
-                selected = rawSelected;
+                document.getElementById('fileNameDisplay').textContent = `Error: ${result.message}`;
+                alert(`File upload failed: ${result.message}`);
             }
-            // --- END MODE-SPECIFIC CHANNEL ENFORCEMENT ---
+        })
+        .catch(error => {
+            console.error("Upload error:", error);
+            document.getElementById('fileNameDisplay').textContent = `Upload failed: Network or Server Error.`;
+        });
+    }
+    
+    // --- Drag and Drop Listeners (Unchanged) ---
+    const dropZone = document.getElementById('dropZone');
+    const edfFileInput = document.getElementById('edfFile');
 
-            // Reset buffers and state for the new stream
-            channelDataBuffers = {};
-            selected.forEach(chIndex => channelDataBuffers[chIndex] = { data: [], time: [] }); 
-            globalTime = 0;
-            bandPowerBuffer = {}; 
-            currentYRange = 500000; 
-            
-            // --- Plotly Configuration based on Mode ---
-            let traces, layout;
+    edfFileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) handleFileUpload(file);
+    });
+    
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, preventDefaults, false);
+        document.body.addEventListener(eventName, preventDefaults, false);
+    });
 
-            if (mode === "time" || mode === "polar" || mode === "recurrence" || mode === "cycle") {
-                // ... (Configuration for other modes remains the same) ...
-                if (mode === "time") {
-                    traces = selected.map((ch, i) => {
-                        const name = channelIndexToOriginalName[ch.toString()];
-                        return { x: [], y: [], mode: "lines", line: { color: colors[i % colors.length] }, name };
-                    });
-                    layout = {
-                        title: `EEG - Time Graph - Window: ${width}s`,
-                        paper_bgcolor: "#0a0a0a", plot_bgcolor: "#000000", 
-                        font: { color: "#e5e7eb", family: "Inter" },
-                        xaxis: { title: "Time (s)", color: "#e5e7eb", gridcolor: "#374151", range: [0, width] },
-                        yaxis: { title: "Amplitude (µV)", color: "#e5e7eb", gridcolor: "#374151" }
-                    };
-                } else if (mode === "polar") {
-                    traces = selected.map((ch, i) => {
-                        const name = channelIndexToOriginalName[ch.toString()];
-                        return { r: [], theta: [], mode: "lines", line: { color: colors[i % colors.length] }, name, type: "scatterpolar" };
-                    });
-                    layout = {
-                        title: `EEG - Polar Graph - Window: ${width}s`,
-                        paper_bgcolor: "#0a0a0a", font: { color: "#e5e7eb", family: "Inter" },
-                        polar: {
-                            bgcolor: "#000000",
-                            radialaxis: { title: "Amplitude (µV)", color: "#e5e7eb", gridcolor: "#374151" },
-                            angularaxis: { direction: "clockwise", rotation: 90, color: "#e5e7eb", gridcolor: "#374151" }
-                        }
-                    };
-                } else if (mode === "recurrence") {
-                    traces = [{ z: [[0]], type: "heatmap", colorscale: "Viridis", showscale: true }];
-                    const channelName = channelIndexToOriginalName[selected[0].toString()];
-                    layout = {
-                        title: `EEG - Recurrence Graph - ${channelName} - Window: ${width}s`,
-                        paper_bgcolor: "#0a0a0a", plot_bgcolor: "#000000",
-                        font: { color: "#e5e7eb", family: "Inter" },
-                        xaxis: { title: "Time Index", color: "#e5e7eb", gridcolor: "#374151" },
-                        yaxis: { title: "Time Index", color: "#e5e7eb", gridcolor: "#374151" }
-                    };
-                } else if (mode === "cycle") {
-                    const bands = ['Delta (0.5-4Hz)', 'Theta (4-8Hz)', 'Alpha (8-13Hz)', 'Beta (13-30Hz)', 'Gamma (>30Hz)'];
-                    bandPowerBuffer = { bands: bands, power: Array(bands.length).fill(0) }; 
-                    const channelTitle = channelIndexToOriginalName[selected[0].toString()];
-                    traces = [{
-                        x: bands, y: bandPowerBuffer.power, type: 'bar',
-                        marker: { color: ['#FF5733', '#33FF57', '#3357FF', '#F3FF33', '#FF33EC'] }
-                    }];
-                    layout = {
-                        title: `EEG - Scaled Band Power: ${channelTitle}`,
-                        paper_bgcolor: "#0a0a0a", plot_bgcolor: "#000000",
-                        font: { color: "#e5e7eb", family: "Inter" },
-                        xaxis: { title: "Frequency Band", color: "#e5e7eb", gridcolor: "#374151" },
-                        yaxis: { 
-                            title: `Scaled Average Power (x10^10)`, color: "#e5e7eb", 
-                            gridcolor: "#374151", range: [0, currentYRange] 
-                        } 
-                    };
-                }
-            } else if (mode === "topomap") {
-                // 1. Head Outline (Static Trace 0) - MODIFIED FOR PERFECT CIRCLE
-                const headOutlineX = [];
-                const headOutlineY = [];
-                const R = 0.5; // Head radius
-                const numPoints = 100;
+    function preventDefaults (e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
 
-                // Circular part only
-                for (let i = 0; i <= numPoints; i++) {
-                    const angle = i * (Math.PI * 2 / numPoints);
-                    // Points start at the top (cos=1) and go clockwise
-                    headOutlineX.push(R * Math.sin(angle));
-                    headOutlineY.push(R * Math.cos(angle));
-                }
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dropZone.addEventListener(eventName, () => dropZone.classList.add('border-accent'), false);
+    });
 
-                // *** REMOVED CODE FOR EARS AND NOSE ***
-                
+    ['dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, () => dropZone.classList.remove('border-accent'), false);
+    });
 
-                traces = [
-                    // TRACE 0: Head outline, now a perfect circle
-                    {
-                        type: 'scatter',
-                        mode: 'lines',
-                        x: headOutlineX,
-                        y: headOutlineY,
-                        showlegend: false,
-                        line: { color: 'white', width: 2 }
-                    },
-                    // TRACE 1: Scatter markers for electrode dots (on top of the contour)
-                    {
-                        type: 'scatter',
-                        mode: 'markers+text', 
-                        x: [], 
-                        y: [], 
-                        text: [], 
-                        textfont: { size: 10, color: 'white' },
-                        textposition: 'bottom center', 
-                        hoverinfo: 'text',
-                        marker: {
-                            size: 8, 
-                            color: '#e5e7eb', 
-                            line: { width: 1, color: '#0a0a0a' }
-                        }
-                    },
-                    // TRACE 2: Contour plot for interpolation (the smooth color map)
-                    {
-                        type: 'contour',
-                        z: [[]], 
-                        x: [], 
-                        y: [], 
-                        colorscale: 'Jet', 
-                        showscale: true,
-                        contours: {
-                            coloring: 'heatmap' 
-                        },
-                        autocontour: false,
-                        ncontours: 50, 
-                        zmin: -1, 
-                        zmax: 1, 
-                        colorbar: {
-                            title: 'Amplitude (µV)',
-                            titleside: 'right'
-                        }
+    dropZone.addEventListener('drop', (e) => {
+        const dt = e.dataTransfer;
+        const file = dt.files[0];
+        handleFileUpload(file);
+    }, false);
+
+
+    // --- STREAMING CONTROLS (MODIFIED) ---
+    
+    /**
+     * Stops the streaming interval and resets state for a full stop.
+     */
+    function stopStreaming() {
+        if (intervalId) {
+            clearInterval(intervalId);
+            intervalId = null;
+        }
+        isStreaming = false;
+        isPaused = false;
+        updateButtonStates();
+        console.log("Streaming stopped (and reset).");
+        
+        // Update all plots with a 'STOPPED' title and reset container
+        updatePlotTitles(" (STOPPED)");
+        
+        // Final reset for the plot area
+        plotContainerDiv.innerHTML = '<div id="plot"><div class="text-center p-10 text-xl text-gray-500">Select channels and click \'Start Streaming\'.</div></div>';
+    }
+
+    /**
+     * Pauses the streaming by clearing the interval. Data/Graph state remains intact.
+     */
+    function pauseStreaming() {
+        if (intervalId) {
+            clearInterval(intervalId);
+            intervalId = null;
+        }
+        isPaused = true;
+        updateButtonStates();
+        console.log("Streaming paused.");
+        
+        // Update plot titles with PAUSED
+        updatePlotTitles(" (PAUSED)");
+    }
+
+    /**
+     * Resumes the streaming by setting the interval.
+     */
+    function continueStreaming() {
+        if (!isStreaming || !isPaused) return;
+
+        isPaused = false;
+        intervalId = setInterval(fetchData, 100); 
+        updateButtonStates();
+        console.log("Streaming continued.");
+        
+        // Remove PAUSED/STOPPED from plot titles
+        updatePlotTitles("");
+    }
+    
+    /**
+     * Helper to update plot titles across all active plots.
+     */
+    function updatePlotTitles(suffix) {
+        const mode = graphModeSelector.value;
+        if (mode === "time") {
+            selected.forEach(chIndex => {
+                const plotId = `plot-ch-${chIndex}`;
+                try {
+                    const node = Plotly.d3.select(`#${plotId}`).node();
+                    if (node && node.layout) {
+                        let currentTitle = node.layout.title.text.replace(/ \(PAUSED\)/g, '').replace(/ \(STOPPED\)/g, '').replace(/ \(Time: [\d\.]+s\)/, '');
+                        Plotly.relayout(plotId, { title: currentTitle + suffix });
                     }
-                ];
+                } catch (e) { /* Ignore error if plot isn't initialized */ }
+            });
+        } else {
+            const plotId = 'single-plot';
+            try {
+                const node = Plotly.d3.select(`#${plotId}`).node();
+                if (node && node.layout) {
+                    let currentTitle = node.layout.title.text.replace(/ \(PAUSED\)/g, '').replace(/ \(STOPPED\)/g, '').replace(/ \(Time: [\d\.]+s\)/, '');
+                    Plotly.relayout(plotId, { title: currentTitle + suffix });
+                }
+            } catch (e) { /* Ignore error if plot isn't initialized */ }
+        }
+    }
+
+
+    // --- START/CONTINUE STREAMING LOGIC ---
+    document.getElementById("channelForm").addEventListener("submit", (e) => {
+        e.preventDefault();
+        
+        if (isPaused) {
+            // If paused, just continue
+            continueStreaming();
+            return;
+        }
+        
+        if (isStreaming) {
+            // If running, do nothing on submit until it's stopped/paused
+            return;
+        }
+
+        // --- INITIAL STARTUP LOGIC ---
+
+        let rawSelected = Array.from(document.querySelectorAll("#channelList input[name=channels]:checked")).map(ch => parseInt(ch.value));
+        
+        width = parseFloat(document.getElementById("width").value);
+        mode = graphModeSelector.value;
+
+        // --- MODE-SPECIFIC CHANNEL ENFORCEMENT ---
+        if (rawSelected.length === 0) {
+            Plotly.purge('plot');
+            plotContainerDiv.innerHTML = '<div id="plot"><div class="text-center p-10 text-xl text-red-400">Please select at least one channel to start streaming.</div></div>';
+            updateButtonStates(); 
+            return;
+        }
+
+        if (mode === "recurrence" || mode === "cycle") {
+            selected = [rawSelected[0]]; // Use only the first channel
+        } else {
+            selected = rawSelected;
+        }
+        // --- END MODE-SPECIFIC CHANNEL ENFORCEMENT ---
+
+        // Reset buffers and state for the new stream
+        channelDataBuffers = {};
+        selected.forEach(chIndex => channelDataBuffers[chIndex] = { data: [], time: [] }); 
+        globalTime = 0;
+        bandPowerBuffer = {}; 
+        currentYRange = 500000; 
+        
+        // Clear the main plot container
+        Plotly.purge('plot');
+        plotContainerDiv.innerHTML = '';
+
+
+        // --- Plotly Configuration based on Mode (UNCHANGED) ---
+        let traces, layout;
+        
+        if (mode === "time") {
+            selected.forEach((chIndex, i) => {
+                const chName = channelIndexToOriginalName[chIndex.toString()];
+                const plotId = `plot-ch-${chIndex}`;
+                const color = colors[i % colors.length];
+
+                const plotDiv = document.createElement('div');
+                plotDiv.id = plotId;
+                plotDiv.className = 'w-full mb-4 border border-gray-700 rounded-lg p-2 bg-gray-800'; 
+                plotDiv.style.height = `${Math.floor(600 / selected.length) - 10}px`; 
+                plotContainerDiv.appendChild(plotDiv);
+
+                const individualTrace = [{ 
+                    x: [], y: [], mode: "lines", line: { color: color }, name: chName 
+                }];
                 
-                layout = {
-                    title: `EEG - Topographic Map (Voltage Amplitude)`,
-                    paper_bgcolor: "#0a0a0a", 
-                    plot_bgcolor: "#0a0a0a", 
+                const individualLayout = {
+                    title: `Channel ${chName} - Time Graph - Window: ${width}s`,
+                    paper_bgcolor: "#1f2937", 
+                    plot_bgcolor: "#000000", 
                     font: { color: "#e5e7eb", family: "Inter" },
-                    showlegend: false,
-                    // CRITICAL: Tightened ranges for a cleaner look with the circle
-                    xaxis: { 
-                        visible: false, range: [-0.55, 0.55], fixedrange: true 
-                    },
+                    autosize: true,
+                    margin: { t: 40, r: 10, b: 20, l: 30 },
+                    xaxis: { title: "Time (s)", color: "#e5e7eb", gridcolor: "#374151", range: [0, width], showticklabels: true },
+                    yaxis: { title: "µV", color: "#e5e7eb", gridcolor: "#374151" }
+                };
+
+                Plotly.newPlot(plotId, individualTrace, individualLayout, { responsive: true, displayModeBar: false });
+            });
+            
+        } else if (mode === "polar" || mode === "recurrence" || mode === "cycle") {
+            // Create a single container for non-time plots
+            const singlePlotDiv = document.createElement('div');
+            singlePlotDiv.id = 'single-plot';
+            singlePlotDiv.style.width = '100%';
+            singlePlotDiv.style.height = '600px';
+            plotContainerDiv.appendChild(singlePlotDiv);
+
+            const singlePlotId = 'single-plot';
+
+            if (mode === "polar") {
+                traces = selected.map((ch, i) => {
+                    const name = channelIndexToOriginalName[ch.toString()];
+                    return { r: [], theta: [], mode: "lines", line: { color: colors[i % colors.length] }, name, type: "scatterpolar" };
+                });
+                layout = {
+                    title: `EEG - Polar Graph - Window: ${width}s`,
+                    paper_bgcolor: "#1f2937", plot_bgcolor: "#1f2937", 
+                    font: { color: "#e5e7eb", family: "Inter" },
+                    polar: {
+                        bgcolor: "#000000",
+                        radialaxis: { title: "Amplitude (Normalized)", color: "#e5e7eb", gridcolor: "#374151" },
+                        angularaxis: { direction: "clockwise", rotation: 90, color: "#e5e7eb", gridcolor: "#374151" }
+                    }
+                };
+            } else if (mode === "recurrence") {
+                traces = [{ z: [[0]], type: "heatmap", colorscale: "Viridis", showscale: true }];
+                const channelName = channelIndexToOriginalName[selected[0].toString()];
+                layout = {
+                    title: `EEG - Recurrence Graph - ${channelName} - Window: ${width}s`,
+                    paper_bgcolor: "#1f2937", plot_bgcolor: "#1f2937",
+                    font: { color: "#e5e7eb", family: "Inter" },
+                    xaxis: { title: "Time Index", color: "#e5e7eb", gridcolor: "#374151" },
+                    yaxis: { title: "Time Index", color: "#e5e7eb", gridcolor: "#374151" }
+                };
+            } else if (mode === "cycle") {
+                const bands = ['Delta (0.5-4Hz)', 'Theta (4-8Hz)', 'Alpha (8-13Hz)', 'Beta (13-30Hz)', 'Gamma (>30Hz)'];
+                bandPowerBuffer = { bands: bands, power: Array(bands.length).fill(0) }; 
+                const channelTitle = channelIndexToOriginalName[selected[0].toString()];
+                traces = [{
+                    x: bands, y: bandPowerBuffer.power, type: 'bar',
+                    marker: { color: ['#FF5733', '#33FF57', '#3357FF', '#F3FF33', '#FF33EC'] }
+                }];
+                layout = {
+                    title: `EEG - Scaled Band Power: ${channelTitle}`,
+                    paper_bgcolor: "#1f2937", plot_bgcolor: "#1f2937",
+                    font: { color: "#e5e7eb", family: "Inter" },
+                    xaxis: { title: "Frequency Band", color: "#e5e7eb", gridcolor: "#374151" },
                     yaxis: { 
-                        visible: false, scaleanchor: "x", scaleratio: 1, range: [-0.55, 0.55], fixedrange: true 
-                    },
-                    margin: { l: 20, r: 20, t: 40, b: 20 },
+                        title: `Scaled Average Power (x10^10)`, color: "#e5e7eb", 
+                        gridcolor: "#374151", range: [0, currentYRange] 
+                    } 
                 };
             }
-            // --- End Plotly Configuration ---
-
-            // Start the stream
-            Plotly.newPlot("plot", traces, layout);
-            streaming = true;
             
-            // --- ATTACH CLIPPER TO AFTERPLOT EVENT (CRUCIAL) ---
-            if (mode === 'topomap') {
-                // Remove any previous listener before adding the new one
-                Plotly.d3.select('#plot').on('plotly_afterplot', null); 
-                Plotly.d3.select('#plot').on('plotly_afterplot', applyTopomapClip);
-                // Execute once immediately to apply the clip path
-                applyTopomapClip(); 
-            }
-            // --------------------------------------------------------
-
-            intervalId = setInterval(fetchData, 100); 
-
-            // Update button states
-            startButton.disabled = true;
-            startButton.classList.add('opacity-50', 'cursor-not-allowed');
-            stopButton.disabled = false;
-            stopButton.classList.remove('opacity-50', 'cursor-not-allowed');
-        });
-
-        // --- Helper functions for data buffering (Unchanged) ---
-        function updateBuffer(chIndex, newSignals, newTime) {
-            const buffer = channelDataBuffers[chIndex];
-            const maxPoints = width * fs;
-            buffer.data.push(...newSignals);
-            buffer.time.push(...newTime);
-            if (buffer.data.length > maxPoints) {
-                const excess = buffer.data.length - maxPoints;
-                buffer.data.splice(0, excess);
-                buffer.time.splice(0, excess);
-            }
+            Plotly.newPlot(singlePlotId, traces, layout, { responsive: true, displayModeBar: false });
         }
+        // --- End Plotly Configuration ---
 
-        function updateDataBuffer(chIndex, newSignals) {
-            const buffer = channelDataBuffers[chIndex].data;
-            const maxPoints = width * fs;
-            buffer.push(...newSignals);
-            if (buffer.length > maxPoints) {
-                buffer.splice(0, buffer.length - maxPoints);
-            }
+        // Start the stream
+        isStreaming = true;
+        isPaused = false;
+        intervalId = setInterval(fetchData, 100); 
+
+        updateButtonStates();
+    });
+
+    // --- Helper functions for data buffering (Unchanged) ---
+    function updateBuffer(chIndex, newSignals, newTime) {
+        const buffer = channelDataBuffers[chIndex];
+        const maxPoints = width * fs;
+        buffer.data.push(...newSignals);
+        buffer.time.push(...newTime);
+        if (buffer.data.length > maxPoints) {
+            const excess = buffer.data.length - maxPoints;
+            buffer.data.splice(0, excess);
+            buffer.time.splice(0, excess);
         }
+    }
 
-        // --- Main data fetching and plotting logic (Updated for Topomap) ---
-        async function fetchData() {
-            if (!streaming) return;
+    function updateDataBuffer(chIndex, newSignals) {
+        const buffer = channelDataBuffers[chIndex].data;
+        const maxPoints = width * fs;
+        buffer.push(...newSignals);
+        if (buffer.length > maxPoints) {
+            buffer.splice(0, buffer.length - maxPoints);
+        }
+    }
 
-            try {
-                const response = await fetch("/eeg/update", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ channels: selected, width })
+    // --- Main data fetching and plotting logic (COMPLETED) ---
+    async function fetchData() {
+        if (!isStreaming || isPaused) return; // Only run if streaming and not paused
+
+        try {
+            const response = await fetch("/eeg/update", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ channels: selected, width })
+            });
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            const result = await response.json();
+
+            if (result.message === "No file loaded.") {
+                console.error("No file loaded, stopping stream.");
+                stopStreaming();
+                return;
+            }
+
+            if (!result.signals || typeof result.n_samples === 'undefined' || result.n_samples === 0) {
+                return;
+            }
+
+            const N_samples = result.n_samples;
+            const dt = 1 / fs; 
+
+            // Calculate new global time
+            const timeChunk = [];
+            for (let i = 0; i < N_samples; i++) {
+                globalTime += dt;
+                timeChunk.push(globalTime);
+            }
+
+            const mode = graphModeSelector.value;
+            const singlePlotId = 'single-plot';
+
+            // Plotting logic
+            if (mode === "time") {
+                const xmin = globalTime - width;
+                const xmax = globalTime;
+
+                selected.forEach((chIndex) => {
+                    const plotId = `plot-ch-${chIndex}`;
+                    const newSignals = result.signals[chIndex.toString()]; 
+                    
+                    if (!newSignals || newSignals.length === 0) return;
+                    
+                    updateBuffer(chIndex, newSignals, timeChunk);
+                    
+                    const xUpdate = [channelDataBuffers[chIndex].time];
+                    const yUpdate = [channelDataBuffers[chIndex].data];
+                    
+                    Plotly.restyle(plotId, { x: xUpdate, y: yUpdate });
+                    
+                    Plotly.relayout(plotId, { 
+                        'xaxis.range': [xmin, xmax], 
+                        'title': `Channel ${channelIndexToOriginalName[chIndex.toString()]} - Time Graph - Window: ${width}s (Time: ${globalTime.toFixed(2)}s)`
+                    });
                 });
-                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-                const result = await response.json();
 
-                if (result.message === "No file loaded.") {
-                    console.error("No file loaded, stopping stream.");
-                    stopStreaming();
-                    return;
-                }
-
-                if (!result.signals || typeof result.n_samples === 'undefined' || result.n_samples === 0) {
-                    return;
-                }
-
-                const N_samples = result.n_samples;
-                const dt = 1 / fs; 
-
-                // Plotting logic
-                if (mode === "time") {
-                    const xUpdates = [], yUpdates = [];
-                    const timeChunk = [];
-                    for (let i = 0; i < N_samples; i++) {
-                        globalTime += dt;
-                        timeChunk.push(globalTime);
-                    }
-                    selected.forEach((chIndex, i) => {
-                        const newSignals = result.signals[chIndex.toString()]; 
-                        if (!newSignals || newSignals.length === 0) return;
-                        updateBuffer(chIndex, newSignals, timeChunk);
-                        xUpdates[i] = channelDataBuffers[chIndex].time;
-                        yUpdates[i] = channelDataBuffers[chIndex].data;
-                    });
-                    
-                    Plotly.restyle("plot", { x: xUpdates, y: yUpdates });
-                    
-                    const xmin = globalTime - width;
-                    const xmax = globalTime;
-                    if (xUpdates.length > 0) {
-                        Plotly.relayout("plot", { 
-                            'xaxis.range': [xmin, xmax], 
-                            'title': `EEG - Time Graph - Window: ${width}s (Time: ${globalTime.toFixed(2)}s)` 
-                        });
-                    }
-                } else if (mode === "polar") {
-                    const rUpdate = [], thetaUpdate = [];
-                    selected.forEach((chIndex) => {
-                        const newSignals = result.signals[chIndex.toString()];
-                        if (!newSignals || newSignals.length === 0) return;
-                        updateDataBuffer(chIndex, newSignals);
-                        const buffer = channelDataBuffers[chIndex].data;
-                        const N = buffer.length;
-                        const theta = buffer.map((_, idx) => (idx / (N - 1)) * 360);
-                        const minVal = Math.min(...buffer); 
-                        const r = buffer.map(v => v - minVal); 
-                        rUpdate.push(r); 
-                        thetaUpdate.push(theta);
-                    });
-                    if (rUpdate.length > 0) Plotly.restyle("plot", { r: rUpdate, theta: thetaUpdate });
-                } else if (mode === "recurrence") {
-                    const chIndex = selected[0];
+            } else if (mode === "polar") {
+                const rUpdate = [], thetaUpdate = [];
+                selected.forEach((chIndex) => {
                     const newSignals = result.signals[chIndex.toString()];
                     if (!newSignals || newSignals.length === 0) return;
+                    
                     updateDataBuffer(chIndex, newSignals);
-                    const data = channelDataBuffers[chIndex].data;
-                    const N = data.length;
+                    const buffer = channelDataBuffers[chIndex].data;
+                    const N = buffer.length;
+                    const theta = buffer.map((_, idx) => (idx / (N - 1)) * 360);
+                    // Use a simple normalization for polar plot radius
+                    const maxAbsVal = Math.max(...buffer.map(Math.abs));
+                    const r = buffer.map(v => v / maxAbsVal); 
                     
-                    const recurrence = Array.from({ length: N }, (_, i) =>
-                        Array.from({ length: N }, (_, j) => Math.abs(data[i] - data[j]))
-                    );
+                    rUpdate.push(r); 
+                    thetaUpdate.push(theta);
+                });
+                
+                // Update Plotly for Polar Graph
+                Plotly.restyle(singlePlotId, { r: rUpdate, theta: thetaUpdate });
+                Plotly.relayout(singlePlotId, { 
+                    'title': `EEG - Polar Graph - Window: ${width}s (Time: ${globalTime.toFixed(2)}s)` 
+                });
 
-                    Plotly.react("plot", [{
-                        z: recurrence, type: "heatmap", colorscale: "Viridis", showscale: true
-                    }], {
-                        title: Plotly.d3.select('#plot').node().layout.title.text
-                    });
-                } else if (mode === "cycle") {
-                    const bandPower = result.band_power;
-                    
-                    if (Object.keys(bandPower).length === 0 || !Object.values(bandPower).some(p => p > 0)) {
-                        return;
-                    }
+            } else if (mode === "recurrence") {
+                // Requires the backend to return the recurrence matrix (a 2D array) in result.recurrence_matrix
+                if (!result.recurrence_matrix) return; 
+                
+                Plotly.restyle(singlePlotId, { z: [result.recurrence_matrix] });
+                const channelName = channelIndexToOriginalName[selected[0].toString()];
+                Plotly.relayout(singlePlotId, { 
+                    'title': `EEG - Recurrence Graph - ${channelName} - Window: ${width}s (Time: ${globalTime.toFixed(2)}s)`
+                });
 
-                    bandPowerBuffer.power = bandPowerBuffer.bands.map(bandKey => bandPower[bandKey.split(' ')[0]] || 0);
+            } else if (mode === "cycle") {
+                // Requires the backend to return an array of band powers in result.band_power
+                if (!result.band_power) return; 
 
-                    const maxPower = Math.max(...bandPowerBuffer.power) * 1.1; 
-                    
-                    if (maxPower > currentYRange || maxPower < currentYRange * 0.7) { 
-                        currentYRange = Math.max(100000, Math.ceil(maxPower / 100000) * 100000); 
-                        
-                        Plotly.relayout("plot", {
-                            'yaxis.range': [0, currentYRange],
-                            'yaxis.title': `Scaled Average Power (x10^10)`
-                        });
-                    }
-
-                    Plotly.restyle("plot", {
-                        y: [bandPowerBuffer.power]
-                    }, [0]); 
-
-                    Plotly.relayout("plot", {
-                        title: Plotly.d3.select('#plot').node().layout.title.text
-                    });
-                } else if (mode === "topomap") {
-                    const amplitudes = [];
-                    const xCoords = [];
-                    const yCoords = [];
-                    const names = [];
-
-                    // 1. Collect data from *currently selected* channels (which are the enforced standard set)
-                    selected.forEach((chIndex) => {
-                        const chIndexStr = chIndex.toString();
-                        const newSignals = result.signals[chIndexStr];
-                        
-                        if (!newSignals || newSignals.length === 0) return;
-
-                        const avgAmp = newSignals.reduce((sum, val) => sum + val, 0) / newSignals.length;
-                        
-                        const originalName = channelIndexToOriginalName[chIndexStr];
-                        const cleanedName = cleanChannelName(originalName);
-                        
-                        const loc = channelLocations[cleanedName];
-
-                        if (loc) {
-                            amplitudes.push(avgAmp);
-                            xCoords.push(loc.x);
-                            yCoords.push(loc.y);
-                            names.push(cleanedName); 
-                        }
-                    });
-
-                    if (amplitudes.length > 0) {
-                        // 2. Calculate dynamic color range
-                        const maxAbsAmp = Math.max(...amplitudes.map(Math.abs));
-                        const cRange = maxAbsAmp * 1.1; 
-                        
-                        // 3. Prepare the full grid for the CONTOUR trace (Trace 2)
-                        const ampMap = {};
-                        names.forEach((name, i) => ampMap[name] = amplitudes[i]);
-
-                        const allMappedX = [];
-                        const allMappedY = [];
-                        const allMappedZ = [];
-
-                        Object.keys(channelLocations).forEach(name => {
-                            const loc = channelLocations[name];
-                            allMappedX.push(loc.x);
-                            allMappedY.push(loc.y);
-                            allMappedZ.push(ampMap[name] !== undefined ? ampMap[name] : 0);
-                        });
-
-                        // 4. Update the Scatter trace for the dots (Trace 1)
-                        Plotly.restyle("plot", {
-                            x: [xCoords], 
-                            y: [yCoords], 
-                            text: [names] 
-                        }, [1]);
-
-                        // 5. Update the Contour trace (Trace 2)
-                        Plotly.restyle("plot", {
-                            z: [allMappedZ], 
-                            x: [allMappedX], 
-                            y: [allMappedY],
-                            zmin: [-cRange],
-                            zmax: [cRange],
-                        }, [2]);
-
-                        // Plotly.relayout will trigger 'plotly_afterplot', which applies the clip
-                        Plotly.relayout("plot", {
-                            'title': `EEG - Topographic Map (Voltage Amplitude) - Max: ${maxAbsAmp.toFixed(2)} µV`,
-                        });
-                    }
+                // Dynamically adjust the Y axis range based on current power values
+                const maxPower = Math.max(...result.band_power);
+                if (maxPower * 1.2 > currentYRange) {
+                    currentYRange = maxPower * 1.2;
                 }
-                // End Plotting Logic
 
-            } catch (error) {
-                console.error("Failed to fetch data:", error);
+                // Update Plotly for Band Power Bar Chart
+                Plotly.restyle(singlePlotId, { y: [result.band_power] });
+                Plotly.relayout(singlePlotId, { 
+                    'yaxis.range': [0, currentYRange],
+                    'title': `EEG - Scaled Band Power: ${channelIndexToOriginalName[selected[0].toString()]} (Time: ${globalTime.toFixed(2)}s)`
+                });
+            }
+
+        } catch (error) {
+            console.error("Data fetch or plot update error:", error);
+            // Optionally alert the user or stop the stream on a critical error
+            if (error.message.includes("status: 500")) {
+                console.error("Server error during data update. Stopping stream.");
+            }
+            // If the error is network/server side, stop the loop to prevent spamming the backend
+            if (!isPaused) {
                 stopStreaming();
-                const plotDiv = document.getElementById('plot');
-                if (plotDiv) {
-                    plotDiv.innerHTML = '<div class="text-center p-10 text-xl text-red-500 bg-red-900/20 rounded-xl">Connection to data stream failed. Please ensure the backend is running and refresh the page to retry.</div>';
-                }
             }
         }
-    </script>
+    }
+
+    // Initialize button states on load
+    document.addEventListener('DOMContentLoaded', () => {
+        updateButtonStates();
+    });
+
+</script>
 </body>
 </html>

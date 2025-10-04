@@ -7,20 +7,20 @@ import wfdb
 import os
 
 # ----------------------------------------------------------
-# 1️⃣ CONFIGURATION
+# 1. CONFIGURATION
 # ----------------------------------------------------------
 DATA_PATH = r"data1/s0543_re"   # Path without extension
 MODEL_SAVE_PATH = "simple_ecg_model.pt"
 
 # ----------------------------------------------------------
-# 2️⃣ LOAD ECG SIGNAL
+# 2. LOAD ECG SIGNAL
 # ----------------------------------------------------------
-print("📥 Loading ECG signal...")
+print("Loading ECG signal...")
 
 try:
     record = wfdb.rdrecord(DATA_PATH)
     sig = record.p_signal[:, 0]  # Use the first channel
-    print(f"✅ Loaded signal shape: {sig.shape}")
+    print(f"Loaded signal shape: {sig.shape}")
 except Exception as e:
     raise RuntimeError(f"Error loading ECG data: {e}")
 
@@ -42,7 +42,7 @@ dataset = TensorDataset(X, y)
 loader = DataLoader(dataset, batch_size=1, shuffle=True)
 
 # ----------------------------------------------------------
-# 3️⃣ DEFINE SIMPLE MODEL
+# 3. DEFINE SIMPLE MODEL
 # ----------------------------------------------------------
 class SimpleECG(nn.Module):
     def __init__(self):
@@ -64,13 +64,13 @@ class SimpleECG(nn.Module):
         return self.net(x)
 
 # ----------------------------------------------------------
-# 4️⃣ TRAIN THE MODEL
+# 4. TRAIN THE MODEL
 # ----------------------------------------------------------
 model = SimpleECG()
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), lr=0.001)
 
-print("🏋️ Training model...")
+print("Training model...")
 for epoch in range(10):
     total_loss = 0
     for xb, yb in loader:
@@ -83,7 +83,7 @@ for epoch in range(10):
     print(f"Epoch {epoch+1}, Loss: {total_loss/len(loader):.4f}")
 
 # ----------------------------------------------------------
-# 5️⃣ SAVE MODEL
+# 5. SAVE MODEL
 # ----------------------------------------------------------
 torch.save(model.state_dict(), MODEL_SAVE_PATH)
-print(f"✅ Model saved as {MODEL_SAVE_PATH}")
+print(f"Model saved as {MODEL_SAVE_PATH}")
