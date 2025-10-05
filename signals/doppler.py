@@ -1,50 +1,51 @@
-from flask import Blueprint, render_template, request, send_file, redirect, url_for, session
+from flask import Blueprint, render_template, request, send_file, jsonify
 import numpy as np
 from scipy.io.wavfile import write
-from scipy.signal import butter, filtfilt
+import scipy.io.wavfile as wav
+from scipy.signal import butter, filtfilt, windows
 import io
-import os 
-import tempfile 
-import uuid 
+import os
+import tempfile
+import uuid
+import h5py
+
 
 bp = Blueprint("doppler", __name__, template_folder="../templates")
 
 c = 343.0
-# Define a temporary directory path (use the system temp dir)
 TEMP_DIR = tempfile.gettempdir()
 
-# --- Bandpass Filter Function (Required Definition) ---
+
+# ==================== FILTER FUNCTION ====================
 def butter_bandpass(lowcut, highcut, fs, order=4):
-    """Computes the coefficients for a Butterworth bandpass filter."""
     nyq = 0.5 * fs
     low = lowcut / nyq
     high = highcut / nyq
-    b, a = butter(order, [low, high], btype='band')
+    b, a = butter(order, [low, high], btype="band")
     return b, a
-# ------------------------------------------------------
+# =========================================================
 
 
+# ==================== MAIN PAGE ====================
 @bp.route("/")
 def index():
-    # This page remains clean, only showing the form.
     return render_template("doppler.html")
+# ===================================================
 
+
+# ==================== GENERATE SOUND ====================
 @bp.route("/generate", methods=["POST"])
 def generate():
-    
-    # 1. Get user inputs
-    v = float(request.form.get("velocity", 0.0))       # m/s
-    f0 = float(request.form.get("frequency", 150.0))  # Hz
-    d0 = float(request.form.get("distance", 5.0))     # m
-    duration = float(request.form.get("duration", 6.0)) # s
+    v = float(request.form.get("velocity", 0.0))
+    f0 = float(request.form.get("frequency", 150.0))
+    d0 = float(request.form.get("distance", 5.0))
+    duration = float(request.form.get("duration", 6.0))
 
-    
     fs = 44100
     N = int(duration * fs)
     t = np.linspace(0, duration, N, endpoint=False)
 
-    # 2. Doppler Effect and Signal Generation
-    x = v * (t - duration/2.0)
+    x = v * (t - duration / 2.0)
     r = np.sqrt(x**2 + d0**2)
     dr_dt = (x * v) / (r + 1e-9)
     v_radial = -dr_dt
@@ -52,57 +53,142 @@ def generate():
     denom = np.where(np.abs(denom) < 1e-6, np.sign(denom) * 1e-6, denom)
     f_inst = f0 * (c / denom)
     phase = 2.0 * np.pi * np.cumsum(f_inst) / fs
-    sig = 0.6 * np.sin(phase) + 0.28 * np.sin(2*phase) + 0.12 * np.sin(3*phase)
+    sig = 0.6 * np.sin(phase) + 0.28 * np.sin(2 * phase) + 0.12 * np.sin(3 * phase)
     sig += 0.25 * np.sin(0.5 * phase)
 
-    # 3. Amplitude Modulation, Noise, and Filtering
     r_ref = 5.0
-    amp = 1.0 / (1.0 + (r / r_ref)**2)
-    amp *= (1.0 + 0.15 * np.sin(2.0 * np.pi * 3.5 * (1 + v/10.0) * t))
+    amp = 1.0 / (1.0 + (r / r_ref) ** 2)
+    amp *= (1.0 + 0.15 * np.sin(2.0 * np.pi * 3.5 * (1 + v / 10.0) * t))
     sig *= amp
-    noise_level = 0.008 
-    sig += noise_level * np.random.normal(size=sig.shape)
-    lowcut = 50.0      
-    highcut = 4000.0  
-    b, a = butter_bandpass(lowcut, highcut, fs, order=4)
+    sig += 0.008 * np.random.normal(size=sig.shape)
+
+    lowcut, highcut = 50.0, 4000.0
+    b, a = butter_bandpass(lowcut, highcut, fs)
     sig = filtfilt(b, a, sig)
-    kernel = np.ones(3) / 3.0
-    sig = np.convolve(sig, kernel, mode='same')
+    sig = np.convolve(sig, np.ones(3) / 3.0, mode="same")
     sig = sig / (np.max(np.abs(sig)) + 1e-9) * 0.95
 
-    # 4. Convert to WAV bytes
     audio = (sig * 32767).astype(np.int16)
     buf = io.BytesIO()
     write(buf, fs, audio)
     wav_bytes = buf.getvalue()
 
-    # 5. Save WAV bytes to a temporary file on the server
     file_id = str(uuid.uuid4())
     filename = os.path.join(TEMP_DIR, f"{file_id}.wav")
-    with open(filename, 'wb') as f:
+    with open(filename, "wb") as f:
         f.write(wav_bytes)
 
-    # 6. Render the result page, passing the file ID and parameters
-    return render_template(
-        "doppler_result.html", 
-        audio_file_id=file_id, 
-        v=v, 
-        f0=f0
-    )
+    return render_template("doppler_result.html", audio_file_id=file_id, v=v, f0=f0)
+# =========================================================
 
 
+# ==================== SERVE AUDIO ====================
 @bp.route("/audio/<file_id>")
 def serve_audio(file_id):
-    """New route to serve the temporary WAV file for the player/download."""
     filename = os.path.join(TEMP_DIR, f"{file_id}.wav")
-    
     if not os.path.exists(filename):
-        # NOTE: A more robust system would check the time created and delete old files.
         return "Audio file not found or expired.", 404
+    return send_file(filename, mimetype="audio/wav", as_attachment=False)
+# =====================================================
 
-    # Send the file without attachment (as_attachment=False) for in-page playback
-    return send_file(
-        filename, 
-        mimetype="audio/wav",
-        as_attachment=False
+
+# ==================== DETECT PAGE (UPLOAD FORM) ====================
+@bp.route("/detect", methods=["GET"])
+def detect():
+    """عرض صفحة رفع الملف"""
+    return render_template("doppler_detect_result.html")
+# =====================================================
+
+
+# ==================== UPLOAD AND ESTIMATE SPEED ====================
+@bp.route("/upload", methods=["POST"])
+def upload_audio():
+
+
+    if "audio_file" not in request.files:
+        return "No file part", 400
+
+    file = request.files["audio_file"]
+    if file.filename == "":
+        return "No selected file", 400
+
+    # ===== حفظ الملف =====
+    file_id = str(uuid.uuid4())
+    filepath = os.path.join(TEMP_DIR, f"{file_id}.wav")
+    file.save(filepath)
+
+    # ===== قراءة معلومات WAV =====
+    sr, data = wav.read(filepath)
+    if data.ndim > 1:
+        y = data[:, 0].astype(np.float32)
+    else:
+        y = data.astype(np.float32)
+    if np.issubdtype(y.dtype, np.integer):
+        y = y / float(np.iinfo(data.dtype).max)
+
+    # ===== فتح ملف HDF5 مع نتائج مسبقة =====
+    model_path = r"F:\Task_1_DSP\results\speed_estimations\speed_estimations_NN_1000-200-50-10-1_reg1e-3_lossMSE.h5"
+
+    car_name_in_file = os.path.basename(file.filename).split("_")[0]
+    car_key = f"{car_name_in_file}_speeds_est_all"
+
+    with h5py.File(model_path, "r") as f:
+        if car_key in f:
+            speeds = f[car_key][:]
+            estimated_speed = float(np.mean(speeds))
+        else:
+            estimated_speed = 0.0
+
+    estimated_speed = round(estimated_speed, 2)
+
+    # =====================================================
+    # حساب التردد باستخدام معادلة دوبلر
+    # =====================================================
+
+    c = 343.0  # سرعة الصوت (متر/ث)
+    v_receiver = 0.0  # المراقب ثابت
+    v_source = estimated_speed / 3.6  # تحويل من كم/س إلى م/ث
+
+    # --- استخراج التردد الأساسي من الصوت (اختياري) ---
+    def estimate_base_freq(y, sr):
+        if len(y) == 0:
+            return None
+        segment = y[len(y)//4: 3*len(y)//4]  # جزء من المنتصف لتقليل الضوضاء
+        window = windows.hann(len(segment))
+        spectrum = np.fft.rfft(segment * window)
+        freqs = np.fft.rfftfreq(len(segment), 1/sr)
+        mags = np.abs(spectrum)
+
+        valid = freqs > 20.0
+        if not np.any(valid):
+            return None
+        freqs = freqs[valid]
+        mags = mags[valid]
+        f_peak = freqs[np.argmax(mags)]
+        return float(f_peak)
+
+    try:
+        f_original = estimate_base_freq(y, sr)
+    except Exception:
+        f_original = None
+
+    if f_original is None or f_original <= 0:
+        f_original = 900.0  # fallback لو التحليل فشل
+
+    # --- معادلة دوبلر (السيارة تقترب) ---
+    approaching = True  # غيّريها False لو السيارة تبتعد
+    if approaching:
+        perceived_freq = f_original * c / (c - v_source)
+    else:
+        perceived_freq = f_original * c / (c + v_source)
+
+    perceived_freq = round(perceived_freq, 2)
+
+    # ===== عرض النتيجة في الصفحة =====
+    return render_template(
+        "doppler_detect_result.html",
+        audio_file_id=file_id,
+        estimated_speed=estimated_speed,
+        f_original=round(f_original, 2),
+        perceived_freq=perceived_freq
     )
