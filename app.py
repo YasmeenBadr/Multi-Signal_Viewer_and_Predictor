@@ -1,5 +1,5 @@
 from flask import Flask, render_template
-from signals import eeg, ecg, radar, doppler
+from signals import eeg, ecg, radar, doppler , sar
 
 app = Flask(__name__)
 
@@ -21,6 +21,10 @@ app.register_blueprint(radar.bp, url_prefix="/radar")
 
 # DOPPLER routes
 app.register_blueprint(doppler.bp, url_prefix="/doppler")
+
+
+# SAR routes
+app.register_blueprint(sar.bp, url_prefix="/sar")
 
 if __name__ == "__main__":
     app.run(debug=True)

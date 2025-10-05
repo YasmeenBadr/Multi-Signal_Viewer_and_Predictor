@@ -17,8 +17,6 @@
       color: #00eaff;
     }
 
-
-
     .card {
       background-color: #1f1f1f;
       border: 1px solid #00eaff20;
@@ -40,6 +38,11 @@
     .btn-custom:hover {
       background-color: #00c0cc;
       color: white;
+    }
+
+    .small {
+      color: #aaa;
+      font-size: 13px;
     }
   </style>
 </head>
@@ -80,38 +83,74 @@
           <!-- Results will appear here -->
           <div id="resultBox" class="mt-4"></div>
         </div>
-
       </div>
-
-
-
 
       <!-- SAR -->
       <div class="tab-pane fade" id="sar" role="tabpanel">
         <div class="card p-4">
           <h2>SAR (Synthetic Aperture Radar)</h2>
-          <p>Coming soon: visualization and classification of SAR images.</p>
-          <button class="btn btn-secondary" disabled>Feature Coming Soon</button>
+          <p>Upload a Sentinel-1 GRD (.tif) file to visualize and analyze backscatter.</p>
+
+          <form id="sarForm" enctype="multipart/form-data">
+            <input type="file" name="file" id="sar-file" class="form-control mb-3" accept=".tif,.tiff" required>
+            <button type="submit" class="btn btn-custom">Analyze SAR Image</button>
+          </form>
+
+          <!-- SAR Results -->
+          <div id="sarResultBox" class="mt-4" style="display:none;">
+            <div class="row">
+              <div class="col-md-6 col-lg-4 mb-3">
+                <div class="card p-2 text-center">
+                  <h5>Main Display (2–98% Scaled)</h5>
+                  <img id="sarDisplay" src="" class="img-fluid rounded">
+                </div>
+              </div>
+
+              <div class="col-md-6 col-lg-4 mb-3">
+                <div class="card p-2 text-center">
+                  <h5>Histogram</h5>
+                  <img id="sarHist" src="" class="img-fluid rounded">
+                </div>
+              </div>
+
+              <div class="col-md-6 col-lg-4 mb-3">
+                <div class="card p-2 text-center">
+                  <h5>Water Mask</h5>
+                  <img id="sarMask" src="" class="img-fluid rounded">
+                </div>
+              </div>
+
+              <div class="col-md-6 col-lg-4 mb-3">
+                <div class="card p-2 text-center">
+                  <h5>Overlay (Low-Backscatter in Red)</h5>
+                  <img id="sarOverlay" src="" class="img-fluid rounded">
+                </div>
+              </div>
+            </div>
+
+            <div class="card p-3 mt-3">
+              <h5>Estimated Statistics</h5>
+              <ul id="sarStats" class="list-unstyled mb-0 small"></ul>
+            </div>
+          </div>
         </div>
       </div>
-    </div>
 
-    <!-- Back Button -->
-    <div class="text-center mt-5">
-      <a href="/" class="btn btn-outline-light">⬅ Back to Home</a>
+      <!-- Back Button -->
+      <div class="text-center mt-5">
+        <a href="/" class="btn btn-outline-light">⬅ Back to Home</a>
+      </div>
     </div>
-
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
+  <!-- Drone JS -->
   <script>
     document.getElementById("droneForm").addEventListener("submit", async function (e) {
       e.preventDefault();
 
       const formData = new FormData(this);
-
-      // Send to Flask backend
       const response = await fetch("/radar/analyze", {
         method: "POST",
         body: formData
@@ -126,14 +165,65 @@
 
       const data = await response.json();
       resultBox.innerHTML = `
-    <div class="alert alert-info">
-      <h4>Prediction: <strong>${data.predicted_class}</strong></h4>
-      <p>Confidence: <strong>${(data.confidence * 100).toFixed(2)}%</strong></p>
-    </div>
-  `;
+        <div class="alert alert-info">
+          <h4>Prediction: <strong>${data.predicted_class}</strong></h4>
+          <p>Confidence: <strong>${(data.confidence * 100).toFixed(2)}%</strong></p>
+        </div>`;
     });
   </script>
 
+  <!-- SAR JS -->
+  <script>
+    document.getElementById("sarForm").addEventListener("submit", async function (e) {
+      e.preventDefault();
+
+      const file = document.getElementById("sar-file").files[0];
+      if (!file) {
+        alert("Please select a .tif file");
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const sarBox = document.getElementById("sarResultBox");
+
+      try {
+        const response = await fetch("/sar/view", {
+          method: "POST",
+          body: formData
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to process SAR file.");
+        }
+
+        const data = await response.json();
+
+        // Update images
+        document.getElementById("sarDisplay").src = data.main_image;
+        document.getElementById("sarHist").src = data.histogram;
+        document.getElementById("sarMask").src = data.mask;
+        document.getElementById("sarOverlay").src = data.overlay;
+
+        // Update stats
+        const s = data.stats;
+        document.getElementById("sarStats").innerHTML = `
+          <li><b>Mean:</b> ${s.mean.toFixed(2)} dB</li>
+          <li><b>Std:</b> ${s.std.toFixed(2)} dB</li>
+          <li><b>Min / Max:</b> ${s.min.toFixed(2)} / ${s.max.toFixed(2)} dB</li>
+          <li><b>Threshold:</b> ${s.threshold} dB</li>
+          <li><b>Low-backscatter ratio:</b> ${(s.low_backscatter_ratio * 100).toFixed(2)}%</li>
+        `;
+
+        sarBox.style.display = "block";
+      } catch (err) {
+        console.error(err);
+        sarBox.innerHTML = `<div class="alert alert-danger">Error analyzing SAR file.</div>`;
+        sarBox.style.display = "block";
+      }
+    });
+  </script>
 
 </body>
 
