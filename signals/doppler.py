@@ -8,7 +8,7 @@ import os
 import tempfile
 import uuid
 import h5py
-
+import json
 
 bp = Blueprint("doppler", __name__, template_folder="../templates")
 
@@ -62,6 +62,7 @@ def generate():
     sig *= amp
     sig += 0.008 * np.random.normal(size=sig.shape)
 
+    # فلترة bandpass
     lowcut, highcut = 50.0, 4000.0
     b, a = butter_bandpass(lowcut, highcut, fs)
     sig = filtfilt(b, a, sig)
@@ -78,7 +79,20 @@ def generate():
     with open(filename, "wb") as f:
         f.write(wav_bytes)
 
-    return render_template("doppler_result.html", audio_file_id=file_id, v=v, f0=f0)
+# ======= تحويل الإشارة للرسم =======
+    x_plot_json = t.tolist()  # كل النقاط موجودة
+    y_plot_json = sig.tolist()
+
+   
+    return render_template(
+        "doppler_result.html",
+        audio_file_id=file_id,
+        v=v,
+        f0=f0,
+        x_plot_json=x_plot_json,
+        y_plot_json=y_plot_json
+    )
+
 # =========================================================
 
 
@@ -103,8 +117,6 @@ def detect():
 # ==================== UPLOAD AND ESTIMATE SPEED ====================
 @bp.route("/upload", methods=["POST"])
 def upload_audio():
-
-
     if "audio_file" not in request.files:
         return "No file part", 400
 
@@ -144,21 +156,19 @@ def upload_audio():
     # =====================================================
     # حساب التردد باستخدام معادلة دوبلر
     # =====================================================
+    c = 343.0
+    v_receiver = 0.0
+    v_source = estimated_speed / 3.6
 
-    c = 343.0  # سرعة الصوت (متر/ث)
-    v_receiver = 0.0  # المراقب ثابت
-    v_source = estimated_speed / 3.6  # تحويل من كم/س إلى م/ث
-
-    # --- استخراج التردد الأساسي من الصوت (اختياري) ---
+    # --- استخراج التردد الأساسي ---
     def estimate_base_freq(y, sr):
         if len(y) == 0:
             return None
-        segment = y[len(y)//4: 3*len(y)//4]  # جزء من المنتصف لتقليل الضوضاء
+        segment = y[len(y)//4: 3*len(y)//4]
         window = windows.hann(len(segment))
         spectrum = np.fft.rfft(segment * window)
         freqs = np.fft.rfftfreq(len(segment), 1/sr)
         mags = np.abs(spectrum)
-
         valid = freqs > 20.0
         if not np.any(valid):
             return None
@@ -173,10 +183,9 @@ def upload_audio():
         f_original = None
 
     if f_original is None or f_original <= 0:
-        f_original = 900.0  # fallback لو التحليل فشل
+        f_original = 900.0
 
-    # --- معادلة دوبلر (السيارة تقترب) ---
-    approaching = True  # غيّريها False لو السيارة تبتعد
+    approaching = True
     if approaching:
         perceived_freq = f_original * c / (c - v_source)
     else:
@@ -184,11 +193,22 @@ def upload_audio():
 
     perceived_freq = round(perceived_freq, 2)
 
+    # ===== إعداد بيانات الرسم =====
+    N = len(y)
+    x_plot = np.linspace(0, N/sr, N)  # الوقت بالثواني
+    y_plot = y
+
+    # تحويل للـ JSON
+    y_plot_json = json.dumps(y_plot.tolist())
+    x_plot_json = json.dumps(x_plot.tolist())
+
     # ===== عرض النتيجة في الصفحة =====
     return render_template(
         "doppler_detect_result.html",
         audio_file_id=file_id,
         estimated_speed=estimated_speed,
         f_original=round(f_original, 2),
-        perceived_freq=perceived_freq
+        perceived_freq=perceived_freq,
+        y_plot_json=y_plot_json,
+        x_plot_json=x_plot_json
     )

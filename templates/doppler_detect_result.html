@@ -41,6 +41,13 @@
       margin-top: 40px;
     }
     .btn:hover { background-color: #00c0cc; color: white; }
+
+    #soundCanvas {
+      display: block;
+      margin: 20px auto 40px auto;
+      border: 1px solid #00eaff;
+      background-color: #111;
+    }
   </style>
 </head>
 <body>
@@ -59,15 +66,36 @@
         <h4>Original Frequency</h4>
         <div class="result-value">{{ f_original }} Hz</div>
       </div>
+    </div>
 
-      <!-- Box 3 -->
-      <div class="result-box">
-        <h4>Coming Soon</h4>
-        <div class="result-value">---</div>
-      </div>
+    <!-- Sound signal plot -->
+    <div>
+      <h4>Sound Signal</h4>
+      <canvas id="soundCanvas" width="800" height="200"></canvas>
     </div>
 
     <a href="{{ url_for('doppler.index') }}" class="btn">Back</a>
   </div>
+
+  <script>
+    var y_plot = JSON.parse('{{ y_plot_json | safe }}');
+    var x_plot = JSON.parse('{{ x_plot_json | safe }}');
+
+    const canvas = document.getElementById('soundCanvas');
+    const ctx = canvas.getContext('2d');
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    ctx.beginPath();
+    ctx.moveTo(0, canvas.height/2);
+    for(let i=0; i<x_plot.length; i++){
+        let x = i * canvas.width / x_plot.length;
+        let y = canvas.height/2 - y_plot[i]*canvas.height/2;
+        ctx.lineTo(x, y);
+    }
+    ctx.strokeStyle = "#00eaff";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  </script>
 </body>
 </html>
