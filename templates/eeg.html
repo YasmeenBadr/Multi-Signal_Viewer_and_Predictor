@@ -21,6 +21,10 @@
                     },
                     fontFamily: {
                         sans: ['Inter', 'sans-serif'],
+                    },
+                    spacing: {
+                        // Define custom size for collapsed sidebar (w-14 is 3.5rem)
+                        '14': '3.5rem', 
                     }
                 }
             }
@@ -28,22 +32,32 @@
     </script>
     <style>
         body { font-family: 'Inter', sans-serif; }
-        .plot-container { min-height: 600px; }
+        /* EEG Plot Wrapper (allows page elongation) */
+        .plot-wrapper { 
+            min-height: 300px; 
+        } 
+        .plot-container { 
+            height: auto; 
+            min-height: 550px;
+        }
+        /* Fix the height of the Band Power plot's container */
+        #bandPowerContainer {
+            height: 600px; 
+        }
+        
         .channel-list::-webkit-scrollbar { width: 8px; }
         .channel-list::-webkit-scrollbar-track { background: #1f2937; }
         .channel-list::-webkit-scrollbar-thumb { background-color: #374151; border-radius: 4px; }
         .channel-list::-webkit-scrollbar-thumb:hover { background-color: #4b5563; }
         .hidden { display: none; } 
-        /* NEW: Class for disabled channel selection area */
         .disabled-input { opacity: 0.6; pointer-events: none; }
-        /* Added button styles */
         .btn-secondary {
-            background-color: #374151; /* Gray-700 equivalent */
-            color: #e5e7eb; /* text-light */
+            background-color: #374151;
+            color: #e5e7eb;
             transition: background-color 0.2s;
         }
         .btn-secondary:hover:enabled {
-            background-color: #4b5563; /* Gray-600 equivalent */
+            background-color: #4b5563;
         }
     </style>
 </head>
@@ -51,154 +65,332 @@
 
     <div class="container mx-auto">
         <h1 class="text-3xl font-extrabold text-accent mb-6 text-center">Real-Time EEG Signal Analyzer</h1>
-
+        
         <div class="flex flex-col md:flex-row gap-6">
             
-            <div class="md:w-1/4 bg-secondary-bg p-6 rounded-xl shadow-2xl sidebar">
-                <h4 class="text-xl font-semibold text-accent mb-4">EEG Controls</h4>
+            <div class="md:w-1/4 bg-secondary-bg p-6 rounded-xl shadow-2xl sidebar transition-all duration-300 ease-in-out" id="controlPanel">
                 
-                <div class="mb-6 border-2 border-dashed border-gray-600 rounded-lg p-4 text-center hover:border-accent transition duration-300" 
-                     id="dropZone">
-                    <input type="file" id="edfFile" accept=".edf" class="hidden">
-                    <label for="edfFile" class="cursor-pointer">
-                        <svg class="mx-auto h-8 w-8 text-accent mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 014 4.903V18a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+                <div class="flex justify-between items-center mb-4">
+                    <h4 class="text-xl font-extrabold text-accent" id="panelHeader">Control Panel</h4>
+                    <button id="collapseButton" class="text-accent hover:text-accent-hover transition duration-200 focus:outline-none p-1 rounded-full bg-gray-700/50">
+                        <svg class="h-6 w-6 transform rotate-0 transition-transform duration-300" id="collapseIcon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"></path>
                         </svg>
-                        <p class="text-sm font-medium">Drag & drop or <span class="text-accent font-bold">click to upload</span> an **EDF** file</p>
-                    </label>
-                    <p id="fileNameDisplay" class="text-xs text-gray-400 mt-2">No file loaded.</p>
-                </div>
-
-                <form id="channelForm" class="hidden">
-                    <div class="mb-4">
-                        <label for="width" class="block text-sm font-medium mb-1">Window width (seconds)</label>
-                        <input type="number" id="width" name="width" 
-                                class="w-full p-2 bg-gray-700 text-text-light border border-gray-600 rounded-lg focus:ring-accent focus:border-accent" 
-                                value="5" min="1" step="1">
-                    </div>
-
-                    <div class="mb-4">
-                        <label for="graphMode" class="block text-sm font-medium mb-1">Graph Mode</label>
-                        <select id="graphMode" 
-                                 class="w-full p-2 bg-gray-700 text-text-light border border-gray-600 rounded-lg focus:ring-accent focus:border-accent">
-                            <option value="time">Time Graph (Multi-Channel)</option>
-                            <option value="polar">Polar Graph (Multi-Channel)</option>
-                            <option value="recurrence">Recurrence Graph (Single Channel)</option>
-                            <option value="cycle">Cycle Based Analysis (Single/Averaged)</option>
-                        </select>
-                    </div>
-
-                    <div class="mb-4" id="montageSelectorContainer">
-                        <label for="montageSelector" class="block text-sm font-medium mb-1">Quick Channel Set (Montage)</label>
-                        <select id="montageSelector"
-                                class="w-full p-2 bg-gray-700 text-text-light border border-gray-600 rounded-lg focus:ring-accent focus:border-accent">
-                            <option value="none">Custom Selection (Show All Channels)</option>
-                            <option value="standard">Standard 10-20 Subset</option>
-                            <option value="frontal">Frontal Lobe Only</option>
-                            <option value="occipital">Occipital Lobe Only</option>
-                            <option value="all">Select All Channels (May be slow/cluttered)</option>
-                        </select>
-                    </div>
-
-                    <div id="channelSelectionContainer" class="mb-6">
-                        <label class="block text-sm font-medium mb-2">Select Channels</label>
-                        
-                        <div id="channelInstructions" class="text-xs text-yellow-400 mb-2 p-2 bg-yellow-900/20 rounded hidden">
-                            Hint: For this mode, selecting one channel is highly recommended.
-                        </div>
-
-                        <div id="channelList" class="channel-list p-3 rounded-lg border border-gray-700 bg-gray-800 max-h-40 overflow-y-auto">
-                            <p class="text-center text-gray-500">Channels load after file upload.</p>
-                        </div>
-                    </div>
-
-                    <div class="flex gap-2 mb-2">
-                        <button type="submit" id="startContinueButton" class="w-1/2 bg-accent hover:bg-accent-hover text-text-dark font-extrabold py-2 rounded-lg transition duration-200 shadow-lg" >
-                            Start Streaming
-                        </button>
-                        <button type="button" id="pauseButton" onclick="pauseStreaming()" class="w-1/2 btn-secondary font-extrabold py-2 rounded-lg transition duration-200 shadow-lg opacity-50 cursor-not-allowed" disabled>
-                            Pause
-                        </button>
-                    </div>
-
-                    <button type="button" id="stopButton" class="w-full bg-red-700 hover:bg-red-600 text-text-light font-extrabold py-2 rounded-lg transition duration-200 shadow-lg opacity-50 cursor-not-allowed" disabled onclick="stopStreaming()">
-                            Stop Streaming (Reset)
                     </button>
-                </form>
-            </div>
-
-            <div class="md:w-3/4 bg-secondary-bg p-4 rounded-xl shadow-2xl plot-container">
-                <h4 class="text-xl font-semibold text-accent mb-4">EEG Signal Viewer</h4>
-                <div id="plot" style="width:100%;height:600px;">
-                    <div class="text-center p-10 text-xl text-gray-500">
-                        Please upload an EDF file to begin analysis.
+                </div>
+                
+                <div id="controlPanelContent" class="transition-opacity duration-300 ease-in-out">
+                    
+                    <div class="mb-6 border-2 border-dashed border-gray-600 rounded-lg p-4 text-center hover:border-accent transition duration-300" 
+                        id="dropZone">
+                        <input type="file" id="edfFile" accept=".edf" class="hidden">
+                        <label for="edfFile" class="cursor-pointer">
+                            <svg class="mx-auto h-8 w-8 text-accent mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 014 4.903V18a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+                            </svg>
+                            <p class="text-sm font-medium">Drag & drop or <span class="text-accent font-bold">click to upload</span> an **EDF** file</p>
+                        </label>
+                        <p id="fileNameDisplay" class="text-xs text-gray-400 mt-2">No file loaded.</p>
                     </div>
+                    <h5 class="text-md font-bold text-gray-300 mt-4 mb-3 border-b border-gray-700 pb-2">Playback Settings</h5>
+                    <div class="flex gap-4 mb-4">
+                        <div class="flex-1">
+                            <label for="width" class="block text-xs font-medium mb-1 text-gray-400">Window (s)</label>
+                            <input type="number" id="width" name="width" 
+                                    class="w-full p-2 bg-gray-700 text-text-light border border-gray-600 rounded-lg focus:ring-accent focus:border-accent" 
+                                    value="5" min="1" step="1">
+                        </div>
+                        
+                        <div class="flex-1">
+                            <label for="speedMultiplier" class="block text-xs font-medium mb-1 text-gray-400">Stream Speed (x)</label>
+                            <input type="number" id="speedMultiplier" name="speedMultiplier" 
+                                    class="w-full p-2 bg-gray-700 text-text-light border border-gray-600 rounded-lg focus:ring-accent focus:border-accent" 
+                                    value="1.0" min="0.1" max="5.0" step="0.1">
+                        </div>
+                    </div>
+                    <div id="streamingButtons" class="mt-4 mb-6">
+                        <div class="flex gap-2 mb-2">
+                            <button type="button" id="startContinueButton" class="flex-1 flex items-center justify-center bg-accent hover:bg-accent-hover text-text-dark font-extrabold py-3 rounded-xl transition duration-200 shadow-lg text-sm" >
+                                <span class="mr-1 text-lg">▶</span> Start Streaming
+                            </button>
+                            <button type="button" id="pauseButton" onclick="pauseStreaming()" class="flex-1 flex items-center justify-center btn-secondary font-extrabold py-3 rounded-xl transition duration-200 shadow-lg opacity-50 cursor-not-allowed text-sm" disabled>
+                                <span class="mr-1 text-lg">⏸</span> Pause
+                            </button>
+                        </div>
+                        <button type="button" id="stopButton" class="w-full flex items-center justify-center bg-red-700 hover:bg-red-600 text-text-light font-extrabold py-3 rounded-xl transition duration-200 shadow-lg opacity-50 cursor-not-allowed text-sm" disabled onclick="stopStreaming()">
+                                <span class="mr-1 text-lg">◼</span> Stop & Reset
+                        </button>
+                    </div>
+                    <form id="channelForm" class="hidden">
+                        <h5 class="text-md font-bold text-gray-300 mt-4 mb-3 border-b border-gray-700 pb-2">Graph Configuration</h5>
+                        
+                        <div class="mb-4">
+                            <label for="graphMode" class="block text-sm font-medium mb-1">Graph Mode</label>
+                            <select id="graphMode" 
+                                    class="w-full p-2 bg-gray-700 text-text-light border border-gray-600 rounded-lg focus:ring-accent focus:border-accent">
+                                <option value="time">Time Graph (Multi-Channel Stacked)</option>
+                                <option value="polar">Polar Graph (Multi-Channel)</option>
+                                <option value="recurrence">Recurrence Graph (ChX vs ChY Density Heatmap)</option>
+                                <option value="xor">XOR Graph (Single Channel)</option>
+                            </select>
+                        </div>
+                        
+                        <div class="mb-4 hidden" id="polarModeContainer">
+                            <label class="inline-flex items-center text-sm font-medium text-yellow-300 bg-yellow-900/20 p-2 rounded-lg">
+                                <input type="checkbox" id="cumulativePolarCheckbox" class="form-checkbox h-4 w-4 text-accent bg-gray-700 border-gray-600 rounded focus:ring-accent">
+                                <span class="ml-2">Cumulative Plot (Retain Full History)</span>
+                            </label>
+                        </div>
+
+                        <div class="mb-4 hidden" id="colormapContainer">
+                            <label for="colormapSelector" class="block text-sm font-medium mb-1">2D Map Colorscale (Density/Intensity)</label>
+                            <select id="colormapSelector"
+                                    class="w-full p-2 bg-gray-700 text-text-light border border-gray-600 rounded-lg focus:ring-accent focus:border-accent">
+                                <option value="Viridis">Viridis (Default)</option>
+                                <option value="Jet">Jet (High Contrast)</option>
+                                <option value="Electric">Electric</option>
+                                <option value="Hot">Hot</option>
+                                <option value="Greys">Greys (Monochrome)</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-4" id="montageSelectorContainer">
+                            <label for="montageSelector" class="block text-sm font-medium mb-1">Quick Channel Set (Montage)</label>
+                            <select id="montageSelector"
+                                    class="w-full p-2 bg-gray-700 text-text-light border border-gray-600 rounded-lg focus:ring-accent focus:border-accent">
+                                <option value="none">Custom Channel Selection</option>
+                                <option value="standard">Full 10-20 Channels</option>
+                                <option value="frontal">Cognition & Attention (Frontal Lobe)</option>
+                                <option value="occipital">Visual Processing (Occipital Lobe)</option>
+                                <option value="all">Select ALL Raw Channels (May be slow/cluttered)</option>
+                            </select>
+                        </div>
+
+                        <div id="channelSelectionContainer" class="mb-6">
+                            <label class="block text-sm font-medium mb-2">Select Channels</label>
+                            
+                            <div id="channelInstructions" class="text-xs text-yellow-400 mb-2 p-2 bg-yellow-900/20 rounded hidden">
+                                Hint: For this mode, selecting one channel is highly recommended.
+                            </div>
+
+                            <div id="channelList" class="channel-list p-3 rounded-lg border border-gray-700 bg-gray-800 max-h-40 overflow-y-auto">
+                                <p class="text-center text-gray-500">Channels load after file upload.</p>
+                            </div>
+                        </div>
+                    </form>
                 </div>
             </div>
-        </div>
+            
+            <div class="md:w-3/4 plot-wrapper transition-all duration-300 ease-in-out" id="mainPlotWrapper">
+                <div class="flex flex-col lg:flex-row gap-4">
+                    
+                    <div class="lg:w-3/4 bg-secondary-bg p-4 rounded-xl shadow-2xl plot-container">
+                        <h4 class="text-xl font-semibold text-accent mb-4">EEG Signal Viewer</h4>
+                        <div id="plot" style="width:100%;height:100%;">
+                            <div class="text-center p-10 text-xl text-gray-500">
+                                Please upload an EDF file to begin analysis.
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="lg:w-1/4 bg-secondary-bg p-4 rounded-xl shadow-2xl" id="bandPowerContainer">
+                        <h4 class="text-lg font-semibold text-gray-300 mb-2 border-b border-gray-700 pb-1">Average Band Power</h4>
+                        <div id="bandPowerPlot" style="width:100%;height:100%;">
+                            <div class="text-center p-10 text-sm text-gray-500">
+                                Start streaming to view average band power.
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+            </div>
     </div>
     
     <script>
         // --- GLOBAL VARIABLES ---
-    let isStreaming = false; // Indicates if the app is in an active streaming session (started)
-    let isPaused = false; // Indicates if streaming is paused (interval is cleared, but buffers/graph exist)
+        let isStreaming = false; 
+        let isPaused = false; 
         let intervalId;
         let selected = [];
         let width = 5;
         let fs = 160; 
         let channelDataBuffers = {};
         let globalTime = 0; 
-        let bandPowerBuffer = {};
         let currentYRange = 500000; 
         const colors = ["#FF5733","#33FF57","#3357FF","#F3FF33","#FF33EC","#33FFF6","#FF8F33","#8F33FF","#33FF99","#FF3333"];
         
-    const startContinueButton = document.getElementById('startContinueButton');
-    const pauseButton = document.getElementById('pauseButton'); // NEW
+        let streamSpeedMultiplier = 1.0; 
+        const BASE_INTERVAL_MS = 100; 
+        
+        let xorPreviousWindow = {};
+        
+        // --- POLAR MODE VARIABLE ---
+        let isCumulativePolar = false;
+        
+        // --- BAND POWER CONSTANTS ---
+        const BAND_NAMES = ['Delta', 'Theta', 'Alpha', 'Beta', 'Gamma']; 
+        const BAND_COLORS = ['#FF5733', '#33FF57', '#3357FF', '#F3FF33', '#FF33EC'];
+        
+        // --- STABILITY IMPROVEMENT VARIABLES ---
+        let bandPowerSMABuffer = []; 
+        const SMA_WINDOW_SIZE = 5;    
+        let bandPowerYRange = 500000; 
+        // ---------------------------------------
+        
+        // --- DOM ELEMENTS ---
+        const startContinueButton = document.getElementById('startContinueButton');
+        const pauseButton = document.getElementById('pauseButton');
         const stopButton = document.getElementById('stopButton');
         const channelListDiv = document.getElementById('channelList');
         const channelForm = document.getElementById('channelForm');
-    const plotContainerDiv = document.getElementById('plot'); 
+        // The div with id="plot" is *inside* the div with class="plot-container"
+        const plotContainerOuterDiv = document.querySelector('.plot-container'); // This is the container 
+        const plotDiv = document.getElementById('plot'); // The Plotly target div
+        const bandPowerPlotDiv = document.getElementById('bandPowerPlot'); 
         const graphModeSelector = document.getElementById('graphMode');
         const montageSelector = document.getElementById('montageSelector');
         const montageSelectorContainer = document.getElementById('montageSelectorContainer');
         const channelInstructions = document.getElementById('channelInstructions');
         const channelSelectionContainer = document.getElementById('channelSelectionContainer'); 
+        const speedMultiplierInput = document.getElementById('speedMultiplier');
+        const widthInput = document.getElementById('width'); 
         
-    let channelNameMap = {}; 
-    let channelIndexToOriginalName = {}; 
-    let allAvailableChannels = {}; 
+        // New Controls
+        const polarModeContainer = document.getElementById('polarModeContainer');
+        const cumulativePolarCheckbox = document.getElementById('cumulativePolarCheckbox');
+        const colormapContainer = document.getElementById('colormapContainer');
+        const colormapSelector = document.getElementById('colormapSelector');
+        
+        // COLLAPSE ELEMENTS
+        const controlPanel = document.getElementById('controlPanel');
+        const mainPlotWrapper = document.getElementById('mainPlotWrapper');
+        const controlPanelContent = document.getElementById('controlPanelContent');
+        const collapseButton = document.getElementById('collapseButton');
+        const collapseIcon = document.getElementById('collapseIcon');
+        let isSidebarCollapsed = false;
+
+        let channelNameMap = {}; 
+        let channelIndexToOriginalName = {}; 
+        let allAvailableChannels = {}; 
 
         
-        // Define standard 10-20 channel names (cleaned/uppercase)
+        // UPDATED MONTAGE DEFINITION
         const montages = {
             'standard': ['FP1', 'FP2', 'F3', 'F4', 'C3', 'C4', 'P3', 'P4', 'O1', 'O2', 'FZ', 'CZ', 'PZ'], 
             'frontal': ['FP1', 'FP2', 'F3', 'F4', 'F7', 'F8', 'FZ'],
             'occipital': ['P3', 'P4', 'O1', 'O2', 'OZ'],
-        'all': [] 
-    };
+            'all': [] // 'all' uses all channels available in the file
+        };
 
-    // --- NEW: Button State Management ---
-    function updateButtonStates() {
-        // Start/Continue Button
-        startContinueButton.disabled = isStreaming && !isPaused;
-        startContinueButton.classList.toggle('opacity-50', isStreaming && !isPaused);
-        startContinueButton.classList.toggle('cursor-not-allowed', isStreaming && !isPaused);
-        startContinueButton.textContent = isStreaming ? (isPaused ? 'Continue Streaming' : 'Running...') : 'Start Streaming';
+        // --- SIDEBAR COLLAPSE LOGIC ---
+        function resizePlots() {
+            // Collect all Plotly IDs
+            const plotIds = [];
+            if (graphModeSelector.value === 'time') {
+                // If using stacked time plots, get all individual IDs
+                selected.forEach(chIndex => plotIds.push(`plot-ch-${chIndex}`));
+            } else {
+                plotIds.push('single-plot');
+            }
+            plotIds.push('bandPowerPlot'); 
+            
+            // Relayout/resizing for all active plots
+            plotIds.forEach(id => {
+                try {
+                    let node = Plotly.d3.select(`#${id}`).node();
+                    if (node && node.layout) {
+                        // Plotly's relayout(autosize) forces a redraw to the new container size
+                        Plotly.relayout(id, { autosize: true });
+                    }
+                } catch(e) { /* ignore if plot isn't initialized */ }
+            });
+        }
+
+        function toggleSidebar() {
+            isSidebarCollapsed = !isSidebarCollapsed;
+
+            if (isSidebarCollapsed) {
+                // Collapse Sidebar (Control Panel)
+                controlPanel.classList.remove('md:w-1/4', 'p-6');
+                // w-14 is 3.5rem. Use it for the collapsed fixed width on medium screens and up
+                controlPanel.classList.add('md:w-14', 'p-2'); 
+                
+                // Hide content
+                controlPanelContent.classList.add('hidden', 'opacity-0');
+                
+                // Rotate icon to point towards the plot (left)
+                collapseIcon.classList.remove('rotate-0');
+                collapseIcon.classList.add('rotate-180');
+                
+                // Expand Main Plot Area
+                mainPlotWrapper.classList.remove('md:w-3/4');
+                // w-[calc(100%-3.5rem)] for the remaining space
+                mainPlotWrapper.classList.add('md:w-[calc(100%-3.5rem)]'); 
+                
+            } else {
+                // Expand Sidebar (Control Panel)
+                controlPanel.classList.remove('md:w-14', 'p-2');
+                controlPanel.classList.add('md:w-1/4', 'p-6');
+                
+                // Show content
+                controlPanelContent.classList.remove('hidden', 'opacity-0');
+                
+                // Reset icon rotation
+                collapseIcon.classList.remove('rotate-180');
+                collapseIcon.classList.add('rotate-0');
+                
+                // Shrink Main Plot Area
+                mainPlotWrapper.classList.remove('md:w-[calc(100%-3.5rem)]');
+                mainPlotWrapper.classList.add('md:w-3/4');
+            }
+            
+            // Call Plotly resize after CSS transition is complete (300ms)
+            window.requestAnimationFrame(() => {
+                setTimeout(resizePlots, 300); 
+            });
+        }
         
-        // Pause Button
-        pauseButton.disabled = !isStreaming || isPaused;
-        pauseButton.classList.toggle('opacity-50', !isStreaming || isPaused);
-        pauseButton.classList.toggle('cursor-not-allowed', !isStreaming || isPaused);
+        // --- SPEED CONTROL FUNCTIONS ---
+        function getIntervalDelay() {
+            streamSpeedMultiplier = parseFloat(speedMultiplierInput.value) || 1.0;
+            return Math.max(20, Math.floor(BASE_INTERVAL_MS / streamSpeedMultiplier)); 
+        }
 
-        // Stop Button
-        stopButton.disabled = !isStreaming;
-        stopButton.classList.toggle('opacity-50', !isStreaming);
-        stopButton.classList.toggle('cursor-not-allowed', !isStreaming);
-    }
+        function resetStreamingInterval() {
+            if (isStreaming && !isPaused) {
+                if (intervalId) {
+                    clearInterval(intervalId);
+                }
+                intervalId = setInterval(fetchData, getIntervalDelay());
+            }
+        }
 
-        // --- CORE LOGIC FOR DYNAMIC CHANNEL LIST RENDERING (Unchanged) ---
+        speedMultiplierInput.addEventListener('change', resetStreamingInterval);
+        speedMultiplierInput.addEventListener('input', resetStreamingInterval);
+        widthInput.addEventListener('change', () => {
+             width = parseFloat(widthInput.value);
+        });
 
+        // --- Button State Management ---
+        function updateButtonStates() {
+            startContinueButton.disabled = isStreaming && !isPaused;
+            startContinueButton.classList.toggle('opacity-50', isStreaming && !isPaused);
+            startContinueButton.classList.toggle('cursor-not-allowed', isStreaming && !isPaused);
+            startContinueButton.innerHTML = isStreaming ? (isPaused ? '<span class="mr-1 text-lg">▶</span> Continue Streaming' : '<span class="mr-1 text-lg">▶</span> Running...') : '<span class="mr-1 text-lg">▶</span> Start Streaming';
+            
+            pauseButton.disabled = !isStreaming || isPaused;
+            pauseButton.classList.toggle('opacity-50', !isStreaming || isPaused);
+            pauseButton.classList.toggle('cursor-not-allowed', !isStreaming || isPaused);
+
+            stopButton.disabled = !isStreaming;
+            stopButton.classList.toggle('opacity-50', !isStreaming);
+            stopButton.classList.toggle('cursor-not-allowed', !isStreaming);
+        }
+
+        // --- DYNAMIC CHANNEL LIST RENDERING ---
         function cleanChannelName(name) {
+            // Cleans and upper-cases the name for matching against standard montages
             return name.trim().toUpperCase().split(/[-_/\s().]/)[0].replace(/[^A-Z0-9]/g, '');
         }
 
@@ -221,25 +413,25 @@
                 const name = channelsToShow[index];
                 const div = document.createElement('div');
                 div.className = 'flex items-center mb-1';
-            div.innerHTML = `<input class="form-check-input h-4 w-4 text-accent bg-gray-700 border-gray-600 rounded focus:ring-accent" 
-                                       type="checkbox" name="channels" value="${index}" id="ch${index}">
+                div.innerHTML = `<input class="form-check-input h-4 w-4 text-accent bg-gray-700 border-gray-600 rounded focus:ring-accent" 
+                                     type="checkbox" name="channels" value="${index}" id="ch${index}">
                                  <label class="ml-2 text-sm" for="ch${index}">${name} (${parseInt(index) + 1})</label>`;
                 channelListDiv.appendChild(div);
             });
         }
         
-    function applyMontage(montageKey) {
+        function applyMontage(montageKey) {
             const channelsToShow = {};
             let selectedMontageNames = [];
 
-        if (montageKey === 'none' || montageKey === 'all') {
+            if (montageKey === 'none' || montageKey === 'all') {
                 Object.assign(channelsToShow, allAvailableChannels);
             } else {
                 selectedMontageNames = montages[montageKey] || [];
             }
             
-        if (selectedMontageNames.length > 0) {
-            selectedMontageNames.forEach(standardName => {
+            if (selectedMontageNames.length > 0) {
+                selectedMontageNames.forEach(standardName => {
                     const cleanedName = cleanChannelName(standardName);
                     const index = channelNameMap[cleanedName];
                     if (index !== undefined) {
@@ -250,12 +442,12 @@
 
             renderChannelCheckboxes(channelsToShow);
             
-        document.querySelectorAll("input[name=channels]").forEach(cb => {
-                    cb.disabled = false;
-                    if (montageKey === 'all') {
-                        cb.checked = true;
-                    } else {
-                        cb.checked = false;
+            document.querySelectorAll("input[name=channels]").forEach(cb => {
+                cb.disabled = false;
+                if (montageKey === 'all') {
+                    cb.checked = true;
+                } else {
+                    cb.checked = false;
                 }
             });
         }
@@ -263,27 +455,29 @@
         function toggleChannelListDisplay() {
             const currentMode = graphModeSelector.value;
             
-        if (currentMode !== 'time') {
             montageSelectorContainer.classList.remove('hidden');
             channelSelectionContainer.classList.remove('disabled-input');
-            } else {
-                montageSelectorContainer.classList.remove('hidden');
-            channelInstructions.classList.add('hidden');
-                channelSelectionContainer.classList.remove('disabled-input');
-        }
-                
-                if (currentMode === 'recurrence' || currentMode === 'cycle') {
-                    channelInstructions.classList.remove('hidden');
-                    channelInstructions.innerHTML = '⚠️ **SINGLE CHANNEL MODE:** Please select only **one** channel for this graph type.';
-                } else {
-                    channelInstructions.classList.add('hidden');
-                }
-                
-                montageSelector.value = 'none';
-                applyMontage('none'); 
+            channelInstructions.classList.add('hidden'); 
+            
+            // Toggle new containers
+            polarModeContainer.classList.add('hidden'); 
+            colormapContainer.classList.add('hidden'); 
+
+            if (currentMode === 'recurrence') {
+                channelInstructions.classList.remove('hidden');
+                channelInstructions.innerHTML = '⚠️ **RECURRENCE GRAPH (Phase Space Density):** Please select **two channels (ChX and ChY)** to generate a density heatmap of their relationship.';
+                colormapContainer.classList.remove('hidden'); 
+            } else if (currentMode === 'xor') {
+                channelInstructions.classList.remove('hidden');
+                channelInstructions.innerHTML = '⚠️ **SINGLE CHANNEL MODE:** Please select only **one** channel for this graph type.';
+            } else if (currentMode === 'polar') {
+                polarModeContainer.classList.remove('hidden'); 
+            }
+            
+            montageSelector.value = 'none';
+            applyMontage('none'); 
         }
 
-        // Event Listeners
         montageSelector.addEventListener('change', (e) => {
             applyMontage(e.target.value);
         });
@@ -292,7 +486,7 @@
             toggleChannelListDisplay(); 
         });
 
-        // --- FILE UPLOAD HANDLERS (Unchanged) ---
+        // --- FILE UPLOAD HANDLERS ---
         function handleFileUpload(file) {
             if (!file || file.name.split('.').pop().toLowerCase() !== 'edf') {
                 alert("Please select a valid EDF file.");
@@ -302,7 +496,7 @@
             document.getElementById('fileNameDisplay').textContent = `Uploading: ${file.name}...`;
             stopStreaming(); 
             channelForm.classList.add('hidden'); 
-        updateButtonStates(); // Reset buttons
+            updateButtonStates(); 
 
             const formData = new FormData();
             formData.append('file', file);
@@ -335,14 +529,17 @@
                     document.getElementById('fileNameDisplay').textContent = `File Loaded: ${file.name} (FS: ${fs} Hz, ${Object.keys(result.channels).length} Ch)`;
                     channelForm.classList.remove('hidden');
                     
-                graphModeSelector.value = 'time'; 
+                    graphModeSelector.value = 'time'; 
                     montageSelector.value = 'none';
                     toggleChannelListDisplay(); 
                     
-                // Clear the main container and show instructions
-                Plotly.purge('plot'); // Clear any existing plots
-                plotContainerDiv.innerHTML = '<div id="plot"><div class="text-center p-10 text-xl text-gray-500">Select channels and click \'Start Streaming\'.</div></div>';
-                updateButtonStates(); // Set initial button states
+                    Plotly.purge(plotDiv.id); 
+                    plotDiv.innerHTML = '<div style="width:100%;height:100%;"><div class="text-center p-10 text-xl text-gray-500">Select channels and click \'Start Streaming\'.</div></div>';
+                    
+                    Plotly.purge(bandPowerPlotDiv.id); 
+                    bandPowerPlotDiv.innerHTML = '<div style="width:100%;height:100%;"><div class="text-center p-10 text-sm text-gray-500">Start streaming to view average band power.</div></div>'; 
+                    
+                    updateButtonStates(); 
 
                 } else {
                     document.getElementById('fileNameDisplay').textContent = `Error: ${result.message}`;
@@ -355,7 +552,7 @@
             });
         }
         
-        // --- Drag and Drop Listeners (Unchanged) ---
+        // --- Drag and Drop Listeners ---
         const dropZone = document.getElementById('dropZone');
         const edfFileInput = document.getElementById('edfFile');
 
@@ -389,120 +586,122 @@
         }, false);
 
 
-    // --- STREAMING CONTROLS (MODIFIED) ---
+        // --- STREAMING CONTROLS ---
 
-    /**
-     * Stops the streaming interval and resets state for a full stop.
-     */
         function stopStreaming() {
             if (intervalId) {
                 clearInterval(intervalId);
                 intervalId = null;
             }
-        isStreaming = false;
-        isPaused = false;
-        updateButtonStates();
-        console.log("Streaming stopped (and reset).");
-        
-        // Update all plots with a 'STOPPED' title and reset container
-        updatePlotTitles(" (STOPPED)");
-        
-        // Final reset for the plot area
-        plotContainerDiv.innerHTML = '<div id="plot"><div class="text-center p-10 text-xl text-gray-500">Select channels and click \'Start Streaming\'.</div></div>';
-    }
-
-    /**
-     * Pauses the streaming by clearing the interval. Data/Graph state remains intact.
-     */
-    function pauseStreaming() {
-        if (intervalId) {
-            clearInterval(intervalId);
-            intervalId = null;
+            isStreaming = false;
+            isPaused = false;
+            xorPreviousWindow = {}; 
+            bandPowerSMABuffer = []; 
+            bandPowerYRange = 500000; 
+            isCumulativePolar = false; // Reset polar mode flag
+            updateButtonStates();
+            console.log("Streaming stopped (and reset).");
+            
+            Plotly.purge(plotDiv.id);
+            plotDiv.innerHTML = '<div style="width:100%;height:100%;"><div class="text-center p-10 text-xl text-gray-500">Select channels and click \'Start Streaming\'.</div></div>';
+            Plotly.purge(bandPowerPlotDiv.id); 
+            bandPowerPlotDiv.innerHTML = '<div style="width:100%;height:100%;"><div class="text-center p-10 text-sm text-gray-500">Start streaming to view average band power.</div></div>'; 
+            
         }
-        isPaused = true;
-        updateButtonStates();
-        console.log("Streaming paused.");
-        
-        // Update plot titles with PAUSED
-        updatePlotTitles(" (PAUSED)");
-    }
 
-    /**
-     * Resumes the streaming by setting the interval.
-     */
-    function continueStreaming() {
-        if (!isStreaming || !isPaused) return;
+        function pauseStreaming() {
+            if (intervalId) {
+                clearInterval(intervalId);
+                intervalId = null;
+            }
+            isPaused = true;
+            updateButtonStates();
+            console.log("Streaming paused.");
+            
+            const mode = graphModeSelector.value;
+            const plotIds = (mode === "time") 
+                            ? selected.map(chIndex => `plot-ch-${chIndex}`) 
+                            : ['single-plot'];
+            plotIds.push('bandPowerPlot'); 
 
-        isPaused = false;
-        intervalId = setInterval(fetchData, 100); 
-        updateButtonStates();
-        console.log("Streaming continued.");
-        
-        // Remove PAUSED/STOPPED from plot titles
-        updatePlotTitles("");
-    }
-    
-    /**
-     * Helper to update plot titles across all active plots.
-     */
-    function updatePlotTitles(suffix) {
-        const mode = graphModeSelector.value;
-        if (mode === "time") {
-            selected.forEach(chIndex => {
-                const plotId = `plot-ch-${chIndex}`;
+            plotIds.forEach(id => {
                 try {
-                    const node = Plotly.d3.select(`#${plotId}`).node();
+                    let node = Plotly.d3.select(`#${id}`).node();
                     if (node && node.layout) {
                         let currentTitle = node.layout.title.text.replace(/ \(PAUSED\)/g, '').replace(/ \(STOPPED\)/g, '').replace(/ \(Time: [\d\.]+s\)/, '');
-                        Plotly.relayout(plotId, { title: currentTitle + suffix });
+                        Plotly.relayout(id, { title: currentTitle + " (PAUSED)" });
                     }
                 } catch (e) { /* Ignore error if plot isn't initialized */ }
             });
-        } else {
-            const plotId = 'single-plot';
-            try {
-                const node = Plotly.d3.select(`#${plotId}`).node();
-                if (node && node.layout) {
-                    let currentTitle = node.layout.title.text.replace(/ \(PAUSED\)/g, '').replace(/ \(STOPPED\)/g, '').replace(/ \(Time: [\d\.]+s\)/, '');
-                    Plotly.relayout(plotId, { title: currentTitle + suffix });
-                }
-            } catch (e) { /* Ignore error if plot isn't initialized */ } 
         }
-    }
 
+        function continueStreaming() {
+            if (!isStreaming || !isPaused) return;
 
-    // --- START/CONTINUE STREAMING LOGIC ---
-        document.getElementById("channelForm").addEventListener("submit", (e) => {
-            e.preventDefault();
+            isPaused = false;
+            intervalId = setInterval(fetchData, getIntervalDelay()); 
+            updateButtonStates();
+            console.log("Streaming continued.");
             
-        if (isPaused) {
-            // If paused, just continue
-            continueStreaming();
-            return;
-        }
-        
-        if (isStreaming) {
-            // If running, do nothing on submit until it's stopped/paused
-            return;
+            const mode = graphModeSelector.value;
+            const plotIds = (mode === "time") 
+                            ? selected.map(chIndex => `plot-ch-${chIndex}`) 
+                            : ['single-plot'];
+            plotIds.push('bandPowerPlot'); 
+
+            plotIds.forEach(id => {
+                try {
+                    let node = Plotly.d3.select(`#${id}`).node();
+                    if (node && node.layout) {
+                        let currentTitle = node.layout.title.text.replace(/ \(PAUSED\)/g, '').replace(/ \(STOPPED\)/g, '').replace(/ \(Time: [\d\.]+s\)/, '');
+                        Plotly.relayout(id, { title: currentTitle });
+                    }
+                } catch (e) { /* Ignore error if plot isn't initialized */ }
+            });
         }
 
-        // --- INITIAL STARTUP LOGIC ---
+
+        // --- START/CONTINUE STREAMING LOGIC ---
+        document.getElementById("startContinueButton").addEventListener("click", (e) => {
+            
+            if (isPaused) {
+                continueStreaming();
+                return;
+            }
+            
+            if (isStreaming) {
+                return;
+            }
+
+            // --- INITIAL STARTUP LOGIC ---
+            
+            // CAPTURE CUMULATIVE STATE and COLORMAP
+            isCumulativePolar = cumulativePolarCheckbox.checked;
+            const selectedColormap = colormapSelector.value;
 
             let rawSelected = Array.from(document.querySelectorAll("#channelList input[name=channels]:checked")).map(ch => parseInt(ch.value));
             
-            width = parseFloat(document.getElementById("width").value);
+            width = parseFloat(widthInput.value); 
             mode = graphModeSelector.value;
             
             // --- MODE-SPECIFIC CHANNEL ENFORCEMENT ---
             if (rawSelected.length === 0) {
-            Plotly.purge('plot');
-            plotContainerDiv.innerHTML = '<div id="plot"><div class="text-center p-10 text-xl text-red-400">Please select at least one channel to start streaming.</div></div>';
-            updateButtonStates(); 
+                Plotly.purge(plotDiv.id);
+                plotDiv.innerHTML = '<div style="width:100%;height:100%;"><div class="text-center p-10 text-xl text-red-400">Please select at least one channel to start streaming.</div></div>';
+                updateButtonStates(); 
                 return;
             }
 
-            if (mode === "recurrence" || mode === "cycle") {
-            selected = [rawSelected[0]]; // Use only the first channel
+            if (mode === "recurrence") {
+                if (rawSelected.length < 2) {
+                    Plotly.purge(plotDiv.id);
+                    plotDiv.innerHTML = '<div style="width:100%;height:100%;"><div class="text-center p-10 text-xl text-red-400">Recurrence Graph requires at least **TWO** channels (ChX and ChY).</div></div>';
+                    updateButtonStates(); 
+                    return;
+                }
+                selected = [rawSelected[0], rawSelected[1]]; 
+            } else if (mode === "xor") {
+                selected = [rawSelected[0]]; 
             } else {
                 selected = rawSelected;
             }
@@ -512,115 +711,178 @@
             channelDataBuffers = {};
             selected.forEach(chIndex => channelDataBuffers[chIndex] = { data: [], time: [] }); 
             globalTime = 0;
-            bandPowerBuffer = {}; 
             currentYRange = 500000; 
+            xorPreviousWindow = {}; 
+            bandPowerSMABuffer = []; 
+            bandPowerYRange = 500000; 
             
-        // Clear the main plot container
-        Plotly.purge('plot');
-        plotContainerDiv.innerHTML = '';
+            // Clear the plot containers
+            Plotly.purge(plotDiv.id);
+            Plotly.purge(bandPowerPlotDiv.id);
+            plotDiv.innerHTML = '';
+            bandPowerPlotDiv.innerHTML = '';
+            
 
+            // --- Plotly Configuration based on Mode ---
 
-        // --- Plotly Configuration based on Mode (UNCHANGED) ---
-            let traces, layout;
-
-                if (mode === "time") {
-            selected.forEach((chIndex, i) => {
-                const chName = channelIndexToOriginalName[chIndex.toString()];
-                const plotId = `plot-ch-${chIndex}`;
-                const color = colors[i % colors.length];
-
-                const plotDiv = document.createElement('div');
-                plotDiv.id = plotId;
-                plotDiv.className = 'w-full mb-4 border border-gray-700 rounded-lg p-2 bg-gray-800'; 
-                plotDiv.style.height = `${Math.floor(600 / selected.length) - 10}px`; 
-                plotContainerDiv.appendChild(plotDiv);
-
-                const individualTrace = [{ 
-                    x: [], y: [], mode: "lines", line: { color: color }, name: chName 
-                }];
+            if (mode === "time") {
+                // Time graph plots go directly into the main #plot div.
                 
-                const individualLayout = {
-                    title: `Channel ${chName} - Time Graph - Window: ${width}s`,
-                    paper_bgcolor: "#1f2937", 
-                    plot_bgcolor: "#000000", 
-                        font: { color: "#e5e7eb", family: "Inter" },
-                    autosize: true,
-                    margin: { t: 40, r: 10, b: 20, l: 30 },
-                    xaxis: { title: "Time (s)", color: "#e5e7eb", gridcolor: "#374151", range: [0, width], showticklabels: true },
-                    yaxis: { title: "µV", color: "#e5e7eb", gridcolor: "#374151" }
-                };
+                const totalChannels = selected.length;
+                let plotHeight = '150px'; 
+                if (totalChannels > 0 && totalChannels <= 3) {
+                    // Increase height for 1, 2, or 3 channels to make them larger
+                    plotHeight = '350px'; 
+                }
 
-                Plotly.newPlot(plotId, individualTrace, individualLayout, { responsive: true, displayModeBar: false });
-            });
-            
-        } else if (mode === "polar" || mode === "recurrence" || mode === "cycle") {
-            // Create a single container for non-time plots
-            const singlePlotDiv = document.createElement('div');
-            singlePlotDiv.id = 'single-plot';
-            singlePlotDiv.style.width = '100%';
-            singlePlotDiv.style.height = '600px';
-            plotContainerDiv.appendChild(singlePlotDiv);
+                selected.forEach((chIndex, i) => {
+                    const chName = channelIndexToOriginalName[chIndex.toString()];
+                    const plotId = `plot-ch-${chIndex}`;
 
-            const singlePlotId = 'single-plot';
+                    const plotDivElement = document.createElement('div');
+                    plotDivElement.id = plotId;
+                    plotDivElement.className = 'w-full mb-2 border border-gray-700 rounded-lg p-1 bg-gray-800'; 
+                    plotDivElement.style.height = plotHeight; 
+                    plotDiv.appendChild(plotDivElement);
 
-            if (mode === "polar") {
+                    const individualTrace = [{ 
+                        x: [], y: [], mode: "lines", line: { color: colors[i % colors.length] }, name: chName 
+                    }];
+                    
+                    const individualLayout = {
+                        title: `Channel ${chName} - Time Graph - Window: ${width}s`,
+                        paper_bgcolor: "#1f2937", 
+                        plot_bgcolor: "#000000", 
+                        font: { color: "#e5e7eb", family: "Inter", size: 10 },
+                        autosize: true,
+                        margin: { t: 25, r: 10, b: 20, l: 30 }, 
+                        xaxis: { 
+                            title: (i === selected.length - 1) ? "Time (s)" : "", 
+                            color: "#e5e7eb", 
+                            gridcolor: "#374151", 
+                            range: [0, width], 
+                            showticklabels: (i === selected.length - 1) 
+                        },
+                        yaxis: { 
+                            title: chName, 
+                            color: "#e5e7eb", 
+                            gridcolor: "#374151", 
+                            showticklabels: false, 
+                            autorange: true
+                        }
+                    };
+
+                    Plotly.newPlot(plotId, individualTrace, individualLayout, { responsive: true, displayModeBar: false });
+                });
+                
+            } else { // polar, recurrence, xor all use a single plot in the #plot container
+                const singlePlotDiv = document.createElement('div');
+                singlePlotDiv.id = 'single-plot';
+                singlePlotDiv.style.width = '100%';
+                singlePlotDiv.style.height = '100%'; 
+                plotDiv.appendChild(singlePlotDiv);
+
+                const singlePlotId = 'single-plot';
+                let traces, layout;
+
+                if (mode === "polar") {
                     traces = selected.map((ch, i) => {
                         const name = channelIndexToOriginalName[ch.toString()];
                         return { r: [], theta: [], mode: "lines", line: { color: colors[i % colors.length] }, name, type: "scatterpolar" };
                     });
+                    
+                    const polarTitle = isCumulativePolar ? 
+                        `EEG - Polar Graph - CUMULATIVE MODE` : 
+                        `EEG - Polar Graph - Fixed Window: ${width}s`;
+
                     layout = {
-                        title: `EEG - Polar Graph - Window: ${width}s`,
-                    paper_bgcolor: "#1f2937", plot_bgcolor: "#1f2937", 
-                    font: { color: "#e5e7eb", family: "Inter" },
+                        title: polarTitle,
+                        paper_bgcolor: "#1f2937", plot_bgcolor: "#1f2937", 
+                        font: { color: "#e5e7eb", family: "Inter" },
                         polar: {
                             bgcolor: "#000000",
-                        radialaxis: { title: "Amplitude (Normalized)", color: "#e5e7eb", gridcolor: "#374151" },
-                            angularaxis: { direction: "clockwise", rotation: 90, color: "#e5e7eb", gridcolor: "#374151" }
+                            radialaxis: { title: "Amplitude (Normalized)", color: "#e5e7eb", gridcolor: "#374151" },
+                            angularaxis: { direction: "clockwise", rotation: 90, color: "#e5e7eb", gridcolor: "#374151", ticksuffix: "°" }
                         }
                     };
                 } else if (mode === "recurrence") {
-                    traces = [{ z: [[0]], type: "heatmap", colorscale: "Viridis", showscale: true }];
-                    const channelName = channelIndexToOriginalName[selected[0].toString()];
-                    layout = {
-                        title: `EEG - Recurrence Graph - ${channelName} - Window: ${width}s`,
-                    paper_bgcolor: "#1f2937", plot_bgcolor: "#1f2937",
-                        font: { color: "#e5e7eb", family: "Inter" },
-                        xaxis: { title: "Time Index", color: "#e5e7eb", gridcolor: "#374151" },
-                        yaxis: { title: "Time Index", color: "#e5e7eb", gridcolor: "#374151" }
-                    };
-                } else if (mode === "cycle") {
-                    const bands = ['Delta (0.5-4Hz)', 'Theta (4-8Hz)', 'Alpha (8-13Hz)', 'Beta (13-30Hz)', 'Gamma (>30Hz)'];
-                    bandPowerBuffer = { bands: bands, power: Array(bands.length).fill(0) }; 
-                    const channelTitle = channelIndexToOriginalName[selected[0].toString()];
-                    traces = [{
-                        x: bands, y: bandPowerBuffer.power, type: 'bar',
-                        marker: { color: ['#FF5733', '#33FF57', '#3357FF', '#F3FF33', '#FF33EC'] }
+                    const chX = channelIndexToOriginalName[selected[0].toString()];
+                    const chY = channelIndexToOriginalName[selected[1].toString()];
+                    
+                    traces = [{ 
+                        x: [], 
+                        y: [], 
+                        type: "histogram2d", 
+                        colorscale: selectedColormap,   // APPLY COLORMAP
+                        showscale: true,
+                        name: `Density` 
                     }];
                     layout = {
-                        title: `EEG - Scaled Band Power: ${channelTitle}`,
-                    paper_bgcolor: "#1f2937", plot_bgcolor: "#1f2937",
+                        title: `EEG - Recurrence Graph (Phase Space Density): ${chX} vs ${chY}`,
+                        paper_bgcolor: "#1f2937", plot_bgcolor: "#000000",
                         font: { color: "#e5e7eb", family: "Inter" },
-                        xaxis: { title: "Frequency Band", color: "#e5e7eb", gridcolor: "#374151" },
-                        yaxis: { 
-                            title: `Scaled Average Power (x10^10)`, color: "#e5e7eb", 
-                            gridcolor: "#374151", range: [0, currentYRange] 
-                        } 
+                        xaxis: { title: `Channel ${chX} (µV)`, color: "#e5e7eb", gridcolor: "#374151" },
+                        yaxis: { title: `Channel ${chY} (µV)`, color: "#e5e7eb", gridcolor: "#374151" },
+                    };
+                } else if (mode === "xor") {
+                    const channelName = channelIndexToOriginalName[selected[0].toString()];
+                    traces = [{ 
+                        x: [], y: [], mode: "lines", 
+                        line: { color: "#00eaff", width: 2 }, 
+                        name: "XOR Difference" 
+                    }];
+                    layout = {
+                        title: `EEG - XOR Graph - ${channelName} - Window: ${width}s`,
+                        paper_bgcolor: "#1f2937", plot_bgcolor: "#1f2937",
+                        font: { color: "#e5e7eb", family: "Inter" },
+                        xaxis: { title: "Time (s)", color: "#e5e7eb", gridcolor: "#374151", range: [0, width] },
+                        yaxis: { title: "XOR Difference (µV)", color: "#e5e7eb", gridcolor: "#374151" }
                     };
                 }
-            
-            Plotly.newPlot(singlePlotId, traces, layout, { responsive: true, displayModeBar: false });
+                
+                Plotly.newPlot(singlePlotId, traces, layout, { responsive: true, displayModeBar: false });
             }
-            // --- End Plotly Configuration ---
+            
+            // --- Band Power Plot Initialization (Runs for all modes) ---
+            const bandPowerTraces = [{
+                // Data is swapped for horizontal bar chart
+                x: Array(BAND_NAMES.length).fill(0), 
+                y: BAND_NAMES, 
+                type: 'bar',
+                orientation: 'h', // Set orientation to horizontal
+                marker: { color: BAND_COLORS }
+            }];
+            const bandPowerLayout = {
+                title: `Smoothed Average Power`,
+                paper_bgcolor: "#1f2937", plot_bgcolor: "#1f2937",
+                font: { color: "#e5e7eb", family: "Inter" },
+                // Axes are swapped for horizontal bar chart
+                xaxis: { 
+                    title: `Smoothed Average Power (x10^10)`, color: "#e5e7eb", 
+                    gridcolor: "#374151", range: [0, bandPowerYRange] 
+                },
+                yaxis: { 
+                    // Y-axis label is now simply the band names
+                    title: "Frequency Band", color: "#e5e7eb", 
+                    gridcolor: "#374151" 
+                },
+                margin: { t: 40, r: 10, b: 60, l: 40 }
+            };
+            
+            Plotly.newPlot('bandPowerPlot', bandPowerTraces, bandPowerLayout, { responsive: true, displayModeBar: false });
+
 
             // Start the stream
-        isStreaming = true;
-        isPaused = false;
-            intervalId = setInterval(fetchData, 100); 
+            isStreaming = true;
+            isPaused = false;
+            intervalId = setInterval(fetchData, getIntervalDelay()); 
+            updateButtonStates();
+            // Call resize once on start to ensure initial sizing is correct
+            setTimeout(resizePlots, 100); 
 
-        updateButtonStates();
         });
-
-        // --- Helper functions for data buffering (Unchanged) ---
+        
+        // --- Helper functions for data buffering ---
         function updateBuffer(chIndex, newSignals, newTime) {
             const buffer = channelDataBuffers[chIndex];
             const maxPoints = width * fs;
@@ -632,166 +894,258 @@
                 buffer.time.splice(0, excess);
             }
         }
-
-        function updateDataBuffer(chIndex, newSignals) {
+        
+        // Used by polar, recurrence, and xor modes
+        function updateSignalBuffer(chIndex, newSignals) {
             const buffer = channelDataBuffers[chIndex].data;
             const maxPoints = width * fs;
             buffer.push(...newSignals);
-            if (buffer.length > maxPoints) {
+            
+            const mode = graphModeSelector.value;
+            
+            // Truncation logic: only truncate if NOT in cumulative polar mode
+            // Recurrence and XOR always use a fixed window (maxPoints)
+            const shouldTruncate = mode !== 'polar' || !isCumulativePolar; 
+
+            if (shouldTruncate && buffer.length > maxPoints) {
                 buffer.splice(0, buffer.length - maxPoints);
             }
+            // If in cumulative polar mode, the buffer grows forever
         }
 
-    // --- Main data fetching and plotting logic (COMPLETED) ---
+        // --- Main data fetching and plotting logic ---
         async function fetchData() {
-        if (!isStreaming || isPaused) return; // Only run if streaming and not paused
+            if (!isStreaming || isPaused) return;
 
             try {
                 const response = await fetch("/eeg/update", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ channels: selected, width })
+                    // Send all selected channels for averaging in the backend
+                    body: JSON.stringify({ channels: selected, width }) 
                 });
                 if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                 const result = await response.json();
 
                 if (result.message === "No file loaded.") {
-                    console.error("No file loaded, stopping stream.");
                     stopStreaming();
                     return;
                 }
 
                 if (!result.signals || typeof result.n_samples === 'undefined' || result.n_samples === 0) {
-                    return;
+                    // Only return if there is no signal data to plot for the main graph
+                    if (!result.band_power || Object.keys(result.band_power).length === 0) {
+                        return;
+                    }
                 }
 
                 const N_samples = result.n_samples;
                 const dt = 1 / fs; 
 
-            // Calculate new global time
-                    const timeChunk = [];
-                    for (let i = 0; i < N_samples; i++) {
-                        globalTime += dt;
-                        timeChunk.push(globalTime);
-                    }
+                // Calculate new global time
+                const timeChunk = [];
+                for (let i = 0; i < N_samples; i++) {
+                    globalTime += dt;
+                    timeChunk.push(globalTime);
+                }
 
-            const mode = graphModeSelector.value;
-            const singlePlotId = 'single-plot';
+                const mode = graphModeSelector.value;
+                const singlePlotId = 'single-plot';
 
-            // Plotting logic
-            if (mode === "time") {
-                const xmin = globalTime - width;
-                const xmax = globalTime;
+                // --- 1. Main Plotting Logic (Modes) ---
+                if (mode === "time") {
+                    const xmin = globalTime - width;
+                    const xmax = globalTime;
 
-                selected.forEach((chIndex) => {
-                    const plotId = `plot-ch-${chIndex}`;
+                    selected.forEach((chIndex) => {
+                        const plotId = `plot-ch-${chIndex}`;
                         const newSignals = result.signals[chIndex.toString()]; 
-                    
+                        
                         if (!newSignals || newSignals.length === 0) return;
-                    
+                        
                         updateBuffer(chIndex, newSignals, timeChunk);
-                    
-                    const xUpdate = [channelDataBuffers[chIndex].time];
-                    const yUpdate = [channelDataBuffers[chIndex].data];
-                    
-                    Plotly.restyle(plotId, { x: xUpdate, y: yUpdate });
-                    
-                    Plotly.relayout(plotId, { 
+                        
+                        const xUpdate = [channelDataBuffers[chIndex].time];
+                        const yUpdate = [channelDataBuffers[chIndex].data];
+                        
+                        Plotly.restyle(plotId, { x: xUpdate, y: yUpdate });
+                        
+                        Plotly.relayout(plotId, { 
                             'xaxis.range': [xmin, xmax], 
-                        'title': `Channel ${channelIndexToOriginalName[chIndex.toString()]} - Time Graph - Window: ${width}s (Time: ${globalTime.toFixed(2)}s)`
-                    });
+                            'title': `Channel ${channelIndexToOriginalName[chIndex.toString()]} - Time Graph - Window: ${width}s (Time: ${globalTime.toFixed(2)}s)`
                         });
+                    });
 
                 } else if (mode === "polar") {
                     const rUpdate = [], thetaUpdate = [];
                     selected.forEach((chIndex) => {
                         const newSignals = result.signals[chIndex.toString()];
                         if (!newSignals || newSignals.length === 0) return;
-                    
-                        updateDataBuffer(chIndex, newSignals);
+                        
+                        // Use the modified buffer update function
+                        updateSignalBuffer(chIndex, newSignals);
                         const buffer = channelDataBuffers[chIndex].data;
                         const N = buffer.length;
+                        
+                        // Theta is Time: Maps the entire current buffer length (N) to 360 degrees.
                         const theta = buffer.map((_, idx) => (idx / (N - 1)) * 360);
-                    // Use a simple normalization for polar plot radius
-                    const maxAbsVal = Math.max(...buffer.map(Math.abs));
-                    const r = buffer.map(v => v / maxAbsVal); 
-                    
+                        
+                        // R is Magnitude: Normalization is done based on the *current* buffer's max amplitude.
+                        const maxAbsVal = Math.max(...buffer.map(Math.abs));
+                        const r = buffer.map(v => v / (maxAbsVal || 1)); 
+                        
                         rUpdate.push(r); 
                         thetaUpdate.push(theta);
                     });
                 
-                // Update Plotly for Polar Graph
-                Plotly.restyle(singlePlotId, { r: rUpdate, theta: thetaUpdate });
-                Plotly.relayout(singlePlotId, { 
-                    'title': `EEG - Polar Graph - Window: ${width}s (Time: ${globalTime.toFixed(2)}s)` 
-                });
+                    Plotly.restyle(singlePlotId, { r: rUpdate, theta: thetaUpdate });
+                    
+                    const polarTitle = isCumulativePolar ? 
+                        `EEG - Polar Graph - CUMULATIVE MODE (Time: ${globalTime.toFixed(2)}s)` : 
+                        `EEG - Polar Graph - Fixed Window: ${width}s (Time: ${globalTime.toFixed(2)}s)`;
+                        
+                    Plotly.relayout(singlePlotId, { 
+                        'title': polarTitle
+                    });
 
                 } else if (mode === "recurrence") {
+                    const chXIndex = selected[0];
+                    const chYIndex = selected[1];
+                    const newSignalsX = result.signals[chXIndex.toString()];
+                    const newSignalsY = result.signals[chYIndex.toString()];
+
+                    if (!newSignalsX || newSignalsX.length === 0 || !newSignalsY || newSignalsY.length === 0) return;
+                    
+                    // Use the modified buffer update function (will truncate to fixed window)
+                    updateSignalBuffer(chXIndex, newSignalsX);
+                    updateSignalBuffer(chYIndex, newSignalsY);
+                    
+                    const dataX = channelDataBuffers[chXIndex].data;
+                    const dataY = channelDataBuffers[chYIndex].data;
+                    
+                    // Plotly's histogram2d automatically calculates the Z-data (density) when X and Y are restyled.
+                    Plotly.restyle(singlePlotId, { x: [dataX], y: [dataY] });
+
+                    const chX = channelIndexToOriginalName[chXIndex.toString()];
+                    const chY = channelIndexToOriginalName[chYIndex.toString()];
+
+                    Plotly.relayout(singlePlotId, { 
+                        'title': `EEG - Recurrence Graph (Phase Space Density): ${chX} vs ${chY} (Time: ${globalTime.toFixed(2)}s)`
+                    });
+
+                } else if (mode === "xor") {
                     const chIndex = selected[0];
                     const newSignals = result.signals[chIndex.toString()];
                     if (!newSignals || newSignals.length === 0) return;
-                
-                    updateDataBuffer(chIndex, newSignals);
-                    const data = channelDataBuffers[chIndex].data;
-                    const N = data.length;
                     
-                // Calculate recurrence matrix
-                    const recurrence = Array.from({ length: N }, (_, i) =>
-                        Array.from({ length: N }, (_, j) => Math.abs(data[i] - data[j]))
-                    );
-
-                Plotly.restyle(singlePlotId, { z: [recurrence] });
-                const channelName = channelIndexToOriginalName[selected[0].toString()];
-                Plotly.relayout(singlePlotId, { 
-                    'title': `EEG - Recurrence Graph - ${channelName} - Window: ${width}s (Time: ${globalTime.toFixed(2)}s)`
-                });
-
-                } else if (mode === "cycle") {
-                    const bandPower = result.band_power;
+                    const chunkSize = Math.floor(width * fs); 
                     
-                    if (Object.keys(bandPower).length === 0 || !Object.values(bandPower).some(p => p > 0)) {
-                        return;
-                    }
+                    const windowBeforeUpdate = channelDataBuffers[chIndex].data.length === chunkSize ? 
+                                           [...channelDataBuffers[chIndex].data] : null;
 
-                // Convert band power object to array in the correct order
-                const bands = ['Delta', 'Theta', 'Alpha', 'Beta', 'Gamma'];
-                const bandPowerArray = bands.map(band => bandPower[band] || 0);
+                    updateBuffer(chIndex, newSignals, timeChunk); // XOR uses the full buffer which includes time
+                    const currentBuffer = channelDataBuffers[chIndex].data;
+                    const currentTime = channelDataBuffers[chIndex].time;
 
-                // Dynamically adjust the Y axis range based on current power values
-                const maxPower = Math.max(...bandPowerArray);
-                    if (maxPower > currentYRange || maxPower < currentYRange * 0.7) { 
-                        currentYRange = Math.max(100000, Math.ceil(maxPower / 100000) * 100000); 
+                    let xorResult = currentBuffer;
+                    let xorTime = currentTime;
+                    
+                    if (currentBuffer.length >= chunkSize) {
                         
-                    Plotly.relayout(singlePlotId, {
-                            'yaxis.range': [0, currentYRange],
-                            'yaxis.title': `Scaled Average Power (x10^10)`
+                        if (xorPreviousWindow[chIndex] && xorPreviousWindow[chIndex].length === chunkSize) {
+                            const chunk1 = xorPreviousWindow[chIndex]; 
+                            const chunk2 = currentBuffer;              
+                            
+                            const chunk2Mean = chunk2.reduce((sum, val) => sum + val, 0) / chunk2.length;
+                            // Calculate Standard Deviation (Std)
+                            const chunk2Std = Math.sqrt(chunk2.reduce((sum, val) => sum + Math.pow(val - chunk2Mean, 2), 0) / chunk2.length);
+                            // Dynamic Threshold: 10% of the standard deviation
+                            const threshold = chunk2Std * 0.1;
+                            
+                            // Apply Thresholded XOR
+                            xorResult = chunk2.map((val, idx) => {
+                                const prevVal = chunk1[idx] || 0;
+                                const distance = Math.abs(val - prevVal);
+                                
+                                // Core logic: If change > threshold, plot change, else plot 0
+                                return distance > threshold ? distance : 0;
+                            });
+                            
+                            xorTime = currentTime;
+
+                        } else {
+                            // This runs once when the buffer first fills
+                            xorResult = currentBuffer;
+                            xorTime = currentTime;
+                        }
+                        
+                        if (windowBeforeUpdate) {
+                             xorPreviousWindow[chIndex] = windowBeforeUpdate.slice(-chunkSize);
+                        }
+
+                        Plotly.restyle(singlePlotId, { 
+                            x: [xorTime.slice(-chunkSize)], 
+                            y: [xorResult.slice(-chunkSize)] 
+                        });
+                        
+                        const xmin = globalTime - width;
+                        const xmax = globalTime;
+                        Plotly.relayout(singlePlotId, { 
+                            'xaxis.range': [xmin, xmax],
+                            'title': `EEG - XOR Graph - ${channelIndexToOriginalName[chIndex.toString()]} - Window: ${width}s (Time: ${globalTime.toFixed(2)}s)`
+                        });
+                    }
+                }
+                
+                // --- 2. Permanent Band Power Plotting Logic (Runs for all modes) ---
+                const bandPower = result.band_power;
+                
+                if (bandPower && Object.keys(bandPower).length > 0) {
+                    
+                    bandPowerSMABuffer.push(bandPower);
+                    if (bandPowerSMABuffer.length > SMA_WINDOW_SIZE) {
+                        bandPowerSMABuffer.shift(); // Remove the oldest entry
+                    }
+                    
+                    // Calculate the averaged band power array
+                    const averagedPowerArray = BAND_NAMES.map(bandKey => {
+                        // The bandKey is now 'Delta', 'Theta', etc.
+                        const sum = bandPowerSMABuffer.reduce((total, current) => total + (current[bandKey] || 0), 0);
+                        return sum / bandPowerSMABuffer.length;
+                    });
+                    
+                    // Update X-axis range for Band Power Plot (Since it's horizontal)
+                    const maxPower = Math.max(...averagedPowerArray);
+                    if (maxPower > bandPowerYRange || maxPower < bandPowerYRange * 0.7) { 
+                        // Set new range, ensuring a minimum for stability
+                        bandPowerYRange = Math.max(100000, Math.ceil(maxPower / 100000) * 100000); 
+                        
+                        Plotly.relayout('bandPowerPlot', {
+                            'xaxis.range': [0, bandPowerYRange] 
                         });
                     }
 
-                // Update Plotly for Band Power Bar Chart
-                Plotly.restyle(singlePlotId, { y: [bandPowerArray] });
-                Plotly.relayout(singlePlotId, { 
-                    'title': `EEG - Scaled Band Power: ${channelIndexToOriginalName[selected[0].toString()]} (Time: ${globalTime.toFixed(2)}s)`
-                });
-            }
+                    // Restyle the data
+                    // Update the X array for a horizontal chart
+                    Plotly.restyle('bandPowerPlot', { x: [averagedPowerArray] }); 
+                }
 
             } catch (error) {
-            console.error("Data fetch or plot update error:", error);
-            // Optionally alert the user or stop the stream on a critical error
-            if (error.message.includes("status: 500")) {
-                console.error("Server error during data update. Stopping stream.");
-            }
-            // If the error is network/server side, stop the loop to prevent spamming the backend
-            if (!isPaused) {
-                stopStreaming();
+                console.error("Data fetch or plot update error:", error);
+                if (!isPaused) {
+                    stopStreaming();
+                }
             }
         }
-    }
 
-    // Initialize button states on load
-    document.addEventListener('DOMContentLoaded', () => {
-        updateButtonStates();
-    });
+        // Initialize button states on load
+        document.addEventListener('DOMContentLoaded', () => {
+            updateButtonStates();
+            collapseButton.addEventListener('click', toggleSidebar);
+            
+            // Set initial state for the cumulative checkbox
+            isCumulativePolar = cumulativePolarCheckbox.checked;
+        });
 
     </script>
 </body>
