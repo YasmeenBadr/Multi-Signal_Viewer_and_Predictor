@@ -6,44 +6,47 @@ import numpy as np
 import wfdb
 import os
 
-# ----------------------------------------------------------
+# -------------------------
 # 1. CONFIGURATION
-# ----------------------------------------------------------
-DATA_PATH = r"data1/s0543_re"   # Path without extension
+# -------------------------
+DATA_PATH = r"data1/s0010_re"  # Path without extension
 MODEL_SAVE_PATH = "simple_ecg_model.pt"
+TARGET_LEN = 5000
 
-# ----------------------------------------------------------
+# -------------------------
 # 2. LOAD ECG SIGNAL
-# ----------------------------------------------------------
+# -------------------------
 print("Loading ECG signal...")
-
 try:
     record = wfdb.rdrecord(DATA_PATH)
-    sig = record.p_signal[:, 0]  # Use the first channel
+    sig = record.p_signal[:, 0]  # first channel
     print(f"Loaded signal shape: {sig.shape}")
 except Exception as e:
     raise RuntimeError(f"Error loading ECG data: {e}")
 
-# Trim or pad the signal to fixed length (e.g., 5000 samples)
-target_len = 5000
-if len(sig) > target_len:
-    sig = sig[:target_len]
-else:
-    sig = np.pad(sig, (0, target_len - len(sig)))
+# normalize signal
+sig_norm = (sig - np.mean(sig)) / (np.std(sig) + 1e-8)
+# simulate abnormal signal for training
+sig_abn = sig_norm * 0.8 + np.random.randn(len(sig_norm)) * 0.05
 
-# Create dummy dataset (one healthy, one abnormal example)
-X = np.array([sig, sig * 0.5])  # simulate two different examples
-y = np.array([0, 1])            # 0=healthy, 1=abnormal
+# pad or trim
+def fix_length(x):
+    if len(x) < TARGET_LEN:
+        return np.pad(x, (0, TARGET_LEN - len(x)))
+    return x[:TARGET_LEN]
 
-X = torch.tensor(X, dtype=torch.float32).unsqueeze(1)  # (batch, channel, length)
+X = np.array([fix_length(sig_norm), fix_length(sig_abn)])
+y = np.array([0, 1])  # 0=Normal, 1=Abnormal
+
+X = torch.tensor(X, dtype=torch.float32).unsqueeze(1)
 y = torch.tensor(y, dtype=torch.long)
 
 dataset = TensorDataset(X, y)
 loader = DataLoader(dataset, batch_size=1, shuffle=True)
 
-# ----------------------------------------------------------
-# 3. DEFINE SIMPLE MODEL
-# ----------------------------------------------------------
+# -------------------------
+# 3. MODEL
+# -------------------------
 class SimpleECG(nn.Module):
     def __init__(self):
         super().__init__()
@@ -55,23 +58,21 @@ class SimpleECG(nn.Module):
             nn.ReLU(),
             nn.MaxPool1d(2),
             nn.Flatten(),
-            nn.Linear(32 * 1250, 64),
+            nn.Linear(32*1250, 64),
             nn.ReLU(),
             nn.Linear(64, 2)
         )
+    def forward(self, x): return self.net(x)
 
-    def forward(self, x):
-        return self.net(x)
-
-# ----------------------------------------------------------
-# 4. TRAIN THE MODEL
-# ----------------------------------------------------------
 model = SimpleECG()
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), lr=0.001)
 
+# -------------------------
+# 4. TRAIN
+# -------------------------
 print("Training model...")
-for epoch in range(10):
+for epoch in range(15):
     total_loss = 0
     for xb, yb in loader:
         optimizer.zero_grad()
@@ -82,8 +83,8 @@ for epoch in range(10):
         total_loss += loss.item()
     print(f"Epoch {epoch+1}, Loss: {total_loss/len(loader):.4f}")
 
-# ----------------------------------------------------------
-# 5. SAVE MODEL
-# ----------------------------------------------------------
+# -------------------------
+# 5. SAVE
+# -------------------------
 torch.save(model.state_dict(), MODEL_SAVE_PATH)
 print(f"Model saved as {MODEL_SAVE_PATH}")

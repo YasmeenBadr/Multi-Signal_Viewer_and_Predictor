@@ -1,4 +1,3 @@
-# signals/ecg.py
 import os
 import numpy as np
 import torch
@@ -16,6 +15,7 @@ except ImportError:
     DATA_PATH = None
 
 ECG_BP = Blueprint("ecg", __name__, url_prefix="/ecg", template_folder="../templates")
+
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 SIMPLE_MODEL_PATH = os.path.join(os.getcwd(), "simple_ecg_model.pt")
 
@@ -38,7 +38,8 @@ _stream = {
     "fs": 360,
     "pos": 0,
     "record_path": None,
-    "prev_chunk": None
+    "prev_chunks": {},       # store previous chunk for XOR per channel
+    "recurrence_points": {}  # store cumulative points for recurrence plot
 }
 
 DISPLAY_FS = 200
@@ -63,6 +64,7 @@ class SimpleECG(nn.Module):
             nn.ReLU(),
             nn.Linear(64, 2)
         )
+
     def forward(self, x):
         return self.net(x)
 
@@ -77,6 +79,30 @@ if os.path.exists(SIMPLE_MODEL_PATH):
 else:
     print("simple_ecg_model.pt not found — using untrained model.")
 model.eval()
+
+# -------------------------
+# 2D CNN Model for recurrence colormap
+# -------------------------
+class Simple2DCNN(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Conv2d(1, 8, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(2),
+            nn.Conv2d(8, 16, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(2),
+            nn.Flatten(),
+            nn.Linear(16*32*32, 32),
+            nn.ReLU(),
+            nn.Linear(32, 2)
+        )
+    def forward(self, x):
+        return self.net(x)
+
+model2d = Simple2DCNN().to(DEVICE)
+model2d.eval()
 
 # -------------------------
 # Load record
@@ -129,13 +155,15 @@ if not _stream["loaded"]:
 # -------------------------
 def extract_diagnosis_from_hea(record_base):
     hea_path = record_base + ".hea"
-    if not os.path.exists(hea_path): return None
+    if not os.path.exists(hea_path):
+        return None
     try:
         with open(hea_path,"r",encoding="latin-1") as f:
             for line in f:
                 if line.startswith("#") and ("diagnosis" in line.lower() or "reason" in line.lower()):
                     return line.strip("#").split(":",1)[-1].strip()
-    except: return None
+    except:
+        return None
     return None
 
 def _prepare_for_model(sig, target_len=_model_seq_len):
@@ -144,29 +172,29 @@ def _prepare_for_model(sig, target_len=_model_seq_len):
         arr = np.pad(arr, (0, target_len - len(arr)))
     elif len(arr) > target_len:
         arr = arr[:target_len]
+    arr = (arr - np.mean(arr)) / (np.std(arr) + 1e-6)
     return torch.tensor(arr, dtype=torch.float32).unsqueeze(0).unsqueeze(0).to(DEVICE)
 
 def predict_signal(sig):
-    x = _prepare_for_model(sig)
+    if isinstance(sig, list) or sig.ndim == 1:
+        x = _prepare_for_model(sig)
+    else:
+        x = _prepare_for_model(np.mean(sig, axis=1))
     with torch.no_grad():
         logits = model(x)
         probs = torch.softmax(logits, dim=-1).cpu().numpy()[0]
         idx = int(np.argmax(probs))
-        label = DISEASE_CLASSES[idx]
-        desc = DISEASE_DESCRIPTIONS[label]
-
-        result = {
-            "label": label,
-            "prob": float(probs[idx]),
-            "description": desc
-        }
-        rec_base = _stream.get("record_path")
-        if label=="Abnormal" and rec_base:
-            disease_text = extract_diagnosis_from_hea(rec_base)
-            result["disease_name"] = disease_text if disease_text else "Unknown (check .hea)"
-        else:
-            result["disease_name"] = "None (Normal ECG)"
-        return result
+    rec_base = _stream.get("record_path")
+    disease_text = extract_diagnosis_from_hea(rec_base) if rec_base else None
+    if disease_text and "healthy" in disease_text.lower():
+        idx = 0
+    if np.mean(np.abs(sig)) < 0.05:
+        idx = 0
+    label = DISEASE_CLASSES[idx]
+    result = {"label": label,"description": DISEASE_DESCRIPTIONS[label]}
+    if label=="Abnormal":
+        result["disease_name"] = disease_text if disease_text else "Unknown (check .hea)"
+    return result
 
 # -------------------------
 # Routes
@@ -192,46 +220,69 @@ def update():
     start = _stream["pos"]
     end = start + N
     total_len = _stream["signals"].shape[0]
-    
+
     if end <= total_len:
         seg_block = _stream["signals"][start:end,:]
     else:
         part1 = _stream["signals"][start:,:]
         part2 = _stream["signals"][:end-total_len,:]
         seg_block = np.vstack([part1, part2])
+
     _stream["pos"] = end % total_len
 
-    # 1D Prediction
-    arr = np.mean(seg_block[:, channels], axis=1) if channels else seg_block.mean(axis=1)
-    prediction = predict_signal(arr)
+    # Prediction
+    if len(channels) == 1:
+        sig_selected = seg_block[:, channels[0]]
+    else:
+        sig_selected = np.mean(seg_block[:, channels], axis=1)
+    prediction = predict_signal(sig_selected)
 
-    # ----------------- Prepare plots -----------------
     downsample_factor = max(1,int(fs/DISPLAY_FS))
     time_axis = (np.arange(seg_block.shape[0])/fs)[::downsample_factor].tolist()
     signals_out = {str(ch): seg_block[::downsample_factor,ch].astype(float).tolist() for ch in channels if 0<=ch<seg_block.shape[1]}
 
-    # --------- XOR plot ---------
-    prev_chunk = _stream.get("prev_chunk")
+    # ---- XOR only if 1 channel ----
     xor_out = {}
-    if prev_chunk is not None:
-        xor_chunk = np.bitwise_xor((seg_block*100).astype(np.int32), (prev_chunk*100).astype(np.int32))
-        xor_out = {str(ch): xor_chunk[::downsample_factor,ch].astype(float).tolist() for ch in channels}
-    _stream["prev_chunk"] = seg_block.copy()
+    if len(channels) == 1:
+        ch = channels[0]
+        chunk = ((seg_block[:,ch]-np.min(seg_block[:,ch]))*1000).astype(np.int32)
+        prev = _stream["prev_chunks"].get(ch)
+        if prev is not None:
+            xor = np.bitwise_xor(chunk, prev)
+            xor_out[ch] = xor[::downsample_factor].tolist()
+        else:
+            xor_out[ch] = np.zeros_like(chunk[::downsample_factor]).tolist()
+        _stream["prev_chunks"][ch] = chunk.copy()
 
-    # --------- Recurrence plot (cumulative) ---------
-    rec_matrix = []
-    for chx in channels:
-        row = []
-        for chy in channels:
-            diff = seg_block[:,chx,None] - seg_block[:,chy,None].T
-            mat = np.abs(diff)
-            row.append(float(mat.mean()))
-        rec_matrix.append(row)
+    # ---- Polar plot ----
+    polar_out = {}
+    for ch in channels:
+        sig = seg_block[:, ch]
+        Nsig = len(sig)
+        theta = np.linspace(0, 360, Nsig)
+        r = sig - np.min(sig)
+        polar_out[str(ch)] = {"r": r.tolist(), "theta": theta.tolist()}
+
+    # ---- Recurrence only if 2 channels ----
+    recurrence_scatter_data = {"x_vals": [], "y_vals": []}
+    colormap_data = None
+    if len(channels) == 2:
+        chX, chY = channels[:2]
+        if chX not in _stream["recurrence_points"]:
+            _stream["recurrence_points"][chX] = []
+            _stream["recurrence_points"][chY] = []
+        _stream["recurrence_points"][chX].extend(seg_block[:,chX][::downsample_factor].tolist())
+        _stream["recurrence_points"][chY].extend(seg_block[:,chY][::downsample_factor].tolist())
+        recurrence_scatter_data["x_vals"] = _stream["recurrence_points"][chX]
+        recurrence_scatter_data["y_vals"] = _stream["recurrence_points"][chY]
+        colormap_data = np.stack([seg_block[:, chX], seg_block[:, chY]], axis=0).tolist()
 
     return jsonify({
         "time": time_axis,
         "signals": signals_out,
         "prediction": prediction,
         "xor": xor_out,
-        "recurrence": rec_matrix
+        "polar": polar_out,
+        "recurrence_scatter": recurrence_scatter_data,
+        "colormap": colormap_data
     })
