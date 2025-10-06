@@ -95,18 +95,14 @@ def view_sar():
         
         print(f"Valid pixels: {len(valid_data)}")
         
-        # Calculate statistics
+        # Calculate statistics for processing
         mean_db = np.mean(valid_data)
         std_db = np.std(valid_data)
-        min_db = np.min(valid_data)
-        max_db = np.max(valid_data)
-        
-        print(f"Stats - Mean: {mean_db:.2f}, Std: {std_db:.2f}, Min: {min_db:.2f}, Max: {max_db:.2f}")
         
         # Adaptive threshold for low-backscatter detection
         threshold = mean_db - 1.5 * std_db
         
-        # Calculate low-backscatter ratio
+        # Calculate low-backscatter mask
         low_backscatter_mask = data_db < threshold
         low_backscatter_ratio = np.sum(low_backscatter_mask) / low_backscatter_mask.size
         
@@ -139,19 +135,9 @@ def view_sar():
         histogram = fig_to_base64(fig2)
         print("Histogram generated")
         
-        # --- 3. Water/Low-Backscatter Mask ---
-        print("Generating mask...")
-        fig3, ax3 = plt.subplots(figsize=(10, 8))
-        mask_display = np.where(low_backscatter_mask, 1, 0)
-        ax3.imshow(mask_display, cmap='binary', interpolation='nearest')
-        ax3.set_title('Low-Backscatter Mask (White = Potential Water)', fontsize=14, fontweight='bold')
-        ax3.axis('off')
-        mask_image = fig_to_base64(fig3)
-        print("Mask generated")
-        
-        # --- 4. Overlay (Red highlight on low-backscatter) ---
+        # --- 3. Overlay (Red highlight on low-backscatter) ---
         print("Generating overlay...")
-        fig4, ax4 = plt.subplots(figsize=(10, 8))
+        fig3, ax3 = plt.subplots(figsize=(10, 8))
         
         # Convert grayscale to RGB
         rgb_base = np.stack([data_display]*3, axis=-1)
@@ -164,26 +150,17 @@ def view_sar():
         alpha = 0.5
         rgb_blended = (1 - alpha) * rgb_base + alpha * rgb_overlay
         
-        ax4.imshow(rgb_blended, interpolation='nearest')
-        ax4.set_title('Overlay (Low-Backscatter in Red)', fontsize=14, fontweight='bold')
-        ax4.axis('off')
-        overlay_image = fig_to_base64(fig4)
+        ax3.imshow(rgb_blended, interpolation='nearest')
+        ax3.set_title('Overlay (Low-Backscatter in Red)', fontsize=14, fontweight='bold')
+        ax3.axis('off')
+        overlay_image = fig_to_base64(fig3)
         print("Overlay generated")
         
         # Prepare response
         response = {
             "main_image": main_image,
             "histogram": histogram,
-            "mask": mask_image,
-            "overlay": overlay_image,
-            "stats": {
-                "mean": float(mean_db),
-                "std": float(std_db),
-                "min": float(min_db),
-                "max": float(max_db),
-                "threshold": float(threshold),
-                "low_backscatter_ratio": float(low_backscatter_ratio)
-            }
+            "overlay": overlay_image
         }
         
         print("Response prepared successfully")

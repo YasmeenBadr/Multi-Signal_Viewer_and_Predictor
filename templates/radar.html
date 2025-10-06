@@ -49,9 +49,6 @@
     .small {
       color: #aaa;
       font-size: 13px;
-
-
-
     }
   </style>
 </head>
@@ -124,22 +121,10 @@
 
               <div class="col-md-6 col-lg-4 mb-3">
                 <div class="card p-2 text-center">
-                  <h5>Water Mask</h5>
-                  <img id="sarMask" src="" class="img-fluid rounded">
-                </div>
-              </div>
-
-              <div class="col-md-6 col-lg-4 mb-3">
-                <div class="card p-2 text-center">
                   <h5>Overlay (Low-Backscatter in Red)</h5>
                   <img id="sarOverlay" src="" class="img-fluid rounded">
                 </div>
               </div>
-            </div>
-
-            <div class="card p-3 mt-3">
-              <h5>Estimated Statistics</h5>
-              <ul id="sarStats" class="list-unstyled mb-0 small"></ul>
             </div>
           </div>
         </div>
@@ -178,8 +163,6 @@
     <h4 style="color:#001f4d !important;">Prediction: <strong style="color:#001f4d !important;">${data.predicted_class}</strong></h4>
     <p style="color:#001f4d !important;">Confidence: <strong style="color:#001f4d !important;">${(data.confidence * 100).toFixed(2)}%</strong></p>
   </div>`;
-
-
     });
   </script>
 
@@ -214,18 +197,7 @@
         // Update images
         document.getElementById("sarDisplay").src = data.main_image;
         document.getElementById("sarHist").src = data.histogram;
-        document.getElementById("sarMask").src = data.mask;
         document.getElementById("sarOverlay").src = data.overlay;
-
-        // Update stats
-        const s = data.stats;
-        document.getElementById("sarStats").innerHTML = `
-          <li><b>Mean:</b> ${s.mean.toFixed(2)} dB</li>
-          <li><b>Std:</b> ${s.std.toFixed(2)} dB</li>
-          <li><b>Min / Max:</b> ${s.min.toFixed(2)} / ${s.max.toFixed(2)} dB</li>
-          <li><b>Threshold:</b> ${s.threshold} dB</li>
-          <li><b>Low-backscatter ratio:</b> ${(s.low_backscatter_ratio * 100).toFixed(2)}%</li>
-        `;
 
         sarBox.style.display = "block";
       } catch (err) {
