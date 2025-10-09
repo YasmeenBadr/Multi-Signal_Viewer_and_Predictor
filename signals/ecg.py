@@ -39,12 +39,14 @@ _stream = {
     "pos": 0,
     "record_path": None,
     "prev_chunks": {},       # store previous chunk for XOR per channel
-    "recurrence_points": {}  # store cumulative points for recurrence plot
+    "recurrence_points": {},  # store cumulative points for recurrence plot
+    "polar_points": {}        # store cumulative polar r-values per channel
 }
 
 DISPLAY_FS = 200
 STREAMING_CHUNK_DURATION = 1.0
 _model_seq_len = 5000
+POLAR_MAX_POINTS = 2000
 
 # -------------------------
 # 1D model
@@ -131,6 +133,72 @@ if wfdb is not None and DATA_PATH and os.path.exists(DATA_PATH + ".dat"):
         _stream["loaded"] = False
 
 if not _stream["loaded"]:
+# Simulate ECG data if no WFDB record is loaded
+    print("No WFDB record found — using simulated ECG (12 leads).")
+    fs = 360
+    duration_s = 60
+    t = np.linspace(0, duration_s, int(duration_s * fs), endpoint=False)
+    sim = np.zeros((len(t), 12), dtype=np.float32)
+    for ch in range(12):
+        sim[:, ch] = 0.6 * np.sin(2 * np.pi * 1.2 * t + 0.15 * ch) + 0.05 * np.random.randn(len(t))
+        spike_times = np.arange(0, duration_s, 1.0) + 0.03 * ch
+        for st in spike_times:
+            idx = int(st * fs)
+            if 0 <= idx < len(t):
+                sim[idx:idx+3, ch] += [0.8, 1.2, 0.6]
+    _stream.update({
+        "signals": sim,
+        "channels": [f"Lead {ch+1}" for ch in range(12)],
+        "fs": fs,
+        "loaded": True
+    })
+# -------------------------
+# Upload route for .hea and .dat files
+# -------------------------
+@ECG_BP.route("/upload", methods=["POST"])
+def upload():
+    upload_dir = os.path.join(os.getcwd(), "uploads")
+    os.makedirs(upload_dir, exist_ok=True)
+    files = request.files.getlist("files")
+    base_name = None
+    saved = {"hea": None, "dat": None, "xyz": None}
+    xyz_uploaded = False
+    for f in files:
+        fname = f.filename
+        if fname.endswith(".hea"):
+            saved["hea"] = fname
+            base_name = fname[:-4]
+            f.save(os.path.join(upload_dir, fname))
+        elif fname.endswith(".dat"):
+            saved["dat"] = fname
+            base_name = fname[:-4]
+            f.save(os.path.join(upload_dir, fname))
+        elif fname.endswith(".xyz"):
+            saved["xyz"] = fname
+            xyz_uploaded = True
+            f.save(os.path.join(upload_dir, fname))
+    # Try to reload ECG record if both files are present
+    msg = []
+    if saved["hea"] and saved["dat"]:
+        record_base = os.path.join(upload_dir, base_name)
+        try:
+            s, names, sr = load_wfdb_record(record_base)
+            _stream.update({
+                "signals": s,
+                "channels": names,
+                "fs": sr,
+                "pos": 0,
+                "loaded": True,
+                "record_path": record_base
+            })
+            msg.append("Files uploaded and record loaded.")
+        except Exception as e:
+            return jsonify({"success": False, "error": f"Failed to load record: {e}"})
+    else:
+        msg.append("Files uploaded. Please upload both .hea and .dat for record reload.")
+    if xyz_uploaded:
+        msg.append(".xyz file uploaded and saved.")
+    return jsonify({"success": True, "message": " ".join(msg)})
     print("No WFDB record found — using simulated ECG (12 leads).")
     fs = 360
     duration_s = 60
@@ -214,7 +282,41 @@ def config():
 @ECG_BP.route("/update", methods=["POST"])
 def update():
     req = request.json or {}
-    channels = req.get("channels", list(range(12)))
+    # channels can come in as: list of ints, list of strings, a single int, or a comma-separated string
+    raw_channels = req.get("channels", list(range(12)))
+    channels = []
+    # normalize to a list of ints
+    if isinstance(raw_channels, int):
+        channels = [raw_channels]
+    elif isinstance(raw_channels, str):
+        # e.g. "0,1,2" or "0"
+        try:
+            channels = [int(x) for x in raw_channels.split(",") if x.strip() != ""]
+        except ValueError:
+            channels = list(range(12))
+    elif isinstance(raw_channels, (list, tuple)):
+        parsed = []
+        for x in raw_channels:
+            try:
+                parsed.append(int(x))
+            except Exception:
+                # ignore non-convertible entries
+                continue
+        channels = parsed if parsed else list(range(12))
+    else:
+        channels = list(range(12))
+
+    # validate channel indices and preserve order/uniqueness
+    max_ch = _stream["signals"].shape[1]
+    seen = set()
+    valid_channels = []
+    for c in channels:
+        if 0 <= c < max_ch and c not in seen:
+            valid_channels.append(c)
+            seen.add(c)
+    if not valid_channels:
+        valid_channels = list(range(min(12, max_ch)))
+    channels = valid_channels
     fs = _stream["fs"]
     N = int(STREAMING_CHUNK_DURATION * fs)
     start = _stream["pos"]
@@ -230,7 +332,7 @@ def update():
 
     _stream["pos"] = end % total_len
 
-    # Prediction
+    # Prediction: if single channel use it, otherwise use the mean across selected channels
     if len(channels) == 1:
         sig_selected = seg_block[:, channels[0]]
     else:
@@ -239,7 +341,7 @@ def update():
 
     downsample_factor = max(1,int(fs/DISPLAY_FS))
     time_axis = (np.arange(seg_block.shape[0])/fs)[::downsample_factor].tolist()
-    signals_out = {str(ch): seg_block[::downsample_factor,ch].astype(float).tolist() for ch in channels if 0<=ch<seg_block.shape[1]}
+    signals_out = {str(ch): seg_block[::downsample_factor, ch].astype(float).tolist() for ch in channels}
 
     # ---- XOR only if 1 channel ----
     xor_out = {}
@@ -255,24 +357,42 @@ def update():
         _stream["prev_chunks"][ch] = chunk.copy()
 
     # ---- Polar plot ----
+    # polar_mode: 'fixed' => return current chunk angles and r-values for each selected channel
+    #             'cumulative' => return cumulative r-values across time for each channel
+    polar_mode = str(req.get("polar_mode", "fixed")).lower()
     polar_out = {}
     for ch in channels:
         sig = seg_block[:, ch]
         Nsig = len(sig)
-        theta = np.linspace(0, 360, Nsig)
-        r = sig - np.min(sig)
-        polar_out[str(ch)] = {"r": r.tolist(), "theta": theta.tolist()}
+        theta = np.linspace(0, 360, Nsig, endpoint=False)
+        r = (sig - np.min(sig)).tolist()
+        if polar_mode == "cumulative":
+            # initialize storage for channel
+            if ch not in _stream["polar_points"]:
+                _stream["polar_points"][ch] = {"r": [], "theta": []}
+            # extend cumulative list and cap to POLAR_MAX_POINTS
+            _stream["polar_points"][ch]["r"].extend(r)
+            _stream["polar_points"][ch]["theta"].extend(theta.tolist())
+            # cap length
+            if len(_stream["polar_points"][ch]["r"]) > POLAR_MAX_POINTS:
+                excess = len(_stream["polar_points"][ch]["r"]) - POLAR_MAX_POINTS
+                _stream["polar_points"][ch]["r"] = _stream["polar_points"][ch]["r"][excess:]
+                _stream["polar_points"][ch]["theta"] = _stream["polar_points"][ch]["theta"][excess:]
+            polar_out[str(ch)] = {"r": _stream["polar_points"][ch]["r"], "theta": _stream["polar_points"][ch]["theta"]}
+        else:
+            polar_out[str(ch)] = {"r": r, "theta": theta.tolist()}
 
-    # ---- Recurrence only if 2 channels ----
+    # ---- Recurrence only if exactly 2 channels (unchanged behavior) ----
     recurrence_scatter_data = {"x_vals": [], "y_vals": []}
     colormap_data = None
     if len(channels) == 2:
-        chX, chY = channels[:2]
+        chX, chY = channels[0], channels[1]
         if chX not in _stream["recurrence_points"]:
             _stream["recurrence_points"][chX] = []
+        if chY not in _stream["recurrence_points"]:
             _stream["recurrence_points"][chY] = []
-        _stream["recurrence_points"][chX].extend(seg_block[:,chX][::downsample_factor].tolist())
-        _stream["recurrence_points"][chY].extend(seg_block[:,chY][::downsample_factor].tolist())
+        _stream["recurrence_points"][chX].extend(seg_block[:, chX][::downsample_factor].tolist())
+        _stream["recurrence_points"][chY].extend(seg_block[:, chY][::downsample_factor].tolist())
         recurrence_scatter_data["x_vals"] = _stream["recurrence_points"][chX]
         recurrence_scatter_data["y_vals"] = _stream["recurrence_points"][chY]
         colormap_data = np.stack([seg_block[:, chX], seg_block[:, chY]], axis=0).tolist()

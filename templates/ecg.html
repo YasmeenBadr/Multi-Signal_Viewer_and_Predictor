@@ -44,8 +44,12 @@
   <div class="row">
     <div class="col-md-3 sidebar">
       <h5>ECG Controls</h5>
-      <form id="channelForm">
+  <form id="channelForm">
         <div class="mb-2">
+          <div class="mb-2">
+            <label class="form-label">Speed (updates/sec)</label>
+            <input id="speedControl" class="form-control bg-dark text-white" type="number" min="0.5" max="5" step="0.1" value="1" />
+          </div>
           <label class="form-label">Window width (seconds)</label>
           <input id="width" class="form-control bg-dark text-white" type="number" min="0.5" step="0.5" value="5"/>
         </div>
@@ -62,6 +66,13 @@
             <option value="Rainbow">Rainbow</option>
           </select>
         </div>
+        <div class="mb-2">
+          <label class="form-label">Polar Mode</label>
+          <select id="polarModeSelect" class="form-select bg-dark text-white">
+            <option value="fixed">Fixed (current chunk)</option>
+            <option value="cumulative">Cumulative</option>
+          </select>
+        </div>
         <button class="btn btn-primary w-100" type="submit">Start Streaming</button>
         <button id="stopBtn" class="btn btn-secondary w-100 mt-2" type="button">Stop</button>
       </form>
@@ -72,17 +83,19 @@
         <div id="timePlot" style="width:100%;height:300px;"></div>
       </div>
       <div class="row">
-        <div class="col-md-6 plot-container">
-          <h5>XOR Graph (1 channel only, cumulative)</h5>
+        <div class="col-12 plot-container">
+          <h5>XOR Graph</h5>
           <div id="xorPlot" style="width:100%;height:300px;"></div>
         </div>
-        <div class="col-md-6 plot-container">
+      </div>
+      <div class="row">
+        <div class="col-12 plot-container">
           <h5>Polar Plot</h5>
-          <div id="polarPlot" style="width:100%;height:300px;"></div>
+          <div id="polarPlot" style="width:100%;height:450px;"></div>
         </div>
       </div>
       <div class="plot-container mt-3">
-        <h5>Recurrence 2D Scatter / Colormap (first 2 channels)</h5>
+        <h5>Recurrence 2D Scatter / Colormap </h5>
         <div id="recurrenceScatterPlot" style="width:100%;height:300px;"></div>
       </div>
       <div class="prediction-box mt-3">
@@ -96,10 +109,12 @@
 
 <script>
 let streaming=false, intervalId=null;
+let updateSpeed=1; // updates per second
 let allChannels=[], selectedChannels=[], widthSec=5;
 let fs=360, displayFs=200;
 let channelData={}, globalStart=0;
 let colormap="Jet";
+let polarMode = "fixed";
 
 async function initConfig(){
   try{
@@ -123,29 +138,42 @@ async function initConfig(){
 initConfig();
 
 document.getElementById("colormapSelect").addEventListener("change",(ev)=>{ colormap=ev.target.value; });
+document.getElementById("polarModeSelect").addEventListener("change",(ev)=>{ polarMode = ev.target.value; });
 
-document.getElementById("channelForm").addEventListener("submit", ev=>{
+  document.getElementById("channelForm").addEventListener("submit", ev=>{
   ev.preventDefault();
   selectedChannels=Array.from(document.querySelectorAll("input[name=channels]:checked")).map(n=>parseInt(n.value));
   widthSec=parseFloat(document.getElementById("width").value)||5;
+  updateSpeed=parseFloat(document.getElementById("speedControl").value)||1;
   if(selectedChannels.length===0){ alert("Select channel(s)"); return; }
 
-  if(selectedChannels.length===1 || selectedChannels.length===2){
-    channelData={};
-    globalStart=0;
-    selectedChannels.forEach(ch=>channelData[ch]=[]);
-    initPlots(selectedChannels);
-    streaming=true;
-    if(intervalId) clearInterval(intervalId);
-    intervalId=setInterval(fetchData,900);
-  } else {
-    alert("XOR: 1 channel only; Recurrence: 2 channels only.");
+  // allow any number of channels for time and polar plots
+  channelData={};
+  globalStart=0;
+  selectedChannels.forEach(ch=>channelData[ch]=[]);
+  initPlots(selectedChannels);
+  streaming=true;
+  if(intervalId) clearInterval(intervalId);
+  intervalId=setInterval(fetchData,1000/updateSpeed);
+  // note: XOR will show only if 1 channel selected; recurrence only when exactly 2 channels
+  if(selectedChannels.length>2){
+    // optional gentle notice
+    console.info('More than 2 channels selected: XOR and recurrence plots will remain for 1 and 2 channels respectively.');
   }
+  
 });
 
 document.getElementById("stopBtn").addEventListener("click", ()=>{
   streaming=false;
   if(intervalId) clearInterval(intervalId);
+});
+
+document.getElementById("speedControl").addEventListener("change", ev => {
+  updateSpeed = parseFloat(ev.target.value) || 1;
+  if(streaming){
+    if(intervalId) clearInterval(intervalId);
+    intervalId = setInterval(fetchData, 1000/updateSpeed);
+  }
 });
 
 function initPlots(channels){
@@ -178,11 +206,11 @@ function initPlots(channels){
 
 async function fetchData(){
   if(!streaming) return;
-  try{
+    try{
     const resp=await fetch("/ecg/update",{
       method:"POST",
       headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({channels:selectedChannels,width:widthSec})
+      body:JSON.stringify({channels:selectedChannels,width:widthSec, polar_mode: polarMode})
     });
     if(!resp.ok) throw new Error("HTTP "+resp.status);
     const result=await resp.json();
@@ -213,8 +241,9 @@ async function fetchData(){
     }
 
     const rArr=[],thetaArr=[];
-    selectedChannels.forEach(ch=>{
+    selectedChannels.forEach((ch, idx)=>{
       const polar=result.polar[String(ch)]||{r:[],theta:[]};
+      // For cumulative mode, polar.r may be longer; Plotly.restyle expects arrays matching traces
       rArr.push(polar.r);
       thetaArr.push(polar.theta);
     });
