@@ -39,8 +39,10 @@ _stream = {
     "pos": 0,
     "record_path": None,
     "prev_chunks": {},       # store previous chunk for XOR per channel
+    "prev_chunks_raw": {},   # store previous raw float chunk per channel (for thresholded XOR)
     "recurrence_points": {},  # store cumulative points for recurrence plot
-    "polar_points": {}        # store cumulative polar r-values per channel
+    "polar_points": {},       # store cumulative polar r-values per channel
+    "pred_buffers": {}        # rolling buffers used for model prediction per channel
 }
 
 DISPLAY_FS = 200
@@ -256,10 +258,21 @@ def predict_signal(sig):
     disease_text = extract_diagnosis_from_hea(rec_base) if rec_base else None
     if disease_text and "healthy" in disease_text.lower():
         idx = 0
-    if np.mean(np.abs(sig)) < 0.05:
-        idx = 0
+    # Avoid forcing 'Normal' for modest amplitude signals. Only override when
+    # the signal is essentially flat (very low absolute amplitude).
+    try:
+        if np.max(np.abs(sig)) < 0.01:
+            idx = 0
+    except Exception:
+        pass
     label = DISEASE_CLASSES[idx]
-    result = {"label": label,"description": DISEASE_DESCRIPTIONS[label]}
+    result = {"label": label, "description": DISEASE_DESCRIPTIONS[label]}
+    # include raw model probabilities and confidence for debugging/UI
+    try:
+        result["probabilities"] = probs.tolist()
+        result["confidence"] = float(probs[idx])
+    except Exception:
+        pass
     if label=="Abnormal":
         result["disease_name"] = disease_text if disease_text else "Unknown (check .hea)"
     return result
@@ -332,11 +345,32 @@ def update():
 
     _stream["pos"] = end % total_len
 
-    # Prediction: if single channel use it, otherwise use the mean across selected channels
+    # Prediction: accumulate a rolling buffer per channel and use a longer sequence
+    # for prediction (model expects _model_seq_len samples). This gives the model
+    # more context than the 1s seg_block and avoids trivial 'Normal' outputs.
+    for ch in channels:
+        if ch not in _stream["pred_buffers"]:
+            _stream["pred_buffers"][ch] = []
+        _stream["pred_buffers"][ch].extend(seg_block[:, ch].astype(float).tolist())
+        # cap to model sequence length
+        if len(_stream["pred_buffers"][ch]) > _model_seq_len:
+            _stream["pred_buffers"][ch] = _stream["pred_buffers"][ch][-_model_seq_len:]
+
+    # build signal for prediction: if single channel use its buffer; otherwise use
+    # the mean across channel buffers (aligned to the shortest buffer length).
     if len(channels) == 1:
-        sig_selected = seg_block[:, channels[0]]
+        sig_selected = np.array(_stream["pred_buffers"][channels[0]], dtype=np.float32)
     else:
-        sig_selected = np.mean(seg_block[:, channels], axis=1)
+        # find available lengths
+        lens = [len(_stream["pred_buffers"].get(ch, [])) for ch in channels]
+        minlen = min(lens) if lens else 0
+        if minlen <= 0:
+            # fallback to current mean of seg_block when buffers are empty
+            sig_selected = np.mean(seg_block[:, channels], axis=1)
+        else:
+            arrs = [np.array(_stream["pred_buffers"][ch], dtype=np.float32)[-minlen:] for ch in channels]
+            sig_selected = np.mean(np.stack(arrs, axis=1), axis=1)
+
     prediction = predict_signal(sig_selected)
 
     downsample_factor = max(1,int(fs/DISPLAY_FS))
@@ -347,14 +381,25 @@ def update():
     xor_out = {}
     if len(channels) == 1:
         ch = channels[0]
-        chunk = ((seg_block[:,ch]-np.min(seg_block[:,ch]))*1000).astype(np.int32)
-        prev = _stream["prev_chunks"].get(ch)
-        if prev is not None:
-            xor = np.bitwise_xor(chunk, prev)
-            xor_out[ch] = xor[::downsample_factor].tolist()
+        # use raw float values for thresholded difference
+        curr_raw = seg_block[:, ch].astype(float)
+        prev_raw = _stream["prev_chunks_raw"].get(ch)
+        # threshold can be provided by client (in signal units); default small value
+        try:
+            xor_threshold = float(req.get("xor_threshold", 0.05))
+        except Exception:
+            xor_threshold = 0.05
+
+        if prev_raw is not None:
+            diff = curr_raw - prev_raw
+            # set to zero where abs(diff) <= threshold, otherwise keep diff
+            mask = np.abs(diff) > xor_threshold
+            xor_vals = np.where(mask, diff, 0.0)
+            xor_out[ch] = xor_vals[::downsample_factor].tolist()
         else:
-            xor_out[ch] = np.zeros_like(chunk[::downsample_factor]).tolist()
-        _stream["prev_chunks"][ch] = chunk.copy()
+            xor_out[ch] = np.zeros_like(curr_raw[::downsample_factor]).tolist()
+        # store current raw chunk for next comparison
+        _stream["prev_chunks_raw"][ch] = curr_raw.copy()
 
     # ---- Polar plot ----
     # polar_mode: 'fixed' => return current chunk angles and r-values for each selected channel
