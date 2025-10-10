@@ -58,6 +58,11 @@
           <div id="channelList" style="max-height:240px; overflow:auto;">Loading...</div>
         </div>
         <div class="mb-2">
+          <label class="form-label">Upload .hea/.dat (drag & drop)</label>
+          <div id="dropZone" style="border:2px dashed #444; padding:12px; border-radius:8px; background:#0e0e0e; color:#cfcfcf; text-align:center;">Drop files here or <a href="#" id="pickFiles">choose files</a></div>
+          <input id="filePicker" type="file" accept=".hea,.dat,.xyz" multiple style="display:none;" />
+        </div>
+        <div class="mb-2">
           <label class="form-label">Recurrence Colormap</label>
           <select id="colormapSelect" class="form-select bg-dark text-white">
             <option value="Jet">Jet</option>
@@ -73,6 +78,26 @@
             <option value="cumulative">Cumulative</option>
           </select>
         </div>
+        <div class="mb-2">
+          <label class="form-label">Display</label>
+          <select id="displaySelect" class="form-select bg-dark text-white">
+            <option value="Time" selected>Time</option>
+            <option value="XOR">XOR</option>
+            <option value="Polar">Polar</option>
+            <option value="Recurrence">Recurrence</option>
+          </select>
+        </div>
+        <div class="mb-2">
+          <label class="form-label">XOR Threshold</label>
+          <input id="xorThreshold" class="form-control bg-dark text-white" type="number" step="0.01" value="0.05" />
+          <div class="form-text text-muted">Only show XOR when abs(curr - prev) &gt; threshold</div>
+        </div>
+        <div class="prediction-box mb-3">
+          <h6>Prediction</h6>
+          <div id="predictionResult" class="prediction-result">Waiting for data...</div>
+          <div id="predictionDescription" style="margin-top:8px; color:#ccc; font-size:0.9rem;"></div>
+          <div id="diseaseName" class="disease-name"></div>
+        </div>
         <button class="btn btn-primary w-100" type="submit">Start Streaming</button>
         <button id="stopBtn" class="btn btn-secondary w-100 mt-2" type="button">Stop</button>
       </form>
@@ -80,17 +105,28 @@
     <div class="col-md-9">
       <div class="plot-container">
         <h5>Real-time ECG (time domain)</h5>
-        <div id="timePlot" style="width:100%;height:300px;"></div>
+        <div id="timePlot" style="width:100%;height:380px;"></div>
       </div>
       <div class="row">
         <div class="col-12 plot-container">
           <h5>XOR Graph</h5>
+          <div id="xorControlsInline" style="margin-bottom:8px; display:none;">
+            <label class="form-label" style="margin-right:8px; color:#cfcfcf;">XOR Threshold</label>
+            <input id="xorThresholdInline" class="form-control bg-dark text-white" type="number" step="0.01" value="0.05" style="width:140px; display:inline-block;" />
+          </div>
           <div id="xorPlot" style="width:100%;height:300px;"></div>
         </div>
       </div>
       <div class="row">
         <div class="col-12 plot-container">
           <h5>Polar Plot</h5>
+          <div id="polarControlsInline" style="margin-bottom:8px; display:none;">
+            <label class="form-label" style="margin-right:8px; color:#cfcfcf;">Polar Mode</label>
+            <select id="polarModeInlineSelect" class="form-select bg-dark text-white" style="width:200px; display:inline-block;">
+              <option value="fixed">Fixed (current chunk)</option>
+              <option value="cumulative">Cumulative</option>
+            </select>
+          </div>
           <div id="polarPlot" style="width:100%;height:450px;"></div>
         </div>
       </div>
@@ -115,6 +151,7 @@ let fs=360, displayFs=200;
 let channelData={}, globalStart=0;
 let colormap="Jet";
 let polarMode = "fixed";
+let currentDisplay = 'All';
 
 async function initConfig(){
   try{
@@ -138,7 +175,119 @@ async function initConfig(){
 initConfig();
 
 document.getElementById("colormapSelect").addEventListener("change",(ev)=>{ colormap=ev.target.value; });
-document.getElementById("polarModeSelect").addEventListener("change",(ev)=>{ polarMode = ev.target.value; });
+document.getElementById("polarModeSelect").addEventListener("change",(ev)=>{ polarMode = ev.target.value; document.getElementById('polarModeInlineSelect').value = polarMode; });
+
+// Inline controls sync
+const xorInline = document.getElementById('xorThresholdInline');
+const xorSidebar = document.getElementById('xorThreshold');
+if(xorInline && xorSidebar){
+  xorInline.addEventListener('input', (e)=>{ xorSidebar.value = e.target.value; });
+  xorSidebar.addEventListener('input', (e)=>{ xorInline.value = e.target.value; });
+}
+const polarInline = document.getElementById('polarModeInlineSelect');
+const polarSidebar = document.getElementById('polarModeSelect');
+if(polarInline && polarSidebar){
+  polarInline.addEventListener('change', (e)=>{ polarSidebar.value = e.target.value; polarMode = e.target.value; });
+  polarSidebar.addEventListener('change', (e)=>{ polarInline.value = e.target.value; polarMode = e.target.value; });
+}
+
+// Drag & drop file upload
+const dropZone = document.getElementById('dropZone');
+const filePicker = document.getElementById('filePicker');
+document.getElementById('pickFiles').addEventListener('click', (e)=>{ e.preventDefault(); filePicker.click(); });
+
+['dragenter','dragover','dragleave','drop'].forEach(evt => dropZone.addEventListener(evt, e=>e.preventDefault()));
+dropZone.addEventListener('dragover', ()=> dropZone.style.borderColor = '#888');
+dropZone.addEventListener('dragleave', ()=> dropZone.style.borderColor = '#444');
+dropZone.addEventListener('drop', (e)=>{ dropZone.style.borderColor='#444'; handleFiles(e.dataTransfer.files); });
+filePicker.addEventListener('change', (e)=> handleFiles(e.target.files));
+
+function handleFiles(fileList){
+  if(!fileList || fileList.length===0) return;
+  const fd = new FormData();
+  for(const f of fileList){ fd.append('files', f, f.name); }
+  dropZone.innerText = 'Uploading...';
+  fetch('/ecg/upload', { method:'POST', body: fd })
+    .then(r=>r.json())
+    .then(j=>{
+      if(j && j.success){
+        dropZone.innerText = 'Upload successful';
+        // refresh channel list/config
+        setTimeout(()=>{ initConfig(); dropZone.innerText = 'Drop files here or choose files'; }, 800);
+      } else {
+        dropZone.innerText = 'Upload failed';
+        alert('Upload failed: ' + (j && j.error ? j.error : JSON.stringify(j)));
+        setTimeout(()=> dropZone.innerText = 'Drop files here or choose files', 1200);
+      }
+    }).catch(err=>{
+      console.error(err);
+      dropZone.innerText = 'Upload error';
+      setTimeout(()=> dropZone.innerText = 'Drop files here or choose files', 1200);
+    });
+}
+
+// Display controls: show/hide containers
+const containers = {
+  'Time': document.getElementById('timePlot').parentElement,
+  'XOR': document.getElementById('xorPlot').parentElement,
+  'Polar': document.getElementById('polarPlot').parentElement,
+  'Recurrence': document.getElementById('recurrenceScatterPlot').parentElement
+};
+const displaySelect = document.getElementById('displaySelect');
+function applyDisplaySelection(val){
+  currentDisplay = val;
+  // default sizes
+  const sizes = {
+    'Time': '450px',
+    'XOR': '450px',
+    'Polar': '650px',
+    'Recurrence': '550px'
+  };
+  Object.keys(containers).forEach(k => {
+    if(k === currentDisplay){
+      containers[k].style.display = 'block';
+      // enlarge the actual plot div for this container
+      const plotIdMap = { 'Time': 'timePlot', 'XOR': 'xorPlot', 'Polar': 'polarPlot', 'Recurrence': 'recurrenceScatterPlot' };
+      const pid = plotIdMap[k];
+      if(pid){
+        const plotDiv = document.getElementById(pid);
+        if(plotDiv){
+          plotDiv.style.height = sizes[k] || '500px';
+          try{ Plotly.relayout(pid, {height: parseInt((sizes[k]||'500px'))}); }catch(e){}
+        }
+      }
+    } else {
+      containers[k].style.display = 'none';
+    }
+  });
+  // show/hide inline controls and sidebar duplicates
+  const xorInlineDiv = document.getElementById('xorControlsInline');
+  const polarInlineDiv = document.getElementById('polarControlsInline');
+  // Toggle inline controls and hide/show the corresponding sidebar control blocks
+  const xorSidebarInput = document.getElementById('xorThreshold');
+  const polarSidebarSelect = document.getElementById('polarModeSelect');
+  const xorSidebarBlock = xorSidebarInput ? xorSidebarInput.parentElement : null;
+  const polarSidebarBlock = polarSidebarSelect ? polarSidebarSelect.parentElement : null;
+
+  if(currentDisplay === 'XOR'){
+    if(xorInlineDiv) xorInlineDiv.style.display = 'block';
+    if(xorSidebarBlock) xorSidebarBlock.style.display = 'none';
+  } else {
+    if(xorInlineDiv) xorInlineDiv.style.display = 'none';
+    if(xorSidebarBlock) xorSidebarBlock.style.display = 'block';
+  }
+
+  if(currentDisplay === 'Polar'){
+    if(polarInlineDiv) polarInlineDiv.style.display = 'block';
+    if(polarSidebarBlock) polarSidebarBlock.style.display = 'none';
+  } else {
+    if(polarInlineDiv) polarInlineDiv.style.display = 'none';
+    if(polarSidebarBlock) polarSidebarBlock.style.display = 'block';
+  }
+}
+displaySelect.addEventListener('change', (e) => applyDisplaySelection(e.target.value));
+// apply initial selection
+applyDisplaySelection(displaySelect.value || 'Time');
 
   document.getElementById("channelForm").addEventListener("submit", ev=>{
   ev.preventDefault();
@@ -168,49 +317,32 @@ document.getElementById("stopBtn").addEventListener("click", ()=>{
   if(intervalId) clearInterval(intervalId);
 });
 
-document.getElementById("speedControl").addEventListener("change", ev => {
-  updateSpeed = parseFloat(ev.target.value) || 1;
-  if(streaming){
-    if(intervalId) clearInterval(intervalId);
-    intervalId = setInterval(fetchData, 1000/updateSpeed);
-  }
-});
+    function initPlots(){
+      const traces = selectedChannels.map((ch, idx)=>({
+        x:[], y:[], mode:"lines", name:`Ch ${ch+1}`, line:{width:1.5}
+      }));
+      Plotly.newPlot("timePlot", traces, {
+        paper_bgcolor:"#000", plot_bgcolor:"#000", font:{color:"#e0e0e0"},
+        xaxis:{title:"Time (s)", range:[0,widthSec], gridcolor:"#333"},
+        yaxis:{title:"Amplitude", gridcolor:"#333"}
+      });
 
-function initPlots(channels){
-  const timeTraces=channels.map(ch=>({x:[],y:[],mode:"lines",name:allChannels[ch],line:{width:1.5}}));
-  Plotly.newPlot("timePlot",timeTraces,{
-    paper_bgcolor:"#000", plot_bgcolor:"#000", font:{color:"#e0e0e0"},
-    xaxis:{title:"Time (s)", range:[0,widthSec], gridcolor:"#333"},
-    yaxis:{title:"Amplitude", gridcolor:"#333"}
-  });
-
-  // XOR plot: only if 1 channel
-  if(channels.length===1){
-    const xorTraces=[{x:[],y:[],mode:"lines",name:`XOR ${allChannels[channels[0]]}`}];
-    Plotly.newPlot("xorPlot",xorTraces,{
-      paper_bgcolor:"#000", plot_bgcolor:"#000", font:{color:"#e0e0e0"},
-      xaxis:{title:"Time (s)", range:[0,widthSec*4]},
-      yaxis:{title:"XOR Amplitude"}
-    });
-  }
-
-  const polarTraces=channels.map(ch=>({r:[],theta:[],mode:"lines",type:"scatterpolar",name:allChannels[ch]}));
-  Plotly.newPlot("polarPlot",polarTraces,{paper_bgcolor:"#000",font:{color:"#e0e0e0"}});
-
-  // Recurrence: only if 2 channels
-  if(channels.length===2){
-    Plotly.newPlot("recurrenceScatterPlot",[{ z: [], type: "heatmap", colorscale: colormap }],
-      {paper_bgcolor:"#000", plot_bgcolor:"#000", font:{color:"#e0e0e0"}});
-  }
-}
+      const polar = selectedChannels.map(ch=>({
+        r:[], theta:[], mode:"lines", type:"scatterpolar", name:`Ch ${ch+1}`
+      }));
+      Plotly.newPlot("polarPlot", polar, {paper_bgcolor:"#000", font:{color:"#e0e0e0"}});
+      Plotly.newPlot("recurrencePlot", [{z:[[]], type:"heatmap", colorscale:"Viridis"}],
+        {paper_bgcolor:"#000", font:{color:"#e0e0e0"}});
+    }
 
 async function fetchData(){
   if(!streaming) return;
     try{
+    const xorThresholdVal = parseFloat(document.getElementById('xorThreshold').value) || 0.05;
     const resp=await fetch("/ecg/update",{
       method:"POST",
       headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({channels:selectedChannels,width:widthSec, polar_mode: polarMode})
+      body:JSON.stringify({channels:selectedChannels,width:widthSec, polar_mode: polarMode, xor_threshold: xorThresholdVal})
     });
     if(!resp.ok) throw new Error("HTTP "+resp.status);
     const result=await resp.json();
@@ -225,7 +357,9 @@ async function fetchData(){
         if(idx===0) globalStart+=drop/plotFs;
       }
       const xvals=channelData[ch].map((_,i)=>globalStart+i/plotFs);
-      Plotly.restyle("timePlot",{x:[xvals],y:[channelData[ch]]},[idx]);
+      if(currentDisplay === 'All' || currentDisplay === 'Time'){
+        Plotly.restyle("timePlot",{x:[xvals],y:[channelData[ch]]},[idx]);
+      }
     });
     Plotly.relayout("timePlot",{"xaxis.range":[globalStart,globalStart+widthSec]});
 
@@ -234,10 +368,18 @@ async function fetchData(){
       const chXOR = selectedChannels[0];
       const xorChunk = result.xor[String(chXOR)] || [];
       const xvalsXOR = xorChunk.map((_, i) => globalStart + i / plotFs);
-      const xMin = xvalsXOR[0], xMax = xvalsXOR[xvalsXOR.length - 1];
-      const yMin = Math.min(...xorChunk)-0.1, yMax = Math.max(...xorChunk)+0.1;
-      Plotly.restyle("xorPlot", { x: [xvalsXOR], y: [xorChunk] }, [0]);
-      Plotly.relayout("xorPlot", { "xaxis.range": [xMin, xMax], "yaxis.range": [yMin, yMax] });
+      if(currentDisplay === 'All' || currentDisplay === 'XOR'){
+        Plotly.restyle("xorPlot", { x: [xvalsXOR], y: [xorChunk] }, [0]);
+        if(xvalsXOR.length>0){
+          const xMin = xvalsXOR[0], xMax = xvalsXOR[xvalsXOR.length - 1];
+          let yMin=0, yMax=0;
+          if(xorChunk.length>0){
+            yMin = Math.min(...xorChunk)-0.01;
+            yMax = Math.max(...xorChunk)+0.01;
+          }
+          Plotly.relayout("xorPlot", { "xaxis.range": [xMin, xMax], "yaxis.range": [yMin, yMax] });
+        }
+      }
     }
 
     const rArr=[],thetaArr=[];
@@ -247,12 +389,16 @@ async function fetchData(){
       rArr.push(polar.r);
       thetaArr.push(polar.theta);
     });
-    Plotly.restyle("polarPlot",{r:rArr,theta:thetaArr});
+    if(currentDisplay === 'All' || currentDisplay === 'Polar'){
+      Plotly.restyle("polarPlot",{r:rArr,theta:thetaArr});
+    }
 
     // Recurrence: only for 2 channels
     if(selectedChannels.length===2){
       const colormapData=result.colormap||[];
-      Plotly.restyle("recurrenceScatterPlot",{z:[colormapData], colorscale: colormap});
+      if(currentDisplay === 'All' || currentDisplay === 'Recurrence'){
+        Plotly.restyle("recurrenceScatterPlot",{z:[colormapData], colorscale: colormap});
+      }
     }
 
     // Prediction
