@@ -2,211 +2,359 @@
 <html lang="en">
 
 <head>
-  <meta charset="UTF-8">
-  <title>RADAR Viewer</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
-  <style>
-    body {
-      background: #121212;
-      color: #e0e0e0;
-      font-family: 'Inter', sans-serif;
-    }
+    <meta charset="UTF-8">
+    <title>RADAR Viewer</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <style>
+        /* Modern UI Color Palette */
+        :root {
+            --bg-dark: #0A0A0A;
+            /* Almost black */
+            --bg-card: #141414;
+            /* Slightly lighter card background */
+            --primary-color: #00E8FF;
+            /* Neon/Cyber Blue */
+            --text-light: #E0E0E0;
+            --text-muted: #999999;
+            --glass-border: rgba(0, 232, 255, 0.2);
+            --glass-shadow: rgba(0, 232, 255, 0.1);
+        }
 
-    .card p,
-    .card li,
-    .card h5 {
-      color: #ffffff !important;
-    }
+        body {
+            background: var(--bg-dark);
+            color: var(--text-light);
+            /* Updated font to Inter */
+            font-family: 'Inter', sans-serif;
+            transition: background 0.5s ease;
+        }
 
-    h1,
-    h2 {
-      color: #00eaff;
-    }
+        /* --- Typography --- */
+        h1,
+        h2 {
+            color: var(--primary-color);
+            text-shadow: 0 0 8px var(--glass-shadow);
+            font-weight: 700;
+        }
 
-    .card {
-      background-color: #1f1f1f;
-      border: 1px solid #00eaff20;
-      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
-    }
+        .text-center.mb-5 {
+            color: var(--text-muted);
+        }
 
-    .nav-tabs .nav-link.active {
-      background-color: #00eaff;
-      color: #121212;
-      font-weight: bold;
-    }
+        /* --- Cards (Glassmorphism Effect) --- */
+        .card {
+            background-color: var(--bg-card);
+            border: 1px solid var(--glass-border);
+            /* Subtle blue border */
+            box-shadow: 0 8px 32px var(--glass-shadow);
+            /* Enhanced shadow */
+            backdrop-filter: blur(10px);
+            /* The key to glassmorphism */
+            -webkit-backdrop-filter: blur(10px);
+            /* For Safari */
+            border-radius: 12px;
+            /* Softer corners */
+            transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
+        }
 
-    .btn-custom {
-      background-color: #00eaff;
-      color: #121212;
-      font-weight: bold;
-    }
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 40px var(--glass-shadow);
+        }
 
-    .btn-custom:hover {
-      background-color: #00c0cc;
-      color: white;
-    }
+        .card p,
+        .card li,
+        .card h5 {
+            color: var(--text-light) !important;
+        }
 
-    .small {
-      color: #aaa;
-      font-size: 13px;
-    }
-  </style>
+        /* --- Tabs --- */
+        .nav-tabs {
+            border-bottom: 1px solid var(--glass-border);
+        }
+
+        .nav-tabs .nav-link {
+            border: none;
+            color: var(--text-muted);
+            transition: color 0.3s, background-color 0.3s;
+            border-radius: 6px 6px 0 0;
+        }
+
+        .nav-tabs .nav-link:hover {
+            color: var(--primary-color);
+            background-color: #1A1A1A;
+        }
+
+        .nav-tabs .nav-link.active {
+            background-color: var(--primary-color);
+            color: var(--bg-dark);
+            font-weight: 600;
+            border-bottom: 3px solid var(--primary-color);
+            /* Highlight effect */
+            transform: translateY(1px);
+        }
+
+        /* --- Buttons --- */
+        .btn-custom {
+            background-color: var(--primary-color);
+            color: var(--bg-dark);
+            font-weight: bold;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            /* Slightly softer */
+            letter-spacing: 0.5px;
+            transition: background-color 0.3s, transform 0.1s, box-shadow 0.3s;
+        }
+
+        .btn-custom:hover {
+            background-color: #00c0cc;
+            color: white;
+            box-shadow: 0 0 15px rgba(0, 232, 255, 0.5);
+            /* Glow on hover */
+            transform: translateY(-2px);
+        }
+
+        .btn-outline-light {
+            border-color: var(--text-muted);
+            color: var(--text-muted);
+            transition: all 0.3s;
+        }
+
+        .btn-outline-light:hover {
+            color: var(--primary-color);
+            border-color: var(--primary-color);
+            background-color: transparent;
+        }
+
+        /* --- Form Elements --- */
+        .form-control {
+            background-color: #1A1A1A;
+            border: 1px solid var(--glass-border);
+            color: var(--text-light);
+            box-shadow: none;
+            /* Remove default focus shadow */
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+
+        .form-control:focus {
+            background-color: #1A1A1A;
+            color: var(--text-light);
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 0.25rem rgba(0, 232, 255, 0.25);
+        }
+
+        /* --- Results Box Styling --- */
+        .alert-info {
+            /* Override Bootstrap alert styling for dark mode */
+            background-color: rgba(0, 232, 255, 0.1);
+            border-color: var(--primary-color);
+            color: var(--primary-color) !important;
+        }
+
+        .alert-info h4,
+        .alert-info p,
+        .alert-info strong {
+            color: var(--primary-color) !important;
+        }
+
+        /* --- Image Styling --- */
+        .img-fluid {
+            border-radius: 8px;
+            border: 1px solid var(--glass-border);
+        }
+
+        .col-md-6.col-lg-4.mb-3 {
+            /* Minor margin adjustment to ensure proper card hover effect doesn't clip */
+            padding-top: 5px;
+            padding-bottom: 5px;
+        }
+
+        /* Utilities */
+        .small {
+            color: var(--text-muted);
+            font-size: 13px;
+        }
+    </style>
 </head>
 
 <body>
-  <div class="container mt-5">
+    <div class="container mt-5">
 
-    <!-- Title -->
-    <h1 class="mb-4 text-center">RADAR Signal Analysis</h1>
-    <p class="text-center mb-5">Select a category below to analyze signals related to Radar systems.</p>
+        <h1 class="mb-2 text-center">RADAR Signal Analysis</h1>
+        <p class="text-center mb-5 lead fw-light">Select a category below to analyze signals related to Radar systems.</p>
 
-    <!-- Tabs -->
-    <ul class="nav nav-tabs mb-4" id="radarTabs" role="tablist">
-      <li class="nav-item" role="presentation">
-        <button class="nav-link active" id="drone-tab" data-bs-toggle="tab" data-bs-target="#drone" type="button"
-          role="tab">Drone Detection</button>
-      </li>
+        <ul class="nav nav-tabs mb-4 justify-content-center" id="radarTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="drone-tab" data-bs-toggle="tab" data-bs-target="#drone" type="button"
+                    role="tab">Drone Detection</button>
+            </li>
 
-      <li class="nav-item" role="presentation">
-        <button class="nav-link" id="sar-tab" data-bs-toggle="tab" data-bs-target="#sar" type="button" role="tab">SAR
-          Analysis</button>
-      </li>
-    </ul>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="sar-tab" data-bs-toggle="tab" data-bs-target="#sar" type="button" role="tab">SAR
+                    Analysis</button>
+            </li>
+        </ul>
 
-    <!-- Tab Content -->
-    <div class="tab-content" id="radarTabsContent">
+        <div class="tab-content" id="radarTabsContent">
 
-      <!-- Drone Detection -->
-      <div class="tab-pane fade show active" id="drone" role="tabpanel">
-        <div class="card p-4">
-          <h2>Drone Detection</h2>
-          <p>Upload an audio recording to detect whether a drone is present.</p>
-          <form id="droneForm" enctype="multipart/form-data">
-            <input type="file" name="file" class="form-control mb-3" accept=".wav,.mp3" required>
-            <button type="submit" class="btn btn-custom">Analyze Drone Audio</button>
-          </form>
+            <div class="tab-pane fade show active" id="drone" role="tabpanel">
+                <div class="card p-4">
+                    <h2>Acoustic Drone Detection</h2>
+                    <p>Upload an audio recording (.wav or .mp3) to detect whether a drone's acoustic signature is present.</p>
+                    <form id="droneForm" enctype="multipart/form-data">
+                        <input type="file" name="file" class="form-control mb-3" accept=".wav,.mp3" required>
+                        <button type="submit" class="btn btn-custom w-100"> Analyze Drone Audio</button>
+                    </form>
 
-          <!-- Results will appear here -->
-          <div id="resultBox" class="mt-4"></div>
-        </div>
-      </div>
-
-      <!-- SAR -->
-      <div class="tab-pane fade" id="sar" role="tabpanel">
-        <div class="card p-4">
-          <h2>SAR (Synthetic Aperture Radar)</h2>
-          <p>Upload a Sentinel-1 GRD (.tif) file to visualize and analyze backscatter.</p>
-
-          <form id="sarForm" enctype="multipart/form-data">
-            <input type="file" name="file" id="sar-file" class="form-control mb-3" accept=".tif,.tiff" required>
-            <button type="submit" class="btn btn-custom">Analyze SAR Image</button>
-          </form>
-
-          <!-- SAR Results -->
-          <div id="sarResultBox" class="mt-4" style="display:none;">
-            <div class="row">
-              <div class="col-md-6 col-lg-4 mb-3">
-                <div class="card p-2 text-center">
-                  <h5>Main Display (2–98% Scaled)</h5>
-                  <img id="sarDisplay" src="" class="img-fluid rounded">
+                    <div id="resultBox" class="mt-4"></div>
                 </div>
-              </div>
-
-              <div class="col-md-6 col-lg-4 mb-3">
-                <div class="card p-2 text-center">
-                  <h5>Histogram</h5>
-                  <img id="sarHist" src="" class="img-fluid rounded">
-                </div>
-              </div>
-
-              <div class="col-md-6 col-lg-4 mb-3">
-                <div class="card p-2 text-center">
-                  <h5>Overlay (Low-Backscatter in Red)</h5>
-                  <img id="sarOverlay" src="" class="img-fluid rounded">
-                </div>
-              </div>
             </div>
-          </div>
+
+            <div class="tab-pane fade" id="sar" role="tabpanel">
+                <div class="card p-4">
+                    <h2>SAR (Synthetic Aperture Radar)</h2>
+                    <p>Upload a Sentinel-1 GRD (.tif) file for backscatter visualization and analysis.</p>
+
+                    <form id="sarForm" enctype="multipart/form-data">
+                        <input type="file" name="file" id="sar-file" class="form-control mb-3" accept=".tif,.tiff" required>
+                        <button type="submit" class="btn btn-custom w-100">Analyze SAR Image</button>
+                    </form>
+
+                    <div id="sarResultBox" class="mt-4" style="display:none;">
+                        <div class="row">
+                            <div class="col-md-6 col-lg-4 mb-3">
+                                <div class="card p-3 text-center h-100">
+                                    <h5>Main Display <span class="small">(2–98% Scaled)</span></h5>
+                                    <img id="sarDisplay" src="" class="img-fluid rounded">
+                                </div>
+                            </div>
+
+                            <div class="col-md-6 col-lg-4 mb-3">
+                                <div class="card p-3 text-center h-100">
+                                    <h5>Backscatter Histogram</h5>
+                                    <img id="sarHist" src="" class="img-fluid rounded">
+                                </div>
+                            </div>
+
+                            <div class="col-md-6 col-lg-4 mb-3">
+                                <div class="card p-3 text-center h-100">
+                                    <h5>Overlay <span class="small">(Low-Backscatter in Red)</span></h5>
+                                    <img id="sarOverlay" src="" class="img-fluid rounded">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="text-center mt-5 mb-5">
+                <a href="/" class="btn btn-outline-light">⬅ Back to Home</a>
+            </div>
         </div>
-      </div>
-
-      <!-- Back Button -->
-      <div class="text-center mt-5">
-        <a href="/" class="btn btn-outline-light">⬅ Back to Home</a>
-      </div>
     </div>
-  </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
-  <!-- Drone JS -->
-  <script>
-    document.getElementById("droneForm").addEventListener("submit", async function (e) {
-      e.preventDefault();
+    <script>
+        document.getElementById("droneForm").addEventListener("submit", async function (e) {
+            e.preventDefault();
 
-      const formData = new FormData(this);
-      const response = await fetch("/radar/analyze", {
-        method: "POST",
-        body: formData
-      });
+            const formData = new FormData(this);
+            const resultBox = document.getElementById("resultBox");
 
-      const resultBox = document.getElementById("resultBox");
+            // Add loading state
+            resultBox.innerHTML = `<div class="alert alert-info" style="color:#001f4d !important;">Analyzing... Please wait.</div>`;
 
-      if (!response.ok) {
-        resultBox.innerHTML = `<div class="alert alert-danger">Error: Could not analyze file.</div>`;
-        return;
-      }
+            try {
+                const response = await fetch("/radar/analyze", {
+                    method: "POST",
+                    body: formData
+                });
 
-      const data = await response.json();
-      resultBox.innerHTML = `
-  <div class="alert alert-info" style="color:#001f4d !important;">
-    <h4 style="color:#001f4d !important;">Prediction: <strong style="color:#001f4d !important;">${data.predicted_class}</strong></h4>
-    <p style="color:#001f4d !important;">Confidence: <strong style="color:#001f4d !important;">${(data.confidence * 100).toFixed(2)}%</strong></p>
-  </div>`;
-    });
-  </script>
+                if (!response.ok) {
+                    throw new Error("Server error or file type issue.");
+                }
 
-  <!-- SAR JS -->
-  <script>
-    document.getElementById("sarForm").addEventListener("submit", async function (e) {
-      e.preventDefault();
+                const data = await response.json();
+                // Overriding alert styles to use the new primary color
+                const primaryColor = document.documentElement.style.getPropertyValue('--primary-color') || '#00E8FF';
 
-      const file = document.getElementById("sar-file").files[0];
-      if (!file) {
-        alert("Please select a .tif file");
-        return;
-      }
-
-      const formData = new FormData();
-      formData.append("file", file);
-
-      const sarBox = document.getElementById("sarResultBox");
-
-      try {
-        const response = await fetch("/sar/view", {
-          method: "POST",
-          body: formData
+                resultBox.innerHTML = `
+                    <div class="alert alert-info">
+                        <h4 style="color: ${primaryColor} !important;">Prediction: <strong style="color: ${primaryColor} !important;">${data.predicted_class}</strong></h4>
+                        <p style="color: ${primaryColor} !important;">Confidence: <strong style="color: ${primaryColor} !important;">${(data.confidence * 100).toFixed(2)}%</strong></p>
+                    </div>`;
+            } catch (err) {
+                resultBox.innerHTML = `<div class="alert alert-danger">Error: Could not analyze file. Check the server connection.</div>`;
+            }
         });
+    </script>
 
-        if (!response.ok) {
-          throw new Error("Failed to process SAR file.");
-        }
+    <script>
+        document.getElementById("sarForm").addEventListener("submit", async function (e) {
+            e.preventDefault();
 
-        const data = await response.json();
+            const file = document.getElementById("sar-file").files[0];
+            if (!file) {
+                alert("Please select a .tif file");
+                return;
+            }
 
-        // Update images
-        document.getElementById("sarDisplay").src = data.main_image;
-        document.getElementById("sarHist").src = data.histogram;
-        document.getElementById("sarOverlay").src = data.overlay;
+            const formData = new FormData();
+            formData.append("file", file);
 
-        sarBox.style.display = "block";
-      } catch (err) {
-        console.error(err);
-        sarBox.innerHTML = `<div class="alert alert-danger">Error analyzing SAR file.</div>`;
-        sarBox.style.display = "block";
-      }
-    });
-  </script>
+            const sarBox = document.getElementById("sarResultBox");
+            sarBox.style.display = "block"; // Show the box early for the loading state
+
+            // Add loading state
+            sarBox.innerHTML = `<div class="card p-4"><div class="text-center text-light">Processing SAR image... This may take a moment.</div></div>`;
+
+            try {
+                const response = await fetch("/sar/view", {
+                    method: "POST",
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error("Failed to process SAR file.");
+                }
+
+                const data = await response.json();
+
+                // Clear loading state and show results structure
+                sarBox.innerHTML = `
+                    <div class="row">
+                        <div class="col-md-6 col-lg-4 mb-3">
+                            <div class="card p-3 text-center h-100">
+                                <h5>Main Display <span class="small">(2–98% Scaled)</span></h5>
+                                <img id="sarDisplay" src="${data.main_image}" class="img-fluid rounded">
+                            </div>
+                        </div>
+
+                        <div class="col-md-6 col-lg-4 mb-3">
+                            <div class="card p-3 text-center h-100">
+                                <h5>Backscatter Histogram</h5>
+                                <img id="sarHist" src="${data.histogram}" class="img-fluid rounded">
+                            </div>
+                        </div>
+
+                        <div class="col-md-6 col-lg-4 mb-3">
+                            <div class="card p-3 text-center h-100">
+                                <h5>Overlay <span class="small">(Low-Backscatter in Red)</span></h5>
+                                <img id="sarOverlay" src="${data.overlay}" class="img-fluid rounded">
+                            </div>
+                        </div>
+                    </div>`;
+                sarBox.style.display = "block";
+
+            } catch (err) {
+                console.error(err);
+                sarBox.innerHTML = `<div class="alert alert-danger mt-4">Error analyzing SAR file. Ensure it is a valid Sentinel-1 GRD (.tif) file.</div>`;
+                sarBox.style.display = "block";
+            }
+        });
+    </script>
 
 </body>
 
