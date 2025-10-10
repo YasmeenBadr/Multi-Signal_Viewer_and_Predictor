@@ -368,11 +368,35 @@ async function fetchData(){
       }
     }
 
-    // Prediction
-    const pred=result.prediction||{};
-    document.getElementById("predictionResult").innerText = pred.label||"N/A";
-    document.getElementById("predictionDescription").innerText = pred.description||"";
-    document.getElementById("diseaseName").innerText = pred.disease_name||"";
+    // Prediction: server may return { raw: {...}, smoothed: {...} } or the old flat object
+    const pred = result.prediction || {};
+    // choose smoothed if available, otherwise raw, otherwise pred itself
+    let disp = null;
+    if(pred && typeof pred === 'object'){
+      if(pred.smoothed) disp = pred.smoothed;
+      else if(pred.raw) disp = pred.raw;
+      else disp = pred;
+    }
+    if(!disp || !disp.label){
+      document.getElementById("predictionResult").innerText = "N/A";
+      document.getElementById("predictionDescription").innerText = "";
+      document.getElementById("diseaseName").innerText = "";
+    } else {
+      document.getElementById("predictionResult").innerText = disp.label || "N/A";
+      document.getElementById("predictionDescription").innerText = disp.description || "";
+      document.getElementById("diseaseName").innerText = disp.disease_name || disp.disease_name || "";
+    }
+    // Recurrence prediction (2D model), show confidence if available
+    try{
+      const rec = result.recurrence_prediction;
+      if(rec && rec.label){
+        // append recurrence info to the description area
+        const descEl = document.getElementById("predictionDescription");
+        const prev = descEl.innerText || "";
+        const recTxt = `Recurrence: ${rec.label} (conf=${(rec.confidence||0).toFixed(2)})`;
+        descEl.innerText = prev ? prev + " | " + recTxt : recTxt;
+      }
+    }catch(e){/* ignore */}
 
   }catch(err){
     console.error(err);
