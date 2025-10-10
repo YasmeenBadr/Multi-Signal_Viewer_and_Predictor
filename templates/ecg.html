@@ -72,13 +72,6 @@
           </select>
         </div>
         <div class="mb-2">
-          <label class="form-label">Polar Mode</label>
-          <select id="polarModeSelect" class="form-select bg-dark text-white">
-            <option value="fixed">Fixed (current chunk)</option>
-            <option value="cumulative">Cumulative</option>
-          </select>
-        </div>
-        <div class="mb-2">
           <label class="form-label">Display</label>
           <select id="displaySelect" class="form-select bg-dark text-white">
             <option value="Time" selected>Time</option>
@@ -86,11 +79,6 @@
             <option value="Polar">Polar</option>
             <option value="Recurrence">Recurrence</option>
           </select>
-        </div>
-        <div class="mb-2">
-          <label class="form-label">XOR Threshold</label>
-          <input id="xorThreshold" class="form-control bg-dark text-white" type="number" step="0.01" value="0.05" />
-          <div class="form-text text-muted">Only show XOR when abs(curr - prev) &gt; threshold</div>
         </div>
         <div class="prediction-box mb-3">
           <h6>Prediction</h6>
@@ -104,34 +92,35 @@
     </div>
     <div class="col-md-9">
       <div class="plot-container">
-        <h5>Real-time ECG (time domain)</h5>
-        <div id="timePlot" style="width:100%;height:380px;"></div>
+        <div id="timePlot" style="width:100%;height:300px;"></div>
       </div>
       <div class="row">
         <div class="col-12 plot-container">
-          <h5>XOR Graph</h5>
-          <div id="xorControlsInline" style="margin-bottom:8px; display:none;">
-            <label class="form-label" style="margin-right:8px; color:#cfcfcf;">XOR Threshold</label>
-            <input id="xorThresholdInline" class="form-control bg-dark text-white" type="number" step="0.01" value="0.05" style="width:140px; display:inline-block;" />
+          <div style="display:flex; gap:12px; align-items:flex-start;">
+            <div id="xorPlot" style="flex:1; width:100%; height:300px;"></div>
+            <div style="width:220px;">
+              <label class="form-label">XOR Threshold</label>
+              <input id="xorThreshold" class="form-control bg-dark text-white" type="number" step="0.01" value="0.05" />
+              <div class="form-text text-muted" style="color:#bbb;">Only show XOR when abs(curr - prev) &gt; threshold</div>
+            </div>
           </div>
-          <div id="xorPlot" style="width:100%;height:300px;"></div>
         </div>
       </div>
       <div class="row">
         <div class="col-12 plot-container">
-          <h5>Polar Plot</h5>
-          <div id="polarControlsInline" style="margin-bottom:8px; display:none;">
-            <label class="form-label" style="margin-right:8px; color:#cfcfcf;">Polar Mode</label>
-            <select id="polarModeInlineSelect" class="form-select bg-dark text-white" style="width:200px; display:inline-block;">
-              <option value="fixed">Fixed (current chunk)</option>
-              <option value="cumulative">Cumulative</option>
-            </select>
+          <div style="display:flex; gap:12px; align-items:flex-start;">
+            <div id="polarPlot" style="flex:1; width:100%; height:450px;"></div>
+            <div style="width:220px;">
+              <label class="form-label">Polar Mode</label>
+              <select id="polarModeSelect" class="form-select bg-dark text-white">
+                <option value="fixed">Fixed (current chunk)</option>
+                <option value="cumulative">Cumulative</option>
+              </select>
+            </div>
           </div>
-          <div id="polarPlot" style="width:100%;height:450px;"></div>
         </div>
       </div>
       <div class="plot-container mt-3">
-        <h5>Recurrence 2D Scatter / Colormap </h5>
         <div id="recurrenceScatterPlot" style="width:100%;height:300px;"></div>
       </div>
       
@@ -170,21 +159,10 @@ async function initConfig(){
 initConfig();
 
 document.getElementById("colormapSelect").addEventListener("change",(ev)=>{ colormap=ev.target.value; });
-document.getElementById("polarModeSelect").addEventListener("change",(ev)=>{ polarMode = ev.target.value; document.getElementById('polarModeInlineSelect').value = polarMode; });
-
-// Inline controls sync
-const xorInline = document.getElementById('xorThresholdInline');
-const xorSidebar = document.getElementById('xorThreshold');
-if(xorInline && xorSidebar){
-  xorInline.addEventListener('input', (e)=>{ xorSidebar.value = e.target.value; });
-  xorSidebar.addEventListener('input', (e)=>{ xorInline.value = e.target.value; });
-}
-const polarInline = document.getElementById('polarModeInlineSelect');
-const polarSidebar = document.getElementById('polarModeSelect');
-if(polarInline && polarSidebar){
-  polarInline.addEventListener('change', (e)=>{ polarSidebar.value = e.target.value; polarMode = e.target.value; });
-  polarSidebar.addEventListener('change', (e)=>{ polarInline.value = e.target.value; polarMode = e.target.value; });
-}
+// polarModeSelect and xorThreshold now live next to their plots
+const polarModeSelect = document.getElementById("polarModeSelect");
+if(polarModeSelect) polarModeSelect.addEventListener("change", (ev)=>{ polarMode = ev.target.value; });
+const xorThresholdInput = document.getElementById('xorThreshold');
 
 // Drag & drop file upload
 const dropZone = document.getElementById('dropZone');
@@ -239,46 +217,16 @@ function applyDisplaySelection(val){
     'Recurrence': '550px'
   };
   Object.keys(containers).forEach(k => {
+    const plotId = (k === 'Time') ? 'timePlot' : (k === 'XOR') ? 'xorPlot' : (k === 'Polar') ? 'polarPlot' : 'recurrenceScatterPlot';
+    const plotDiv = document.getElementById(plotId);
     if(k === currentDisplay){
       containers[k].style.display = 'block';
-      // enlarge the actual plot div for this container
-      const plotIdMap = { 'Time': 'timePlot', 'XOR': 'xorPlot', 'Polar': 'polarPlot', 'Recurrence': 'recurrenceScatterPlot' };
-      const pid = plotIdMap[k];
-      if(pid){
-        const plotDiv = document.getElementById(pid);
-        if(plotDiv){
-          plotDiv.style.height = sizes[k] || '500px';
-          try{ Plotly.relayout(pid, {height: parseInt((sizes[k]||'500px'))}); }catch(e){}
-        }
-      }
+      if(plotDiv) plotDiv.style.height = sizes[k] || '500px';
+      try{ if(plotDiv) Plotly.relayout(plotId, {height: parseInt((sizes[k]||'500px'))}); }catch(e){}
     } else {
       containers[k].style.display = 'none';
     }
   });
-  // show/hide inline controls and sidebar duplicates
-  const xorInlineDiv = document.getElementById('xorControlsInline');
-  const polarInlineDiv = document.getElementById('polarControlsInline');
-  // Toggle inline controls and hide/show the corresponding sidebar control blocks
-  const xorSidebarInput = document.getElementById('xorThreshold');
-  const polarSidebarSelect = document.getElementById('polarModeSelect');
-  const xorSidebarBlock = xorSidebarInput ? xorSidebarInput.parentElement : null;
-  const polarSidebarBlock = polarSidebarSelect ? polarSidebarSelect.parentElement : null;
-
-  if(currentDisplay === 'XOR'){
-    if(xorInlineDiv) xorInlineDiv.style.display = 'block';
-    if(xorSidebarBlock) xorSidebarBlock.style.display = 'none';
-  } else {
-    if(xorInlineDiv) xorInlineDiv.style.display = 'none';
-    if(xorSidebarBlock) xorSidebarBlock.style.display = 'block';
-  }
-
-  if(currentDisplay === 'Polar'){
-    if(polarInlineDiv) polarInlineDiv.style.display = 'block';
-    if(polarSidebarBlock) polarSidebarBlock.style.display = 'none';
-  } else {
-    if(polarInlineDiv) polarInlineDiv.style.display = 'none';
-    if(polarSidebarBlock) polarSidebarBlock.style.display = 'block';
-  }
 }
 displaySelect.addEventListener('change', (e) => applyDisplaySelection(e.target.value));
 // apply initial selection
@@ -312,28 +260,52 @@ document.getElementById("stopBtn").addEventListener("click", ()=>{
   if(intervalId) clearInterval(intervalId);
 });
 
-    function initPlots(){
-      const traces = selectedChannels.map((ch, idx)=>({
-        x:[], y:[], mode:"lines", name:`Ch ${ch+1}`, line:{width:1.5}
-      }));
-      Plotly.newPlot("timePlot", traces, {
-        paper_bgcolor:"#000", plot_bgcolor:"#000", font:{color:"#e0e0e0"},
-        xaxis:{title:"Time (s)", range:[0,widthSec], gridcolor:"#333"},
-        yaxis:{title:"Amplitude", gridcolor:"#333"}
-      });
+document.getElementById("speedControl").addEventListener("change", ev => {
+  updateSpeed = parseFloat(ev.target.value) || 1;
+  if(streaming){
+    if(intervalId) clearInterval(intervalId);
+    intervalId = setInterval(fetchData, 1000/updateSpeed);
+  }
+});
 
-      const polar = selectedChannels.map(ch=>({
-        r:[], theta:[], mode:"lines", type:"scatterpolar", name:`Ch ${ch+1}`
-      }));
-      Plotly.newPlot("polarPlot", polar, {paper_bgcolor:"#000", font:{color:"#e0e0e0"}});
-      Plotly.newPlot("recurrencePlot", [{z:[[]], type:"heatmap", colorscale:"Viridis"}],
-        {paper_bgcolor:"#000", font:{color:"#e0e0e0"}});
-    }
+function initPlots(channels){
+  // Create time traces but hide per-trace legends so only the plot title appears
+  const timeTraces=channels.map(ch=>({x:[],y:[],mode:"lines",name:"",line:{width:1.5}, showlegend:false, hoverinfo:'none'}));
+  Plotly.newPlot("timePlot",timeTraces,{
+    title: 'Real-time ECG (time domain)',
+    paper_bgcolor:"#000", plot_bgcolor:"#000", font:{color:"#e0e0e0"},
+    xaxis:{title:"Time (s)", range:[0,widthSec], gridcolor:"#333"},
+    yaxis:{title:"Amplitude", gridcolor:"#333"},
+    showlegend: false
+  });
+
+  // XOR plot: only if 1 channel
+  if(channels.length===1){
+  const xorTraces=[{x:[],y:[],mode:"lines",name:"", showlegend:false, hoverinfo:'none'}];
+    Plotly.newPlot("xorPlot",xorTraces,{
+      title: `XOR Graph`,
+      paper_bgcolor:"#000", plot_bgcolor:"#000", font:{color:"#e0e0e0"},
+      xaxis:{title:"Time (s)", range:[0,widthSec*4]},
+      yaxis:{title:"XOR Amplitude"},
+      showlegend:false
+    });
+  }
+
+  // hide per-trace names in polar as well — show only plot title
+  const polarTraces=channels.map(ch=>({r:[],theta:[],mode:"lines",type:"scatterpolar",name:"", showlegend:false, hoverinfo:'none'}));
+  Plotly.newPlot("polarPlot",polarTraces,{title: 'Polar Plot', paper_bgcolor:"#000",font:{color:"#e0e0e0"}, showlegend:false});
+
+  // Recurrence: only if 2 channels
+  if(channels.length===2){
+    Plotly.newPlot("recurrenceScatterPlot",[{ z: [], type: "heatmap", colorscale: colormap }],
+      {title: 'Recurrence', paper_bgcolor:"#000", plot_bgcolor:"#000", font:{color:"#e0e0e0"}, showlegend:false});
+  }
+}
 
 async function fetchData(){
   if(!streaming) return;
     try{
-    const xorThresholdVal = parseFloat(document.getElementById('xorThreshold').value) || 0.05;
+  const xorThresholdVal = xorThresholdInput ? (parseFloat(xorThresholdInput.value) || 0.05) : (parseFloat('0.05') || 0.05);
     const resp=await fetch("/ecg/update",{
       method:"POST",
       headers:{"Content-Type":"application/json"},
