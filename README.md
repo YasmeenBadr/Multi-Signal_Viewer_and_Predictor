@@ -25,7 +25,7 @@ This repository combines **real-time visualization**, **interactive multi-mode a
    - [Example Results](#example-results-doppler)
    - [Model Performance](#model-performance-doppler)
    - [Technical Details](#technical-details-doppler)
-7. [Radar](#rf-signal-viewer-coming-soon)
+7. [Radar](#radar)
    - [Drone Detection Module](#drone-detection-module)
      - [How It Works](#how-it-works-drone)
      - [Example Results](#example-results-drone)
