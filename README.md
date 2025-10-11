@@ -19,7 +19,12 @@ This repository combines **real-time visualization**, **interactive multi-mode a
    - [Files of Interest](#files-of-interest)
    - [How It Works](#how-it-works)
    - [Developer Notes & Tuning](#developer-notes--tuning)
-6. [Doppler](#acoustic-signal-viewer-coming-soon)
+6. [Doppler Effect Module — Vehicle Speed Estimation](#doppler-effect-module)
+   - [Overview](#overview-doppler)
+   - [How It Works](#how-it-works-doppler)
+   - [Example Results](#example-results-doppler)
+   - [Model Performance](#model-performance-doppler)
+   - [Technical Details](#technical-details-doppler)
 7. [Radar](#rf-signal-viewer-coming-soon)
 8. [Installation](#installation)
 9. [Contributors](#contributors)
@@ -225,86 +230,6 @@ This repository contains a Flask-based ECG real-time viewer and lightweight mode
     ```
 
     ---
-
-    ## Installation
-
-    Follow these steps to create a reproducible environment and run the Signal Viewer locally on Windows (PowerShell). The commands assume you are executing them from the project root (`Task_1_DSP`).
-
-    Prerequisites
-    - Python 3.10 or 3.11 (3.9 may work). Verify with `python --version`.
-    - Git (optional) if you need to clone the repository.
-    - (Optional) NVIDIA GPU + CUDA drivers for GPU-accelerated PyTorch.
-
-    1) Clone or open the project
-
-    ```powershell
-    git clone https://github.com/YasmeenBadr/Task_1_DSP.git
-    cd Task_1_DSP
-    ```
-
-    2) Create and activate a virtual environment (PowerShell)
-
-    ```powershell
-    python -m venv .venv
-    .\.venv\Scripts\Activate.ps1
-    ```
-
-    3) Upgrade pip/build tools
-
-    ```powershell
-    python -m pip install --upgrade pip setuptools wheel
-    ```
-
-    4) Install PyTorch (pick CPU or CUDA from https://pytorch.org)
-
-    Example CPU-only (PowerShell):
-
-    ```powershell
-    pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
-    ```
-
-    5) Install core dependencies
-
-    ```powershell
-    pip install flask numpy scipy pandas mne matplotlib plotly scikit-learn transformers tqdm
-    ```
-
-    Optional packages (audio, WFDB, raster):
-
-    ```powershell
-    pip install librosa wfdb
-    # For rasterio prefer conda: conda install -c conda-forge rasterio
-    ```
-
-    6) (Optional) Export a pinned requirements.txt
-
-    ```powershell
-    pip freeze > requirements.txt
-    ```
-
-    7) Run the development Flask app
-
-    ```powershell
-    python app.py
-    ```
-
-    Open the app in your browser:
-    - http://127.0.0.1:5000
-   
-
-    Quick checks
-
-    ```powershell
-    python -c "import flask, numpy, mne, transformers; print('Imports OK')"
-    python -c "import torch; print('PyTorch', torch.__version__, 'CUDA available:', torch.cuda.is_available())"
-    ```
-
-    Troubleshooting
-    - If `rasterio` fails to install on Windows, install via conda to get GDAL and binary deps: `conda install -c conda-forge rasterio`.
-    - For large transformer models, ensure adequate RAM/GPU or use smaller checkpoints.
-    - EEG predictor model was way too large (even its check points).
-
-
 ### Model Fusion & Decision Logic
 - Combines predictions from both models:
   - `SimpleECG` → fast temporal prediction.
@@ -350,7 +275,8 @@ https://www.physionet.org/content/ptbdb/1.0.0/
 ------------------------
 
 
-# Doppler Effect Module — Vehicle Speed Estimation
+<h2 id="doppler-effect-module">Doppler Effect Module — Vehicle Speed Estimation</h2>
+<h3 id="overview-doppler">Overview</h3>
 
 The **Doppler Effect module** simulates and analyzes audio signals of moving vehicles to estimate their speed using both **signal processing** and a **trained neural network model**.
 
@@ -360,7 +286,7 @@ It includes two main functions:
 
 ---
 
-## How It Works
+<h3 id="how-it-works-doppler">How It Works</h3>
 
 ### Generation Mode
 When the user provides base frequency, source velocity, and duration:
@@ -378,8 +304,7 @@ When a user uploads a `.wav` file:
 
 ---
 
-## Example Results
-
+## Example Results<h3 id="example-results-doppler">Example Results</h3>
 ### Detection vedio
 ![Watch Detection Video](Doppler/DopplerDetection.gif)
 ---
@@ -390,7 +315,7 @@ When a user uploads a `.wav` file:
 
 ---
 
-## Model Performance
+<h3 id="model-performance-doppler">Model Performance</h3>
 
 - **Model file:** `speed_estimations_NN_1000-200-50-10-1_reg1e-3_lossMSE.h5`
 - **Dataset:** Vehicle audio recordings with annotated speed labels
@@ -426,7 +351,7 @@ It consists of **two main stages**:
 
 ---
 
-## Technical Details
+<h3 id="technical-details-doppler">Technical Details</h3>
 
 - **Libraries Used:** NumPy, SciPy, Librosa, TensorFlow  
 - **Filtering:** Simple band-pass filter (50–4000 Hz) to remove background noise  
