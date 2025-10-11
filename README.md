@@ -45,12 +45,12 @@ Each module (EEG, ECG, Radar, Doppler) includes:
 
 ## Features
 
- Multi-signal visualization (EEG, ECG)
- Real-time smooth plotting using optimized Python backends  
- Multiple visualization modes (Time, XOR, Polar, Recurrence)  
- Channel selection & color map customization  
- Integration with pretrained AI models for automatic abnormality detection  
- Interactive user interface with smooth playback, zoom, and pan controls  
+ - Multi-signal visualization (EEG, ECG).
+ - Real-time smooth plotting using optimized Python backends . 
+ - Multiple visualization modes (Time, XOR, Polar, Recurrence).  
+ - Channel selection & color map customization . 
+ - Integration with pretrained AI models for automatic abnormality detection.
+ - Interactive user interface with smooth playback, zoom, and pan controls. 
 
 ---
 ## System Architecture
@@ -74,10 +74,7 @@ Each module (EEG, ECG, Radar, Doppler) includes:
 ### Overview
 The **EEG Viewer** is a professional real-time visualization tool that supports multiple analysis modes for EEG data.  
 It enables users to upload EEG recordings, visualize them in different modes, and automatically predict the neurological condition using a pretrained **EEGPT-based AI model**.
-
-Upon uploading an EEG file:
-- The system can detect **whether the signal is normal or abnormal**.
-- If abnormal, it classifies it into one of four neurological conditions:
+It classifies it into one of four neurological conditions:
   - **Alzheimer**
   - **Epilepsy**
   - **Parkinson**
