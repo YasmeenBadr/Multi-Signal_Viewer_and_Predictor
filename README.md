@@ -388,7 +388,7 @@ When a file is uploaded, the Flask backend:
 ![Drone Detected](Radar/YesDrone.png)
 *When the model identifies drone audio with high confidence*
 
-###  o Drone Detected  
+###  No Drone Detected  
 ![No Drone Detected](Radar/NotDrone.png)
 *When the model determines no drone presence in the audio*
 
