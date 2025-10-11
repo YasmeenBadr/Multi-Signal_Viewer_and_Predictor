@@ -344,8 +344,10 @@ When a user uploads a `.wav` file:
 
 ## 📊 Example Results
 
-### 🎥 Demonstration Video
+### 🎥 Detection vedio
 ![▶️ Watch Detection Video](Doppler/DopplerDetection.gif)
+---
+### 🎥 Generation vedio
 ![▶️ Watch Generation Video](Doppler/DopplerGeneration.gif)
 
 *The demo shows both Doppler sound generation and vehicle speed detection.*
