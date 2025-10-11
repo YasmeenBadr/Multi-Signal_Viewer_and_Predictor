@@ -382,7 +382,7 @@ It consists of **two main stages**:
 
 The Drone Detection module allows users to upload an audio recording (.wav or .mp3) and automatically detects whether a drone sound is present in the environment.
 
-### How It Works <a id="how-it-works-drone"></a>
+### **How It Works** <a id="how-it-works-drone"></a>
 
 When a file is uploaded, the Flask backend:
 1. Loads the audio using Librosa and resamples it to 16 kHz
@@ -391,7 +391,7 @@ When a file is uploaded, the Flask backend:
 4. Applies a Softmax layer to calculate the probability for each class
 5. Returns the predicted class and confidence score to the frontend
 
-### Example Results <a id="example-results-drone"></a>
+### **Example Results** <a id="example-results-drone"></a>
 
 #### Drone Detected
 ![Drone Detected](Radar/YesDrone.png)
@@ -401,14 +401,14 @@ When the model identifies drone audio with high confidence
 ![No Drone Detected](Radar/NotDrone.png)
 When the model determines no drone presence in the audio
 
-### Model Performance <a id="model-performance-drone"></a>
+### **Model Performance** <a id="model-performance-drone"></a>
 
 - Model: preszzz/drone-audio-detection-05-17-trial-0
 - Input: 16kHz mono audio
 - Output: Binary classification (drone/no drone) with confidence percentage
 - Processing: Real-time inference with GPU acceleration
 
-### Technical Details <a id="technical-details-drone"></a>
+### **Technical Details** <a id="technical-details-drone"></a>
 
 - Framework: Hugging Face Transformers + PyTorch
 - Audio Processing: Librosa for loading and resampling
@@ -421,7 +421,7 @@ When the model determines no drone presence in the audio
 
 The SAR (Synthetic Aperture Radar) Analysis module processes Sentinel-1 GRD files to visualize and analyze radar backscatter data with advanced image processing techniques.
 
-### How It Works <a id="how-it-works-sar"></a>
+### **How it works** <a id="how-it-works-sar"></a>
 
 When a GeoTIFF file is uploaded, the Flask backend:
 
@@ -431,7 +431,7 @@ When a GeoTIFF file is uploaded, the Flask backend:
 4. Calculates Adaptive Thresholds based on statistical analysis
 5. Generates Three Visualizations for comprehensive analysis
 
-### Visualization Outputs <a id="visualization-outputs-sar"></a>
+### **Visualization Outputs** <a id="visualization-outputs-sar"></a>
 
 #### Main Display (2-98% Scaled)
 - Normalized Intensity using percentile scaling
@@ -450,7 +450,7 @@ When a GeoTIFF file is uploaded, the Flask backend:
 - Anomaly detection for dark regions in radar data
 - Pattern identification for surface analysis
 
-### Example Results <a id="example-results-sar"></a>
+### **Example Results** <a id="example-results-sar"></a>
 
 #### SAR Analysis Interface
 ![SAR Analysis Website](Radar/SarImage.png)
