@@ -220,6 +220,14 @@ Developer notes & tuning
 - Recurrence CSVs are written to `results/recurrence_data/` before training; useful for reproducibility.
 
 
-Videos & screenshots
-------------------------
+![ECG Viewer Demo](docs/images/ecg.gif)
+
+
+
+![ECG Viewer Demo 2](docs/images/ecg1.gif)
+*Animated demo: EEG polar graph Viewer in action.*
+
+
+![ECG Viewer Demo 3](docs/images/ecg3.gif)
+*Animated demo: EEG recurrence graph Viewer in action.*
 
