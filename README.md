@@ -13,9 +13,6 @@ This repository combines **real-time visualization**, **interactive multi-mode a
    - [Overview](#overview)
    - [Viewer Modes](#viewer-modes)
    - [EEGPT Model Integration](#eegpt-model-integration)
-   - [How to Run](#how-to-run)
-   - [Example Output](#example-output)
-   - [Repository Link](#repository-link)
 5. [ECG Real-Time Viewer](#ecg-real-time-viewer)
    - [Highlights](#highlights)
    - [Setup and Installation](#setup-and-installation)
@@ -48,14 +45,29 @@ Each module (EEG, ECG, Radar, Doppler) includes:
 
 ## Features
 
-✅ Multi-signal visualization (EEG, ECG)
-✅ Real-time smooth plotting using optimized Python backends  
-✅ Multiple visualization modes (Time, XOR, Polar, Recurrence)  
-✅ Channel selection & color map customization  
-✅ Integration with pretrained AI models for automatic abnormality detection  
-✅ Interactive user interface with smooth playback, zoom, and pan controls  
+ Multi-signal visualization (EEG, ECG)
+ Real-time smooth plotting using optimized Python backends  
+ Multiple visualization modes (Time, XOR, Polar, Recurrence)  
+ Channel selection & color map customization  
+ Integration with pretrained AI models for automatic abnormality detection  
+ Interactive user interface with smooth playback, zoom, and pan controls  
 
 ---
+## System Architecture
+
+### **Backend Framework**
+- **Flask** - Web framework with blueprint architecture
+- **PyTorch** - Deep learning model inference
+- **MNE-Python** - EEG signal processing
+- **NumPy/SciPy** - Numerical computing and signal processing
+- **Transformers** - Hugging Face models for audio classification
+
+### **Frontend Technologies**
+- **HTML5/CSS3** - Modern web interface
+- **Tailwind CSS** - Responsive design framework
+- **JavaScript** - Interactive functionality
+- **Plotly.js** - Real-time data visualization
+- **Chart.js** - Statistical plotting
 
 ## EEG Signal Viewer & Disease Predictor
 
@@ -110,7 +122,9 @@ Additional controls:
 
 ---
 
-### 🧠 Deep Learning Model: Custom EEGPT Fine-Tuning Implementation
+### EEGPT Model Integration
+
+**Deep Learning Model: Custom EEGPT Fine-Tuning Implementation**
 
 We developed and implemented a comprehensive **PyTorch Lightning** setup to fine-tune the powerful **EEGPT** (Electroencephalography Generative Pre-trained Transformer) for downstream neurological disease classification. This custom, production-ready implementation features:
 
@@ -125,6 +139,15 @@ We developed and implemented a comprehensive **PyTorch Lightning** setup to fine
 * Epilepsy
 * Sleep Disorder
 * Parkinson
+
+### Datasets Used
+
+The following datasets were used for training and evaluation of the disease classifiers:
+
+- Epilepsy: https://data.mendeley.com/datasets/5pc2j46cbc/1
+- Alzheimer: https://data.mendeley.com/datasets/ch87yswbz4/1
+- Sleep disorder: https://www.physionet.org/content/sleep-edfx/1.0.0/
+- Parkinson: https://www.kaggle.com/datasets/s3programmer/parkison-diseases-eeg-dataset
 
 Full source code and implementation details are available in its dedicated repository:
 
