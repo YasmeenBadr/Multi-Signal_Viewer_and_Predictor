@@ -160,15 +160,82 @@ Full source code and implementation details are available in its dedicated repos
 
 This repository contains a Flask-based ECG real-time viewer and lightweight model prototypes for detecting abnormalities using both 1D time-domain signals and 2D recurrence-image representations.
 
-## Highlights
+## **Highlights**
 
-- Live streaming ECG visualization (time domain, XOR diff, polar, recurrence colormap) using Plotly.
-- Drag & drop upload of WFDB records (.hea/.dat/.xyz) to visualize and evaluate signals.
-- Lightweight 1D CNN classifier (SimpleECG) for time-domain prediction.
-- Lightweight 2D CNN classifier (Simple2DCNN) trained on recurrence-style 2D histograms generated from two-channel pairs.
-- Background training of the 2D model on uploaded WFDB records (if .hea contains labels); recurrence data is saved to `results/recurrence_data/`.
+### Real-Time ECG Visualization
+- Live streaming of ECG signals in **multiple representations**:
+  - **Time Domain:** raw ECG waveform for each selected channel.
+  - **XOR Difference:** visualizes beat-to-beat differences to highlight rhythm changes.
+  - **Polar Plot:** maps ECG amplitude and phase relationships between channels.
+  - **Recurrence Colormap:** displays nonlinear recurrence patterns and periodicities.
+- Built using **Plotly.js** for dynamic, high-performance visual updates.
+- Adjustable parameters for **speed**, **window width**, **channel selection**, and **colormap type**.
 
-## Setup and Installation
+---
+
+### Smart Data Handling
+- Supports drag-and-drop upload of **WFDB records** (`.hea`, `.dat`, `.xyz`).
+- Automatically extracts **sampling frequency**, **channel names**, and **diagnostic metadata**.
+- Uploaded signals are processed and stored for:
+  - Real-time display.
+  - Background model training.
+  - Recurrence map generation.
+
+---
+
+### Deep Learning Integration
+
+#### **SimpleECG – 1D Convolutional Neural Network**
+- **Purpose:** Detects abnormalities directly from the **raw ECG waveform** stream.
+- **Input:** 1D signal segments per channel.
+- **Architecture Highlights:**
+  - Multiple **Conv1D + ReLU** layers to extract temporal heartbeat patterns.
+  - **BatchNorm** and **Dropout** layers for generalization and stability.
+  - Fully connected layers for classification output.
+- **Output:** Predicts whether the current ECG is **Normal**, **Abnormal**, or indicates a specific **Disease**.
+- **Optimized for:**  
+  Real-time streaming inference — updates predictions as new data arrives.
+
+---
+
+#### **Simple2DCNN – Recurrence-Based 2D CNN**
+- **Purpose:** Learns **nonlinear temporal structures** and **pattern recurrence** between ECG channels.
+- **Input:** 2D **recurrence histograms** or **recurrence plots** generated from channel pairs.
+- **Architecture Highlights:**
+  - **Conv2D + Pooling layers** to capture spatial texture patterns in recurrence maps.
+  - Dense layers classify global recurrence behaviors linked to specific cardiac conditions.
+- **Automatic Training:**
+  - When a `.hea` record includes diagnosis labels, the backend saves the computed recurrence data into:
+    ```
+    results/recurrence_data/
+    ```
+  - A background thread **continuously trains or fine-tunes** the 2D model.
+- **Output:** Detects higher-order rhythm irregularities and supports the main prediction model.
+
+---
+
+### Model Fusion & Decision Logic
+- Combines predictions from both models:
+  - `SimpleECG` → fast temporal prediction.
+  - `Simple2DCNN` → deep recurrence-based refinement.
+- Uses **weighted confidence fusion** for stable and accurate output.
+- Final prediction includes:
+  - **Condition label** (Normal / Abnormal / Disease).
+  - **Disease name** (if detected).
+  - **Model confidence score** displayed on the interface.
+
+---
+
+### System Highlights
+- Full **Flask + Torch** backend for computation and inference.
+- **Asynchronous streaming** for smooth frontend updates.
+- **Bootstrap 5 UI** with dark mode styling and responsive layout.
+- Automatic saving of recurrence data for offline training and analysis.
+- Modular structure: easy to extend with new models or signal transformations.
+
+---
+
+## **Setup and Installation**
 
 
 1. Clone the Repository:
@@ -198,26 +265,33 @@ This repository contains a Flask-based ECG real-time viewer and lightweight mode
 After running, open your browser and go to:
 👉 http://127.0.0.1:5000/ecg
 
-## Files of interest
+---
+
+## **Files of interest**
 
 - `app.py` — Flask app bootstrap (registers the `ecg` blueprint).
 - `signals/ecg.py` — Core streaming logic, prediction wrappers, recurrence image builder, and 2D training hooks.
 - `templates/ecg.html` — Frontend UI, Plotly plots, controls (channel selection, XOR threshold, polar mode), drag & drop upload.
-- `models/` — training artifacts and model weights (if present).
 - `results/recurrence_data/` — CSV exports of the two-channel recurrence data saved prior to 2D training.
 
-## How it works
+---
+
+## **How it works**
 
 - The browser polls `/ecg/update` with selected channels and visualization options. The server returns downsampled time series, XOR diffs (for single-channel), polar data, recurrence colormap data (for 2 channels), and predictions.
 - 1D predictions: a rolling per-channel buffer is accumulated and passed to a small 1D CNN to predict Normal/Abnormal. Predictions are smoothed over a short window.
 - 2D predictions: recurrence images are generated from two-channel pairs and used for a separate 2D CNN. Training runs in a background thread when a WFDB record with labels is loaded.
 
-## Developer notes & tuning
+---
+
+## **Developer notes & tuning**
 
 - Smoothing window: `SMOOTH_WINDOW` in `signals/ecg.py` controls temporal averaging of probabilities.
 - Minimum samples: `MIN_PRED_LEN` controls when the 1D model will run (helps avoid padding bias).
 - Recurrence CSVs are written to `results/recurrence_data/` before training; useful for reproducibility.
+
 ------------------------
+
 ### Dataset used
 
 https://www.physionet.org/content/ptbdb/1.0.0/
