@@ -219,15 +219,21 @@ Developer notes & tuning
 - Minimum samples: `MIN_PRED_LEN` controls when the 1D model will run (helps avoid padding bias).
 - Recurrence CSVs are written to `results/recurrence_data/` before training; useful for reproducibility.
 
+Videos & Screenshoots
+------------------------
 
-![ECG Viewer Demo](docs/images/ecg.gif)
-
-
-
-![ECG Viewer Demo 2](docs/images/ecg1.gif)
-*Animated demo: EEG polar graph Viewer in action.*
+![ECG Viewer Demo](ECG/ecg.gif)
 
 
-![ECG Viewer Demo 3](docs/images/ecg3.gif)
-*Animated demo: EEG recurrence graph Viewer in action.*
+
+![ECG Viewer Demo 2](ECG/ecg1.gif)
+*Animated demo: ECG polar graph Viewer in action.*
+
+
+![ECG Viewer Demo 3](ECG/ecg3.gif)
+*Animated demo: ECG recurrence graph Viewer in action.*
+
+
+![ECG Viewer Demo 3](ECG/xor.png)
+*ECG XOR graph Viewer.*
 
