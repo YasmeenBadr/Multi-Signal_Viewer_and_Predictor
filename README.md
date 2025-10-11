@@ -132,53 +132,7 @@ Full source code and implementation details are available in its dedicated repos
 
 ---
 
-### How to Run
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/YasmeenBadr/Signal-Viewer.git
-   cd Signal-Viewer
-
----
-
-## Quickstart: EEG Viewer
-
-Install dependencies
-
-Bash
-
-```bash
-pip install -r requirements.txt
-```
-
-Run the EEG Viewer
-
-Bash
-
-```bash
-python eeg_viewer.py
-```
-
-Upload EEG Signal
-
-- Choose your EEG .edf or .csv file.
-- Select a visualization mode (Time, Polar, XOR, or Recurrence).
-- Choose one or multiple channels.
-
-
-
-Prediction
-
-- The system will load the pretrained EEGPT model.
-- Displays predicted condition and confidence score on screen.
-
-
-
-Repository Link
-
-📂 EEGPT Model Repo: https://github.com/YasmeenBadr/EEG-Model_for_disease_classification
-
----
 
 ## ❤️ ECG Real-Time Viewer
 
