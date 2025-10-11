@@ -55,7 +55,7 @@
   }
   
   .btn-primary:hover {
-    background: #4cdbff;
+    background: #323739;
     border-color: #00e1ff;
     color: #000;
   }
@@ -86,7 +86,7 @@
     cursor: pointer;
   }
   #pickFiles:hover {
-    color: #00ffaa;
+    color: #ccddd7;
   }
 
   /* Form inputs and selects */
@@ -110,6 +110,12 @@
   .form-check-label {
     color: #ccc;
   }
+  
+
+.form-check-input:checked {
+    background-color: #101112;
+    border-color: #00f7ff;
+}
 
   .form-text {
     color: #888;
@@ -180,14 +186,14 @@
     <div class="col-md-9">
       <!-- Time plot -->
       <div class="plot-container">
-        <div id="timePlot" style="width:100%;height:450px;"></div>
+        <div id="timePlot" style="width:100%;height:550px;"></div>
       </div>
 
       <!-- XOR plot -->
       <div class="row">
         <div class="col-12 plot-container">
           <div style="display:flex; gap:12px; align-items:flex-start;">
-            <div id="xorPlot" style="flex:1; width:100%; height:300px;"></div>
+            <div id="xorPlot" style="flex:1; width:100%; height:400px;"></div>
             <div style="width:220px;">
               <label class="form-label">XOR Threshold</label>
               <input id="xorThreshold" class="form-control" type="number" step="0.01" value="0.05" />
@@ -201,7 +207,7 @@
       <div class="row">
         <div class="col-12 plot-container">
           <div style="display:flex; gap:12px; align-items:flex-start;">
-            <div id="polarPlot" style="flex:1; width:100%; height:450px;"></div>
+            <div id="polarPlot" style="flex:1; width:100%; height:500px;"></div>
             <div style="width:220px;">
               <label class="form-label">Polar Mode</label>
               <select id="polarModeSelect" class="form-select">
@@ -215,7 +221,7 @@
 
       <!-- Recurrence plot -->
       <div class="plot-container mt-3">
-        <div id="recurrenceScatterPlot" style="width:100%;height:300px;"></div>
+        <div id="recurrenceScatterPlot" style="width:100%;height:400px;"></div>
       </div>
     </div>
   </div>
@@ -253,6 +259,7 @@ async function initConfig(){
 }
 initConfig();
 
+// Event listeners
 document.getElementById("colormapSelect").addEventListener("change",(ev)=>{ colormap=ev.target.value; });
 document.getElementById("polarModeSelect").addEventListener("change", (ev)=>{ polarMode = ev.target.value; });
 const xorThresholdInput = document.getElementById('xorThreshold');
@@ -306,7 +313,7 @@ const containers = {
 const displaySelect = document.getElementById('displaySelect');
 function applyDisplaySelection(val){
   currentDisplay = val;
-  const sizes = {'Time':'450px','XOR':'300px','Polar':'450px','Recurrence':'300px'};
+  const sizes = {'Time':'550px','XOR':'400px','Polar':'600px','Recurrence':'600px'};
   Object.keys(containers).forEach(k=>{
     const plotId = (k==='Time')?'timePlot':(k==='XOR')?'xorPlot':(k==='Polar')?'polarPlot':'recurrenceScatterPlot';
     const plotDiv = document.getElementById(plotId);
@@ -323,8 +330,7 @@ applyDisplaySelection(displaySelect.value || 'Time');
 // Form submit
 document.getElementById("channelForm").addEventListener("submit", ev=>{
   ev.preventDefault();
-  if(!filesUploaded){ alert("Upload files first!"); return; }
-
+  if(!filesUploaded){ alert("Please upload files first."); return; }
   selectedChannels = Array.from(document.querySelectorAll("input[name=channels]:checked")).map(n=>parseInt(n.value));
   widthSec = parseFloat(document.getElementById("width").value)||5;
   updateSpeed = parseFloat(document.getElementById("speedControl").value)||1;
@@ -351,13 +357,9 @@ document.getElementById("speedControl").addEventListener("change", ev=>{
   }
 });
 
-// Initialize plots
 function initPlots(channels){
-  const timeTraces = channels.map(ch=>({
-    x:[], y:[], mode:"lines", name:"",
-    line:{width:1.5}, showlegend:false, hoverinfo:'none'
-  }));
-
+  if(!filesUploaded) return; // do not init unless files uploaded
+  const timeTraces = channels.map(ch=>({x:[],y:[],mode:"lines",name:"",line:{width:1.5}, showlegend:false, hoverinfo:'none'}));
   Plotly.newPlot("timePlot", timeTraces, {
     title:'Real-time ECG (time domain)',
     paper_bgcolor:"#000", plot_bgcolor:"#000", font:{color:"#e0e0e0"},
@@ -380,7 +382,6 @@ function initPlots(channels){
   }
 }
 
-// Fetch ECG data
 async function fetchData(){
   if(!streaming) return;
   try{
@@ -405,7 +406,7 @@ async function fetchData(){
       const xvals=channelData[ch].map((_,i)=>globalStart+i/plotFs);
       if(currentDisplay==='All'||currentDisplay==='Time') Plotly.restyle("timePlot",{x:[xvals],y:[channelData[ch]]},[idx]);
     });
-    Plotly.relayout("timePlot",{"xaxis.range":[globalStart,globalStart+widthSec], "yaxis.autorange":true});
+    Plotly.relayout("timePlot",{"xaxis.range":[globalStart,globalStart+widthSec]});
 
     if(selectedChannels.length===1){
       const chXOR=selectedChannels[0];
@@ -434,7 +435,6 @@ async function fetchData(){
       if(currentDisplay==='All'||currentDisplay==='Recurrence') Plotly.restyle("recurrenceScatterPlot",{z:[colormapData], colorscale:colormap});
     }
 
-    // Update predictions
     if(filesUploaded){
       const pred=result.prediction||{};
       let disp=null;
