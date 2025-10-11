@@ -314,7 +314,7 @@ https://www.physionet.org/content/ptbdb/1.0.0/
 *ECG XOR graph Viewer.*
 
 
-# 🚗 Doppler Effect Module — Vehicle Speed Estimation
+# Doppler Effect Module — Vehicle Speed Estimation
 
 The **Doppler Effect module** simulates and analyzes audio signals of moving vehicles to estimate their speed using both **signal processing** and a **trained neural network model**.
 
@@ -324,16 +324,16 @@ It includes two main functions:
 
 ---
 
-## 🔍 How It Works
+## How It Works
 
-### 🎵 Generation Mode
+### Generation Mode
 When the user provides base frequency, source velocity, and duration:
 1. A synthetic sound wave is generated using the **Doppler equation**
 2. Frequency and amplitude vary dynamically as the source approaches and moves away
 3. A **Butterworth band-pass filter (50–4000 Hz)** enhances clarity
 4. A `.wav` file is generated and visualized as a waveform using **Chart.js**
 
-### 🎧 Detection Mode
+### Detection Mode
 When a user uploads a `.wav` file:
 1. The audio is preprocessed and converted into a **Log-Mel Spectrogram (LMS)**
 2. The features are passed through a trained **neural network model**
@@ -342,19 +342,19 @@ When a user uploads a `.wav` file:
 
 ---
 
-## 📊 Example Results
+## Example Results
 
-### 🎥 Detection vedio
-![▶️ Watch Detection Video](Doppler/DopplerDetection.gif)
+### Detection vedio
+![Watch Detection Video](Doppler/DopplerDetection.gif)
 ---
-### 🎥 Generation vedio
-![▶️ Watch Generation Video](Doppler/DopplerGeneration.gif)
+### Generation vedio
+![Watch Generation Video](Doppler/DopplerGeneration.gif)
 
 *The demo shows both Doppler sound generation and vehicle speed detection.*
 
 ---
 
-## 🧠 Model Performance
+## Model Performance
 
 - **Model file:** `speed_estimations_NN_1000-200-50-10-1_reg1e-3_lossMSE.h5`
 - **Dataset:** Vehicle audio recordings with annotated speed labels
@@ -362,13 +362,13 @@ When a user uploads a `.wav` file:
 - **Download Model:** [Click here to download](https://slobodan.ucg.ac.me/science/vse/)
 ---
 
-### 🎯 Model Overview
+### Model Overview
 The model estimates vehicle speed using the Doppler effect in sound.  
 It consists of **two main stages**:
 
 ---
 
-### ⚙️ Stage 1 – Neural Network
+### Stage 1 – Neural Network
 - **Input:** Log-Mel Spectrogram (a time-frequency representation of the audio).  
 - **Objective:** Learn to predict a custom feature called **Modified Attenuation (MA)**,  
   which captures how sound intensity changes over time and distance.  
@@ -376,21 +376,21 @@ It consists of **two main stages**:
 
 ---
 
-### ⚙️ Stage 2 – SVR (Support Vector Regression)
+### Stage 2 – SVR (Support Vector Regression)
 - **Input:** Predicted MA values from Stage 1  
 - **Objective:** Map the MA value to the corresponding real vehicle speed  
 - **Output:** Estimated vehicle speed (km/h)
 
 ---
 
-### 🔄 Pipeline Summary
+### Pipeline Summary
 1. Extract audio features (Log-Mel Spectrogram + MA)  
 2. Train the neural network to predict MA from the audio  
 3. Use an SVR model to convert MA predictions into actual speed estimates  
 
 ---
 
-## 💡 Technical Details
+## Technical Details
 
 - **Libraries Used:** NumPy, SciPy, Librosa, TensorFlow  
 - **Filtering:** Simple band-pass filter (50–4000 Hz) to remove background noise  
@@ -406,11 +406,11 @@ It consists of **two main stages**:
   • vₛ → vehicle speed  
 
 ---
-# 🎧 Drone Detection Module
+# Drone Detection Module
 
 The Drone Detection module allows users to upload an audio recording (`.wav` or `.mp3`) and automatically detects whether a drone sound is present in the environment.
 
-## 🔍 How It Works
+## How It Works
 
 When a file is uploaded, the Flask backend:
 1. Loads the audio using Librosa and resamples it to 16 kHz
@@ -419,17 +419,17 @@ When a file is uploaded, the Flask backend:
 4. Applies a Softmax layer to calculate the probability for each class
 5. Returns the predicted class and confidence score to the frontend
 
-## 📊 Example Results
+## Example Results
 
-### ✅ Drone Detected
+### Drone Detected
 ![Drone Detected](Radar\DroneResult.jpg)
 *When the model identifies drone audio with high confidence*
 
-### ❌ No Drone Detected  
+###  o Drone Detected  
 ![No Drone Detected](Radar\NotDroneResult.jpg)
 *When the model determines no drone presence in the audio*
 
-## 🎯 Model Performance
+## Model Performance
 
 - Model: preszzz/drone-audio-detection-05-17-trial-0
 - Input: 16kHz mono audio
@@ -437,7 +437,7 @@ When a file is uploaded, the Flask backend:
 - Processing: Real-time inference with GPU acceleration
 
 
-## 💡 Technical Details
+## Technical Details
 
 - Framework: Hugging Face Transformers + PyTorch
 - Audio Processing: Librosa for loading and resampling
@@ -449,11 +449,11 @@ When a file is uploaded, the Flask backend:
 
 
 
-# 🛰️ SAR Analysis Module
+# SAR Analysis Module
 
 The SAR (Synthetic Aperture Radar) Analysis module processes Sentinel-1 GRD files to visualize and analyze radar backscatter data with advanced image processing techniques.
 
-## 📊 How It Works
+## How It Works
 
 When a GeoTIFF file is uploaded, the Flask backend:
 
@@ -463,7 +463,7 @@ When a GeoTIFF file is uploaded, the Flask backend:
 4. Calculates Adaptive Thresholds based on statistical analysis
 5. Generates Three Visualizations for comprehensive analysis
 
-## 🎨 Visualization Outputs
+## Visualization Outputs
 
 ### Main Display (2-98% Scaled)
 - Normalized Intensity using percentile scaling
