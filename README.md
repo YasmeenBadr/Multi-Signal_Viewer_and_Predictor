@@ -157,6 +157,11 @@ Our full source code and implementation details we made are available in its ded
 
 This repository contains a Flask-based ECG real-time viewer and lightweight model prototypes for detecting abnormalities using both 1D time-domain signals and 2D recurrence-image representations.
 
+### Files Upload
+
+![ECG Viewer Demo](ECG/ecg.gif)
+
+
 ## **Highlights**
 
 ### Real-Time ECG Visualization
@@ -169,6 +174,20 @@ This repository contains a Flask-based ECG real-time viewer and lightweight mode
 - Adjustable parameters for **speed**, **window width**, **channel selection**, and **colormap type**.
 
 ---
+
+## Videos & Screenshoots
+
+
+![ECG Viewer Demo 2](ECG/ecg1.gif)
+*Animated demo: ECG polar graph Viewer in action.*
+
+
+![ECG Viewer Demo 3](ECG/ecg3.gif)
+*Animated demo: ECG recurrence graph Viewer in action.*
+
+
+![ECG Viewer Demo 3](ECG/xor.png)
+*ECG XOR graph Viewer.*
 
 ### Smart Data Handling
 - Supports drag-and-drop upload of **WFDB records** (`.hea`, `.dat`, `.xyz`).
@@ -223,46 +242,6 @@ This repository contains a Flask-based ECG real-time viewer and lightweight mode
 
 ---
 
-### System Highlights
-- Full **Flask + Torch** backend for computation and inference.
-- **Asynchronous streaming** for smooth frontend updates.
-- **Bootstrap 5 UI** with dark mode styling and responsive layout.
-- Automatic saving of recurrence data for offline training and analysis.
-- Modular structure: easy to extend with new models or signal transformations.
-
----
-
-## **Setup and Installation**
-
-
-1. Clone the Repository:
-
-   ```bash
-   git clone https://github.com/YasmeenBadr/Task_1_DSP.git
-
-
-2. Navigate to the Project Directory:
-
-   ```bash
-   cd Task_1_DSP
-
-
-3. Install Required Dependencies:
-
-   ```bash
-   pip install -r requirements.txt
-
-
-4. Run the Application:
-
-   ```bash
-   python app.py
-
-
-After running, open your browser and go to:
-👉 http://127.0.0.1:5000/ecg
-
----
 
 ## **Files of interest**
 
@@ -294,24 +273,6 @@ After running, open your browser and go to:
 https://www.physionet.org/content/ptbdb/1.0.0/
 
 ------------------------
-
-## Videos & Screenshoots
-
-
-![ECG Viewer Demo](ECG/ecg.gif)
-
-
-
-![ECG Viewer Demo 2](ECG/ecg1.gif)
-*Animated demo: ECG polar graph Viewer in action.*
-
-
-![ECG Viewer Demo 3](ECG/ecg3.gif)
-*Animated demo: ECG recurrence graph Viewer in action.*
-
-
-![ECG Viewer Demo 3](ECG/xor.png)
-*ECG XOR graph Viewer.*
 
 
 # Doppler Effect Module — Vehicle Speed Estimation
