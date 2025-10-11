@@ -19,12 +19,10 @@ This repository combines **real-time visualization**, **interactive multi-mode a
    - [Files of Interest](#files-of-interest)
    - [How It Works](#how-it-works)
    - [Developer Notes & Tuning](#developer-notes--tuning)
-   - [Application Interface](#application-interface)
 6. [Doppler](#acoustic-signal-viewer-coming-soon)
 7. [Radar](#rf-signal-viewer-coming-soon)
 8. [Installation](#installation)
 9. [Contributors](#contributors)
-10. [License](#license)
 
 ---
 
@@ -225,12 +223,87 @@ This repository contains a Flask-based ECG real-time viewer and lightweight mode
 - **Automatic Training:**
   - When a `.hea` record includes diagnosis labels, the backend saves the computed recurrence data into:
     ```
-    results/recurrence_data/
-    ```
-  - A background thread **continuously trains or fine-tunes** the 2D model.
-- **Output:** Detects higher-order rhythm irregularities and supports the main prediction model.
 
----
+    ---
+
+    ## Installation
+
+    Follow these steps to create a reproducible environment and run the Signal Viewer locally on Windows (PowerShell). The commands assume you are executing them from the project root (`Task_1_DSP`).
+
+    Prerequisites
+    - Python 3.10 or 3.11 (3.9 may work). Verify with `python --version`.
+    - Git (optional) if you need to clone the repository.
+    - (Optional) NVIDIA GPU + CUDA drivers for GPU-accelerated PyTorch.
+
+    1) Clone or open the project
+
+    ```powershell
+    git clone https://github.com/YasmeenBadr/Task_1_DSP.git
+    cd Task_1_DSP
+    ```
+
+    2) Create and activate a virtual environment (PowerShell)
+
+    ```powershell
+    python -m venv .venv
+    .\.venv\Scripts\Activate.ps1
+    ```
+
+    3) Upgrade pip/build tools
+
+    ```powershell
+    python -m pip install --upgrade pip setuptools wheel
+    ```
+
+    4) Install PyTorch (pick CPU or CUDA from https://pytorch.org)
+
+    Example CPU-only (PowerShell):
+
+    ```powershell
+    pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+    ```
+
+    5) Install core dependencies
+
+    ```powershell
+    pip install flask numpy scipy pandas mne matplotlib plotly scikit-learn transformers tqdm
+    ```
+
+    Optional packages (audio, WFDB, raster):
+
+    ```powershell
+    pip install librosa wfdb
+    # For rasterio prefer conda: conda install -c conda-forge rasterio
+    ```
+
+    6) (Optional) Export a pinned requirements.txt
+
+    ```powershell
+    pip freeze > requirements.txt
+    ```
+
+    7) Run the development Flask app
+
+    ```powershell
+    python app.py
+    ```
+
+    Open the app in your browser:
+    - http://127.0.0.1:5000
+   
+
+    Quick checks
+
+    ```powershell
+    python -c "import flask, numpy, mne, transformers; print('Imports OK')"
+    python -c "import torch; print('PyTorch', torch.__version__, 'CUDA available:', torch.cuda.is_available())"
+    ```
+
+    Troubleshooting
+    - If `rasterio` fails to install on Windows, install via conda to get GDAL and binary deps: `conda install -c conda-forge rasterio`.
+    - For large transformer models, ensure adequate RAM/GPU or use smaller checkpoints.
+    - EEG predictor model was way too large (even its check points).
+
 
 ### Model Fusion & Decision Logic
 - Combines predictions from both models:
@@ -445,8 +518,96 @@ When a GeoTIFF file is uploaded, the Flask backend:
 - Anomaly detection for dark regions in radar data
 - Pattern identification for surface analysis
 
-## 📸 Example Results
+## Example Results
 
 ### SAR Analysis Interface
 ![SAR Analysis Website](Radar/SarImage.png)
 *Web interface showing the three visualization panels generated from SAR data processing*
+# Installation
+Signal Viewer — Local Setup Guide (Windows / PowerShell)
+
+Follow these steps to create a reproducible environment and run the Signal Viewer locally on Windows using PowerShell.
+All commands assume you are executing them from the project root directory:
+
+Multi-Signal_Viewer_and_Predictor/
+
+### Prerequisites
+
+Python 3.10 or 3.11 (3.9 may work)
+Verify:
+
+python --version
+
+
+Git (optional, for cloning the repository)
+
+(Optional) NVIDIA GPU + CUDA drivers for GPU-accelerated PyTorch
+
+1. Clone or Open the Project
+git clone https://github.com/YasmeenBadr/Multi-Signal_Viewer_and_Predictor.git
+cd Task_1_DSP
+
+
+If you already have the project locally, simply open the folder in PowerShell.
+
+2. Create and Activate a Virtual Environment
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+
+
+ Tip: You can deactivate the environment anytime with deactivate.
+
+3. Upgrade Pip and Build Tools
+python -m pip install --upgrade pip setuptools wheel
+
+4. Install PyTorch
+
+Choose your installation command from PyTorch.org
+.
+
+Example: CPU-only install
+
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+
+
+If you have CUDA-capable hardware, use the CUDA version command from the PyTorch website instead.
+
+5. Install Core Dependencies
+pip install flask numpy scipy pandas mne matplotlib plotly scikit-learn transformers tqdm
+
+Optional Packages (Audio / WFDB / Raster)
+pip install librosa wfdb
+For rasterio (recommended via conda)
+conda install -c conda-forge rasterio
+
+6. Run the Development Flask App
+python app.py
+
+
+Then open the app in your browser:
+
+ http://127.0.0.1:5000
+
+### Quick Checks
+
+Verify everything is working:
+
+python -c "import flask, numpy, mne, transformers; print('Imports OK')"
+python -c "import torch; print('PyTorch', torch.__version__, 'CUDA available:', torch.cuda.is_available())"
+
+### Troubleshooting
+
+Rasterio install fails on Windows
+→ Use Conda for binary dependencies:
+
+conda install -c conda-forge rasterio
+
+
+Large transformer models cause memory errors
+→ Use smaller checkpoints or run on a machine with more RAM/GPU.
+
+EEG Predictor Models
+→ Checkpoints are very large, we were unable to push it in our repo.
+   But you can download it from here
+
+   https://drive.google.com/drive/folders/1Qj0Y9zd0NHSXPiw74WZIYVa76BQSzqH1?dmr=1&ec=wgc-drive-hero-goto
