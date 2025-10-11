@@ -313,3 +313,175 @@ https://www.physionet.org/content/ptbdb/1.0.0/
 ![ECG Viewer Demo 3](ECG/xor.png)
 *ECG XOR graph Viewer.*
 
+
+# 🚗 Doppler Effect Module — Vehicle Speed Estimation
+
+The **Doppler Effect module** simulates and analyzes audio signals of moving vehicles to estimate their speed using both **signal processing** and a **trained neural network model**.
+
+It includes two main functions:
+1. **Generation** — simulate Doppler-shifted audio from a moving source  
+2. **Detection** — upload a real or simulated recording and estimate vehicle speed  
+
+---
+
+## 🔍 How It Works
+
+### 🎵 Generation Mode
+When the user provides base frequency, source velocity, and duration:
+1. A synthetic sound wave is generated using the **Doppler equation**
+2. Frequency and amplitude vary dynamically as the source approaches and moves away
+3. A **Butterworth band-pass filter (50–4000 Hz)** enhances clarity
+4. A `.wav` file is generated and visualized as a waveform using **Chart.js**
+
+### 🎧 Detection Mode
+When a user uploads a `.wav` file:
+1. The audio is preprocessed and converted into a **Log-Mel Spectrogram (LMS)**
+2. The features are passed through a trained **neural network model**
+3. The model outputs the **estimated vehicle speed (km/h)**
+4. Results include speed, dominant frequency, and waveform visualization
+
+---
+
+## 📊 Example Results
+
+### 🎥 Demonstration Video
+![▶️ Watch Detection Video](Doppler/DopplerDetection.gif)
+![▶️ Watch Generation Video](Doppler/DopplerGeneration.gif)
+
+*The demo shows both Doppler sound generation and vehicle speed detection.*
+
+---
+
+## 🧠 Model Performance
+
+- **Model file:** `speed_estimations_NN_1000-200-50-10-1_reg1e-3_lossMSE.h5`
+- **Dataset:** Vehicle audio recordings with annotated speed labels
+- **Framework:** TensorFlow / Keras
+- **Download Model:** [Click here to download](https://slobodan.ucg.ac.me/science/vse/)
+---
+
+### 🎯 Model Overview
+The model estimates vehicle speed using the Doppler effect in sound.  
+It consists of **two main stages**:
+
+---
+
+### ⚙️ Stage 1 – Neural Network
+- **Input:** Log-Mel Spectrogram (a time-frequency representation of the audio).  
+- **Objective:** Learn to predict a custom feature called **Modified Attenuation (MA)**,  
+  which captures how sound intensity changes over time and distance.  
+- **Output:** Predicted MA value.
+
+---
+
+### ⚙️ Stage 2 – SVR (Support Vector Regression)
+- **Input:** Predicted MA values from Stage 1  
+- **Objective:** Map the MA value to the corresponding real vehicle speed  
+- **Output:** Estimated vehicle speed (km/h)
+
+---
+
+### 🔄 Pipeline Summary
+1. Extract audio features (Log-Mel Spectrogram + MA)  
+2. Train the neural network to predict MA from the audio  
+3. Use an SVR model to convert MA predictions into actual speed estimates  
+
+---
+
+## 💡 Technical Details
+
+- **Libraries Used:** NumPy, SciPy, Librosa, TensorFlow  
+- **Filtering:** Simple band-pass filter (50–4000 Hz) to remove background noise  
+- **Feature Type:** Log-Mel Spectrogram for representing sound frequencies  
+- **Core Equation (Doppler Effect):**
+
+  f' = f₀ × c / (c − vₛ)
+
+  where:  
+  • f' → observed frequency  
+  • f₀ → emitted/original frequency  
+  • c → 343 m/s (speed of sound)  
+  • vₛ → vehicle speed  
+
+---
+# 🎧 Drone Detection Module
+
+The Drone Detection module allows users to upload an audio recording (`.wav` or `.mp3`) and automatically detects whether a drone sound is present in the environment.
+
+## 🔍 How It Works
+
+When a file is uploaded, the Flask backend:
+1. Loads the audio using Librosa and resamples it to 16 kHz
+2. Processes the waveform using a Hugging Face Audio Processor (`preszzz/drone-audio-detection-05-17-trial-0`)
+3. Runs inference through a PyTorch Transformer model to classify the sound
+4. Applies a Softmax layer to calculate the probability for each class
+5. Returns the predicted class and confidence score to the frontend
+
+## 📊 Example Results
+
+### ✅ Drone Detected
+![Drone Detected](Radar\DroneResult.jpg)
+*When the model identifies drone audio with high confidence*
+
+### ❌ No Drone Detected  
+![No Drone Detected](Radar\NotDroneResult.jpg)
+*When the model determines no drone presence in the audio*
+
+## 🎯 Model Performance
+
+- Model: preszzz/drone-audio-detection-05-17-trial-0
+- Input: 16kHz mono audio
+- Output: Binary classification (drone/no drone) with confidence percentage
+- Processing: Real-time inference with GPU acceleration
+
+
+## 💡 Technical Details
+
+- Framework: Hugging Face Transformers + PyTorch
+- Audio Processing: Librosa for loading and resampling
+- Inference: GPU-accelerated with torch.no_grad()
+- Output: Softmax probabilities for transparent results
+
+
+---
+
+
+
+# 🛰️ SAR Analysis Module
+
+The SAR (Synthetic Aperture Radar) Analysis module processes Sentinel-1 GRD files to visualize and analyze radar backscatter data with advanced image processing techniques.
+
+## 📊 How It Works
+
+When a GeoTIFF file is uploaded, the Flask backend:
+
+1. Reads SAR Data using Rasterio library
+2. Applies Intelligent Downsampling for large images (max 2000px dimension)
+3. Converts to dB Scale using logarithmic transformation: 10 * log10(data)
+4. Calculates Adaptive Thresholds based on statistical analysis
+5. Generates Three Visualizations for comprehensive analysis
+
+## 🎨 Visualization Outputs
+
+### Main Display (2-98% Scaled)
+- Normalized Intensity using percentile scaling
+- Grayscale colormap for clear backscatter representation
+- Color bar showing normalized intensity values
+- Optimal contrast by excluding extreme outliers
+
+### Backscatter Histogram
+- Distribution analysis of dB values
+- Automatic threshold detection (red dashed line)
+- Statistical insights into backscatter patterns
+- Pixel count distribution across intensity ranges
+
+### Low-Backscatter Overlay
+- Red highlighting of areas with backscatter below adaptive threshold
+- Anomaly detection for dark regions in radar data
+- Pattern identification for surface analysis
+
+## 📸 Example Results
+
+### SAR Analysis Interface
+![SAR Analysis Website](Radar/sar.jpg)
+*Web interface showing the three visualization panels generated from SAR data processing*
