@@ -98,8 +98,8 @@ Upon uploading an EEG file:
 
 Additional controls:
 - Select one or more channels for display.
-- For better visualization, hence the EEG signals of different channels look so different we decided to plot them seperately each own in its own graph.
-- Band Power graph to ilustrate the power of each frequency range (alpha/beta/delta/theta/gamma).
+- For better visualization, hence the EEG signals of different channels look so different we decided to plot them seperately each one in its own graph.
+- Band Power graph to illustrate the power of each frequency range (alpha/beta/delta/theta/gamma).
 - Adjust time chunk width.
 - Choose custom color maps for 2D representations.
 - Polar graph can be cumulative plot to retain full history.
@@ -128,7 +128,7 @@ We developed and implemented a comprehensive **PyTorch Lightning** setup to fine
 
 Full source code and implementation details are available in its dedicated repository:
 
-🔗 **[EEGPT Disease Classification Repository](https://github.com/YasmeenBadr/EEGPT-Disease-Classification)**
+🔗 **[EEGPT Disease Classification Repository](https://github.com/YasmeenBadr/EEG-Model_for_disease_classification)**
 
 ---
 
@@ -176,7 +176,7 @@ Prediction
 
 Repository Link
 
-📂 EEGPT Model Repo: https://github.com/YasmeenBadr/EEGPT-Disease-Classification
+📂 EEGPT Model Repo: https://github.com/YasmeenBadr/EEG-Model_for_disease_classification
 
 ---
 
