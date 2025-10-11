@@ -385,11 +385,11 @@ When a file is uploaded, the Flask backend:
 ## Example Results
 
 ### Drone Detected
-![Drone Detected](Radar\DroneResult.jpg)
+![Drone Detected](Radar/YesDrone.png)
 *When the model identifies drone audio with high confidence*
 
 ###  o Drone Detected  
-![No Drone Detected](Radar\NotDroneResult.jpg)
+![No Drone Detected](Radar/NotDrone.png)
 *When the model determines no drone presence in the audio*
 
 ## Model Performance
@@ -448,5 +448,5 @@ When a GeoTIFF file is uploaded, the Flask backend:
 ## 📸 Example Results
 
 ### SAR Analysis Interface
-![SAR Analysis Website](Radar/sar.jpg)
+![SAR Analysis Website](Radar/SarImage.png)
 *Web interface showing the three visualization panels generated from SAR data processing*
