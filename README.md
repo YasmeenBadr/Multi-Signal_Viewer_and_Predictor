@@ -26,6 +26,15 @@ This repository combines **real-time visualization**, **interactive multi-mode a
    - [Model Performance](#model-performance-doppler)
    - [Technical Details](#technical-details-doppler)
 7. [Radar](#rf-signal-viewer-coming-soon)
+   - [Drone Detection Module](#drone-detection-module)
+     - [How It Works](#how-it-works-drone)
+     - [Example Results](#example-results-drone)
+     - [Model Performance](#model-performance-drone)
+     - [Technical Details](#technical-details-drone)
+   - [SAR Analysis Module](#sar-analysis-module)
+     - [How It Works](#how-it-works-sar)
+     - [Visualization Outputs](#visualization-outputs-sar)
+     - [Example Results](#example-results-sar)
 8. [Installation](#installation)
 9. [Contributors](#contributors)
 
@@ -367,54 +376,52 @@ It consists of **two main stages**:
   • vₛ → vehicle speed  
 
 ---
-# Drone Detection Module
+# Radar <a id="radar"></a>
 
-The Drone Detection module allows users to upload an audio recording (`.wav` or `.mp3`) and automatically detects whether a drone sound is present in the environment.
+## Drone Detection Module <a id="drone-detection-module"></a>
 
-## How It Works
+The Drone Detection module allows users to upload an audio recording (.wav or .mp3) and automatically detects whether a drone sound is present in the environment.
+
+### How It Works <a id="how-it-works-drone"></a>
 
 When a file is uploaded, the Flask backend:
 1. Loads the audio using Librosa and resamples it to 16 kHz
-2. Processes the waveform using a Hugging Face Audio Processor (`preszzz/drone-audio-detection-05-17-trial-0`)
+2. Processes the waveform using a Hugging Face Audio Processor (preszzz/drone-audio-detection-05-17-trial-0)
 3. Runs inference through a PyTorch Transformer model to classify the sound
 4. Applies a Softmax layer to calculate the probability for each class
 5. Returns the predicted class and confidence score to the frontend
 
-## Example Results
+### Example Results <a id="example-results-drone"></a>
 
-### Drone Detected
+#### Drone Detected
 ![Drone Detected](Radar/YesDrone.png)
-*When the model identifies drone audio with high confidence*
+When the model identifies drone audio with high confidence
 
-###  No Drone Detected  
+#### No Drone Detected  
 ![No Drone Detected](Radar/NotDrone.png)
-*When the model determines no drone presence in the audio*
+When the model determines no drone presence in the audio
 
-## Model Performance
+### Model Performance <a id="model-performance-drone"></a>
 
 - Model: preszzz/drone-audio-detection-05-17-trial-0
 - Input: 16kHz mono audio
 - Output: Binary classification (drone/no drone) with confidence percentage
 - Processing: Real-time inference with GPU acceleration
 
-
-## Technical Details
+### Technical Details <a id="technical-details-drone"></a>
 
 - Framework: Hugging Face Transformers + PyTorch
 - Audio Processing: Librosa for loading and resampling
 - Inference: GPU-accelerated with torch.no_grad()
 - Output: Softmax probabilities for transparent results
 
-
 ---
 
-
-
-# SAR Analysis Module
+## SAR Analysis Module <a id="sar-analysis-module"></a>
 
 The SAR (Synthetic Aperture Radar) Analysis module processes Sentinel-1 GRD files to visualize and analyze radar backscatter data with advanced image processing techniques.
 
-## How It Works
+### How It Works <a id="how-it-works-sar"></a>
 
 When a GeoTIFF file is uploaded, the Flask backend:
 
@@ -424,30 +431,32 @@ When a GeoTIFF file is uploaded, the Flask backend:
 4. Calculates Adaptive Thresholds based on statistical analysis
 5. Generates Three Visualizations for comprehensive analysis
 
-## Visualization Outputs
+### Visualization Outputs <a id="visualization-outputs-sar"></a>
 
-### Main Display (2-98% Scaled)
+#### Main Display (2-98% Scaled)
 - Normalized Intensity using percentile scaling
 - Grayscale colormap for clear backscatter representation
 - Color bar showing normalized intensity values
 - Optimal contrast by excluding extreme outliers
 
-### Backscatter Histogram
+#### Backscatter Histogram
 - Distribution analysis of dB values
 - Automatic threshold detection (red dashed line)
 - Statistical insights into backscatter patterns
 - Pixel count distribution across intensity ranges
 
-### Low-Backscatter Overlay
+#### Low-Backscatter Overlay
 - Red highlighting of areas with backscatter below adaptive threshold
 - Anomaly detection for dark regions in radar data
 - Pattern identification for surface analysis
 
-## Example Results
+### Example Results <a id="example-results-sar"></a>
 
-### SAR Analysis Interface
+#### SAR Analysis Interface
 ![SAR Analysis Website](Radar/SarImage.png)
-*Web interface showing the three visualization panels generated from SAR data processing*
+Web interface showing the three visualization panels generated from SAR data processing
+
+---
 # Installation
 Signal Viewer — Local Setup Guide (Windows / PowerShell)
 
