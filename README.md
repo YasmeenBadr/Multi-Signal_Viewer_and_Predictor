@@ -545,19 +545,19 @@ EEG Predictor Models
   <table>
     <tr>
       <td align="center" width="280">
-        <img src="docs/images/Yasmeen Badr.jpg" width="260" height="150"><br>
+        <img src="docs/images/Yasmeen Badr.jpg" width="260" height="180"><br>
         <a href="https://github.com/YasmeenBadr"><b>Yasmeen Badr</b></a>
       </td>
       <td align="center" width="300">
-        <img src="docs/images/Malak Saad.jpg" width="260" height="150"><br>
+        <img src="docs/images/Malak Saad.jpg" width="260" height="180"><br>
         <a href="https://github.com/Malaksaad14"><b>Malak Saad</b></a>
       </td>
       <td align="center" width="280">
-        <img src="docs/images/Olivia Morkos.jpg" width="260" height="150"><br>
+        <img src="docs/images/Olivia Morkos.jpg" width="260" height="180"><br>
         <a href="https://github.com/oliviamorkos"><b>Olivia Morkos</b></a>
       </td>
       <td align="center" width="280">
-        <img src="docs/images/Amany Othman.jpg" width="260" height="150"><br>
+        <img src="docs/images/Amany Othman.jpg" width="260" height="180"><br>
         <a href="https://github.com/Amany-Othman"><b>Amany Othman</b></a>
       </td>
     </tr>
