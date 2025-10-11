@@ -156,154 +156,70 @@ Full source code and implementation details are available in its dedicated repos
 ---
 
 
+ECG Real-Time Viewer
+=====================
 
-## ❤️ ECG Real-Time Viewer
+This repository contains a Flask-based ECG real-time viewer and lightweight model prototypes for detecting abnormalities using both 1D time-domain signals and 2D recurrence-image representations.
 
 Highlights
-
+----------
 - Live streaming ECG visualization (time domain, XOR diff, polar, recurrence colormap) using Plotly.
-
-- Drag & drop upload of WFDB records (.hea, .dat, .xyz) to visualize and evaluate signals.
-
+- Drag & drop upload of WFDB records (.hea/.dat/.xyz) to visualize and evaluate signals.
 - Lightweight 1D CNN classifier (SimpleECG) for time-domain prediction.
-
-- Lightweight 2D CNN classifier (Simple2DCNN) trained on recurrence-style 2D histograms from two-channel pairs.
-
-- Background training of the 2D model when labeled data is uploaded; recurrence data saved in results/recurrence_data/.
+- Lightweight 2D CNN classifier (Simple2DCNN) trained on recurrence-style 2D histograms generated from two-channel pairs.
+- Background training of the 2D model on uploaded WFDB records (if .hea contains labels); recurrence data is saved to `results/recurrence_data/`.
 
 Setup and Installation
+----------
 
-Clone the Repository
+1. Clone the Repository:
 
-Bash
+   ```bash
+   git clone https://github.com/YasmeenBadr/Task_1_DSP.git
 
-```bash
-git clone https://github.com/YasmeenBadr/Task_1_DSP.git
-```
 
-Navigate to the Project Directory
+2. Navigate to the Project Directory:
 
-Bash
+   ```bash
+   cd Task_1_DSP
 
-```bash
-cd Task_1_DSP
-```
 
-Install Required Dependencies
+3. Install Required Dependencies:
 
-Bash
+   ```bash
+   pip install -r requirements.txt
 
-```bash
-pip install -r requirements.txt
-```
 
-Run the Application
+4. Run the Application:
 
-Bash
+   ```bash
+   python app.py
 
-```bash
-python app.py
-```
 
 After running, open your browser and go to:
-
 👉 http://127.0.0.1:5000/ecg
 
-Files of Interest
+Files of interest
+-----------------
+- `app.py` — Flask app bootstrap (registers the `ecg` blueprint).
+- `signals/ecg.py` — Core streaming logic, prediction wrappers, recurrence image builder, and 2D training hooks.
+- `templates/ecg.html` — Frontend UI, Plotly plots, controls (channel selection, XOR threshold, polar mode), drag & drop upload.
+- `models/` — training artifacts and model weights (if present).
+- `results/recurrence_data/` — CSV exports of the two-channel recurrence data saved prior to 2D training.
 
-File	Description
-app.py	Flask app bootstrap (registers the ECG blueprint).
-signals/ecg.py	Core streaming logic, prediction wrappers, recurrence image builder, and 2D training hooks.
-templates/ecg.html	Frontend UI, Plotly plots, controls (channel selection, XOR threshold, polar mode), drag & drop upload.
-models/	Training artifacts and model weights (if present).
-results/recurrence_data/	CSV exports of recurrence data saved before 2D training.
+How it works
+------------
+- The browser polls `/ecg/update` with selected channels and visualization options. The server returns downsampled time series, XOR diffs (for single-channel), polar data, recurrence colormap data (for 2 channels), and predictions.
+- 1D predictions: a rolling per-channel buffer is accumulated and passed to a small 1D CNN to predict Normal/Abnormal. Predictions are smoothed over a short window.
+- 2D predictions: recurrence images are generated from two-channel pairs and used for a separate 2D CNN. Training runs in a background thread when a WFDB record with labels is loaded.
 
-Export to Sheets
+Developer notes & tuning
+------------------------
+- Smoothing window: `SMOOTH_WINDOW` in `signals/ecg.py` controls temporal averaging of probabilities.
+- Minimum samples: `MIN_PRED_LEN` controls when the 1D model will run (helps avoid padding bias).
+- Recurrence CSVs are written to `results/recurrence_data/` before training; useful for reproducibility.
 
-How It Works
 
-The browser polls /ecg/update with selected channels and visualization options.
+Videos & screenshots
+------------------------
 
-The server returns:
-
-Downsampled time series
-
-XOR diffs (for single-channel)
-
-Polar data
-
-Recurrence colormap data (for two channels)
-
-Predictions from 1D and 2D models
-
-Prediction Flow:
-
-1D Predictions:
-A rolling per-channel buffer is passed to a small 1D CNN to predict Normal/Abnormal. Predictions are smoothed over a short window.
-
-2D Predictions:
-Recurrence images are generated from two-channel pairs and used for a separate 2D CNN.
-
-Training runs in a background thread when labeled WFDB records are loaded.
-
-Developer Notes & Tuning
-
-Parameter	Description
-SMOOTH_WINDOW	Controls temporal averaging of probabilities.
-MIN_PRED_LEN	Minimum samples before 1D model runs (prevents padding bias).
-results/recurrence_data/	Stores CSV recurrence data for reproducibility.
-
-Export to Sheets
-
-Application Interface
-
-Preview	Description
-ECG dashboard with multiple visualization options	Recurrence plot and real-time prediction
-
-Export to Sheets
-
-### Videos & Screenshots
-
-Below are demo videos and example screenshots for the ECG Real-Time Viewer. Replace the placeholders with your actual URLs or local image paths.
-
-- Demo Video 1: https://github.com/user-attachments/assets/3347061f-21d7-40a4-aa6c-54c7df7f7570
-- Demo Video 2: https://github.com/user-attachments/assets/fa16a8ff-3014-48c1-a356-1e56812666d5
-
-Screenshots (place image files in `docs/images/` or `uploads/` and reference them with the relative path):
-
-<img width="1335" height="562" alt="Screenshot 2025-10-11 001541" src="https://github.com/user-attachments/assets/af41933f-1758-4421-ab8a-1e4141efc931" />
-*Figure: ECG Viewer displaying the time-domain plot.*
-
-<img width="866" height="654" alt="Screenshot 2025-10-11 001508" src="https://github.com/user-attachments/assets/c1a4578d-51c0-4b03-8e02-a2f6ca763c0b" />
-*Figure: ECG Viewer showing a recurrence colormap used for 2D model input.*
-
-🌊 Acoustic Signal Viewer (Coming Soon)
-Vehicle-passing Doppler effect simulator and detector
-
-Drone/submarine sound identification models
-
-📡 RF Signal Viewer (Coming Soon)
-SAR/Cosmic signal visualization and analysis tools
-
-🛠️ Installation
-Ensure you have Python 3.9+ and install all dependencies:
-
-Bash
-
-```bash
-pip install -r requirements.txt
-```
-
-Supports both CPU and CUDA-enabled GPU environments.
-
-👥 Contributors
-
-Yasmeen Badr — EEG & ECG Viewer Development, Model Integration
-
-Team Members — Signal Processing, Model Fine-tuning, Visualization
-
-📄 License
-
-This project is released under the MIT License.
-
-See LICENSE for more details.
