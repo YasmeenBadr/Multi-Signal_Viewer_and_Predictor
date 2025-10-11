@@ -189,6 +189,8 @@ This repository contains a Flask-based ECG real-time viewer and lightweight mode
 ![ECG Viewer Demo 3](ECG/xor.png)
 *ECG XOR graph Viewer.*
 
+---
+
 ### Smart Data Handling
 - Supports drag-and-drop upload of **WFDB records** (`.hea`, `.dat`, `.xyz`).
 - Automatically extracts **sampling frequency**, **channel names**, and **diagnostic metadata**.
