@@ -3,55 +3,141 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>ECG Real-Time Viewer</title>
+  <title>Real-Time ECG Viewer</title>
   <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"/>
-  <style>
-    body {
-      background:#000;
-      color:#e0e0e0;
-      font-family: Inter, sans-serif;
-    }
-    .sidebar {
-      background:#1e1e1e;
-      padding:18px;
-      border-radius:10px;
-    }
-    .plot-container {
-      background:#111;
-      padding:12px;
-      border-radius:10px;
-      margin-bottom:16px;
-    }
-    .prediction-box {
-      background:#111;
-      padding:12px;
-      border-radius:10px;
-      text-align:center;
-    }
-    .prediction-result {
-      font-weight:700;
-      color:#00ff88;
-    }
-    .disease-name {
-      color:#ff6666;
-      font-weight:600;
-      margin-top:6px;
-    }
-  </style>
+<style>
+  /* General body and sidebar */
+  body {
+    background: #000;
+    color: #e0e0e0;
+    font-family: Inter, sans-serif;
+  }
+
+  .sidebar {
+    background: #030000;
+    padding: 18px;
+    border-radius: 10px;
+    max-height: 95vh;
+    overflow-y: auto; /* scrollable sidebar */
+  }
+
+  .plot-container {
+    background: #000000;
+    padding: 12px;
+    border-radius: 10px;
+    margin-bottom: 16px;
+  }
+
+  .prediction-box {
+    background: #111;
+    padding: 12px;
+    border-radius: 10px;
+    text-align: center;
+  }
+
+  .prediction-result {
+    font-weight: 700;
+    color: #00f7ff;
+  }
+
+  .disease-name {
+    color: #ca1414;
+    font-weight: 600;
+    margin-top: 6px;
+  }
+
+  /* Buttons */
+  .btn-primary {
+    background: #000000;
+    border: 1px solid#00f7ff;
+    font-weight: 600;
+  }
+  
+  .btn-primary:hover {
+    background: #4cdbff;
+    border-color: #00e1ff;
+    color: #000;
+  }
+
+  .btn-secondary {
+    background: #333;
+    border: 1px solid #00f2ff;
+    color: #00ffe5;
+  }
+  .btn-secondary:hover {
+    background: #444;
+    border-color: #00eeff;
+    color: #00fbff;
+  }
+
+  /* Drop zone */
+  #dropZone {
+    border: 2px dashed #00f7ff;
+    padding: 12px;
+    border-radius: 8px;
+    background: #0e0e0e;
+    color: #ccc;
+    text-align: center;
+  }
+  #pickFiles {
+    color:#00f7ff;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+  #pickFiles:hover {
+    color: #00ffaa;
+  }
+
+  /* Form inputs and selects */
+  input.form-control, select.form-select {
+    background: #222;
+    color: #00f7ff;
+    border: 1px solid #00f7ff;
+  }
+
+  input.form-control:focus, select.form-select:focus {
+    border-color: #00f7ff;
+    box-shadow: 0 0 8px #00f7ff;
+  }
+
+  /* Labels */
+  label.form-label {
+    color:#00f7ff;
+    font-weight: 500;
+  }
+
+  .form-check-label {
+    color: #ccc;
+  }
+
+  .form-text {
+    color: #888;
+  }
+
+  /* Heading */
+  h1 {
+    color: #00f7ff;
+    text-align: center;
+    font-weight: 800;
+    margin-bottom: 24px;
+  }
+</style>
 </head>
-<body class="container-fluid p-4">
+<body class="min-h-screen bg-primary-bg text-text-light p-4">
+<div class="container mx-auto">
+  <h1 class="text-3xl font-extrabold mb-6 text-center" style="color:#00eaff;">Real-Time ECG Viewer</h1>
   <div class="row">
     <div class="col-md-3 sidebar">
       <h5>ECG Controls</h5>
-  <form id="channelForm">
+      <form id="channelForm">
         <div class="mb-2">
-          <div class="mb-2">
-            <label class="form-label">Speed (updates/sec)</label>
-            <input id="speedControl" class="form-control bg-dark text-white" type="number" min="0.5" max="5" step="0.1" value="1" />
-          </div>
+          <label class="form-label">Speed (updates/sec)</label>
+          <input id="speedControl" class="form-control" type="number" min="0.5" max="5" step="0.1" value="1" />
+        </div>
+        <div class="mb-2">
           <label class="form-label">Window width (seconds)</label>
-          <input id="width" class="form-control bg-dark text-white" type="number" min="0.5" step="0.5" value="5"/>
+          <input id="width" class="form-control" type="number" min="0.5" step="0.5" value="5"/>
         </div>
         <div class="mb-2">
           <label class="form-label">Select Channels</label>
@@ -59,12 +145,12 @@
         </div>
         <div class="mb-2">
           <label class="form-label">Upload .hea/.dat (drag & drop)</label>
-          <div id="dropZone" style="border:2px dashed #444; padding:12px; border-radius:8px; background:#0e0e0e; color:#cfcfcf; text-align:center;">Drop files here or <a href="#" id="pickFiles">choose files</a></div>
+          <div id="dropZone">Drop files here or <a href="#" id="pickFiles">choose files</a></div>
           <input id="filePicker" type="file" accept=".hea,.dat,.xyz" multiple style="display:none;" />
         </div>
         <div class="mb-2">
           <label class="form-label">Recurrence Colormap</label>
-          <select id="colormapSelect" class="form-select bg-dark text-white">
+          <select id="colormapSelect" class="form-select">
             <option value="Jet">Jet</option>
             <option value="Viridis">Viridis</option>
             <option value="Hot">Hot</option>
@@ -73,7 +159,7 @@
         </div>
         <div class="mb-2">
           <label class="form-label">Display</label>
-          <select id="displaySelect" class="form-select bg-dark text-white">
+          <select id="displaySelect" class="form-select">
             <option value="Time" selected>Time</option>
             <option value="XOR">XOR</option>
             <option value="Polar">Polar</option>
@@ -86,33 +172,39 @@
           <div id="predictionDescription" style="margin-top:8px; color:#ccc; font-size:0.9rem;"></div>
           <div id="diseaseName" class="disease-name"></div>
         </div>
-        <button class="btn btn-primary w-100" type="submit">Start Streaming</button>
+        <button class="btn btn-primary w-100" style="color:#00eaff;" type="submit">Start Streaming</button>
         <button id="stopBtn" class="btn btn-secondary w-100 mt-2" type="button">Stop</button>
       </form>
     </div>
+
     <div class="col-md-9">
+      <!-- Time plot -->
       <div class="plot-container">
-        <div id="timePlot" style="width:100%;height:300px;"></div>
+        <div id="timePlot" style="width:100%;height:450px;"></div>
       </div>
+
+      <!-- XOR plot -->
       <div class="row">
         <div class="col-12 plot-container">
           <div style="display:flex; gap:12px; align-items:flex-start;">
             <div id="xorPlot" style="flex:1; width:100%; height:300px;"></div>
             <div style="width:220px;">
               <label class="form-label">XOR Threshold</label>
-              <input id="xorThreshold" class="form-control bg-dark text-white" type="number" step="0.01" value="0.05" />
+              <input id="xorThreshold" class="form-control" type="number" step="0.01" value="0.05" />
               <div class="form-text text-muted" style="color:#bbb;">Only show XOR when abs(curr - prev) &gt; threshold</div>
             </div>
           </div>
         </div>
       </div>
+
+      <!-- Polar plot -->
       <div class="row">
         <div class="col-12 plot-container">
           <div style="display:flex; gap:12px; align-items:flex-start;">
             <div id="polarPlot" style="flex:1; width:100%; height:450px;"></div>
             <div style="width:220px;">
               <label class="form-label">Polar Mode</label>
-              <select id="polarModeSelect" class="form-select bg-dark text-white">
+              <select id="polarModeSelect" class="form-select">
                 <option value="fixed">Fixed (current chunk)</option>
                 <option value="cumulative">Cumulative</option>
               </select>
@@ -120,23 +212,26 @@
           </div>
         </div>
       </div>
+
+      <!-- Recurrence plot -->
       <div class="plot-container mt-3">
         <div id="recurrenceScatterPlot" style="width:100%;height:300px;"></div>
       </div>
-      
     </div>
   </div>
+</div>
 
 <script>
 let streaming=false, intervalId=null;
-let updateSpeed=1; // updates per second
-let allChannels=[], selectedChannels=[], widthSec=5;
+let updateSpeed=1, allChannels=[], selectedChannels=[], widthSec=5;
 let fs=360, displayFs=200;
 let channelData={}, globalStart=0;
 let colormap="Jet";
 let polarMode = "fixed";
 let currentDisplay = 'All';
+let filesUploaded = false;
 
+// Initialize channel config
 async function initConfig(){
   try{
     const cfg = await fetch("/ecg/config").then(r=>r.json());
@@ -159,20 +254,20 @@ async function initConfig(){
 initConfig();
 
 document.getElementById("colormapSelect").addEventListener("change",(ev)=>{ colormap=ev.target.value; });
-// polarModeSelect and xorThreshold now live next to their plots
-const polarModeSelect = document.getElementById("polarModeSelect");
-if(polarModeSelect) polarModeSelect.addEventListener("change", (ev)=>{ polarMode = ev.target.value; });
+document.getElementById("polarModeSelect").addEventListener("change", (ev)=>{ polarMode = ev.target.value; });
 const xorThresholdInput = document.getElementById('xorThreshold');
 
-// Drag & drop file upload
 const dropZone = document.getElementById('dropZone');
 const filePicker = document.getElementById('filePicker');
 document.getElementById('pickFiles').addEventListener('click', (e)=>{ e.preventDefault(); filePicker.click(); });
 
 ['dragenter','dragover','dragleave','drop'].forEach(evt => dropZone.addEventListener(evt, e=>e.preventDefault()));
-dropZone.addEventListener('dragover', ()=> dropZone.style.borderColor = '#888');
-dropZone.addEventListener('dragleave', ()=> dropZone.style.borderColor = '#444');
-dropZone.addEventListener('drop', (e)=>{ dropZone.style.borderColor='#444'; handleFiles(e.dataTransfer.files); });
+dropZone.addEventListener('dragover', ()=> dropZone.style.borderColor = '#88cc88');
+dropZone.addEventListener('dragleave', ()=> dropZone.style.borderColor = '#00eaff');
+dropZone.addEventListener('drop', (e)=>{
+  dropZone.style.borderColor='#00eaff';
+  handleFiles(e.dataTransfer.files);
+});
 filePicker.addEventListener('change', (e)=> handleFiles(e.target.files));
 
 function handleFiles(fileList){
@@ -184,22 +279,24 @@ function handleFiles(fileList){
     .then(r=>r.json())
     .then(j=>{
       if(j && j.success){
+        filesUploaded = true;
         dropZone.innerText = 'Upload successful';
-        // refresh channel list/config
         setTimeout(()=>{ initConfig(); dropZone.innerText = 'Drop files here or choose files'; }, 800);
       } else {
+        filesUploaded = false;
         dropZone.innerText = 'Upload failed';
         alert('Upload failed: ' + (j && j.error ? j.error : JSON.stringify(j)));
         setTimeout(()=> dropZone.innerText = 'Drop files here or choose files', 1200);
       }
     }).catch(err=>{
       console.error(err);
+      filesUploaded = false;
       dropZone.innerText = 'Upload error';
       setTimeout(()=> dropZone.innerText = 'Drop files here or choose files', 1200);
     });
 }
 
-// Display controls: show/hide containers
+// Display selection
 const containers = {
   'Time': document.getElementById('timePlot').parentElement,
   'XOR': document.getElementById('xorPlot').parentElement,
@@ -209,50 +306,36 @@ const containers = {
 const displaySelect = document.getElementById('displaySelect');
 function applyDisplaySelection(val){
   currentDisplay = val;
-  // default sizes
-  const sizes = {
-    'Time': '450px',
-    'XOR': '450px',
-    'Polar': '650px',
-    'Recurrence': '550px'
-  };
-  Object.keys(containers).forEach(k => {
-    const plotId = (k === 'Time') ? 'timePlot' : (k === 'XOR') ? 'xorPlot' : (k === 'Polar') ? 'polarPlot' : 'recurrenceScatterPlot';
+  const sizes = {'Time':'450px','XOR':'300px','Polar':'450px','Recurrence':'300px'};
+  Object.keys(containers).forEach(k=>{
+    const plotId = (k==='Time')?'timePlot':(k==='XOR')?'xorPlot':(k==='Polar')?'polarPlot':'recurrenceScatterPlot';
     const plotDiv = document.getElementById(plotId);
-    if(k === currentDisplay){
-      containers[k].style.display = 'block';
-      if(plotDiv) plotDiv.style.height = sizes[k] || '500px';
-      try{ if(plotDiv) Plotly.relayout(plotId, {height: parseInt((sizes[k]||'500px'))}); }catch(e){}
-    } else {
-      containers[k].style.display = 'none';
-    }
+    if(k===currentDisplay){
+      containers[k].style.display='block';
+      if(plotDiv) plotDiv.style.height=sizes[k]||'500px';
+      try{ if(plotDiv) Plotly.relayout(plotId,{height:parseInt(sizes[k]||'500px')}); }catch(e){}
+    } else { containers[k].style.display='none'; }
   });
 }
-displaySelect.addEventListener('change', (e) => applyDisplaySelection(e.target.value));
-// apply initial selection
+displaySelect.addEventListener('change', (e)=> applyDisplaySelection(e.target.value));
 applyDisplaySelection(displaySelect.value || 'Time');
 
-  document.getElementById("channelForm").addEventListener("submit", ev=>{
+// Form submit
+document.getElementById("channelForm").addEventListener("submit", ev=>{
   ev.preventDefault();
-  selectedChannels=Array.from(document.querySelectorAll("input[name=channels]:checked")).map(n=>parseInt(n.value));
-  widthSec=parseFloat(document.getElementById("width").value)||5;
-  updateSpeed=parseFloat(document.getElementById("speedControl").value)||1;
+  if(!filesUploaded){ alert("Upload files first!"); return; }
+
+  selectedChannels = Array.from(document.querySelectorAll("input[name=channels]:checked")).map(n=>parseInt(n.value));
+  widthSec = parseFloat(document.getElementById("width").value)||5;
+  updateSpeed = parseFloat(document.getElementById("speedControl").value)||1;
   if(selectedChannels.length===0){ alert("Select channel(s)"); return; }
 
-  // allow any number of channels for time and polar plots
-  channelData={};
-  globalStart=0;
+  channelData={}; globalStart=0;
   selectedChannels.forEach(ch=>channelData[ch]=[]);
   initPlots(selectedChannels);
   streaming=true;
   if(intervalId) clearInterval(intervalId);
   intervalId=setInterval(fetchData,1000/updateSpeed);
-  // note: XOR will show only if 1 channel selected; recurrence only when exactly 2 channels
-  if(selectedChannels.length>2){
-    // optional gentle notice
-    console.info('More than 2 channels selected: XOR and recurrence plots will remain for 1 and 2 channels respectively.');
-  }
-  
 });
 
 document.getElementById("stopBtn").addEventListener("click", ()=>{
@@ -260,60 +343,56 @@ document.getElementById("stopBtn").addEventListener("click", ()=>{
   if(intervalId) clearInterval(intervalId);
 });
 
-document.getElementById("speedControl").addEventListener("change", ev => {
-  updateSpeed = parseFloat(ev.target.value) || 1;
+document.getElementById("speedControl").addEventListener("change", ev=>{
+  updateSpeed = parseFloat(ev.target.value)||1;
   if(streaming){
     if(intervalId) clearInterval(intervalId);
-    intervalId = setInterval(fetchData, 1000/updateSpeed);
+    intervalId=setInterval(fetchData,1000/updateSpeed);
   }
 });
 
+// Initialize plots
 function initPlots(channels){
-  // Create time traces but hide per-trace legends so only the plot title appears
-  const timeTraces=channels.map(ch=>({x:[],y:[],mode:"lines",name:"",line:{width:1.5}, showlegend:false, hoverinfo:'none'}));
-  Plotly.newPlot("timePlot",timeTraces,{
-    title: 'Real-time ECG (time domain)',
+  const timeTraces = channels.map(ch=>({
+    x:[], y:[], mode:"lines", name:"",
+    line:{width:1.5}, showlegend:false, hoverinfo:'none'
+  }));
+
+  Plotly.newPlot("timePlot", timeTraces, {
+    title:'Real-time ECG (time domain)',
     paper_bgcolor:"#000", plot_bgcolor:"#000", font:{color:"#e0e0e0"},
     xaxis:{title:"Time (s)", range:[0,widthSec], gridcolor:"#333"},
-    yaxis:{title:"Amplitude", gridcolor:"#333"},
-    showlegend: false
+    yaxis:{title:"Amplitude", gridcolor:"#333", autorange:true},
+    showlegend:false
   });
 
-  // XOR plot: only if 1 channel
   if(channels.length===1){
-  const xorTraces=[{x:[],y:[],mode:"lines",name:"", showlegend:false, hoverinfo:'none'}];
-    Plotly.newPlot("xorPlot",xorTraces,{
-      title: `XOR Graph`,
-      paper_bgcolor:"#000", plot_bgcolor:"#000", font:{color:"#e0e0e0"},
-      xaxis:{title:"Time (s)", range:[0,widthSec*4]},
-      yaxis:{title:"XOR Amplitude"},
-      showlegend:false
-    });
+    Plotly.newPlot("xorPlot", [{x:[],y:[],mode:"lines",showlegend:false,hoverinfo:'none'}],
+      {title:'XOR Graph', paper_bgcolor:"#000", plot_bgcolor:"#000", font:{color:"#e0e0e0"}, showlegend:false});
   }
 
-  // hide per-trace names in polar as well — show only plot title
-  const polarTraces=channels.map(ch=>({r:[],theta:[],mode:"lines",type:"scatterpolar",name:"", showlegend:false, hoverinfo:'none'}));
-  Plotly.newPlot("polarPlot",polarTraces,{title: 'Polar Plot', paper_bgcolor:"#000",font:{color:"#e0e0e0"}, showlegend:false});
+  const polarTraces = channels.map(ch=>({r:[],theta:[],mode:"lines",type:"scatterpolar",name:"",showlegend:false,hoverinfo:'none'}));
+  Plotly.newPlot("polarPlot", polarTraces, {title:'Polar Plot', paper_bgcolor:"#000", font:{color:"#e0e0e0"}, showlegend:false});
 
-  // Recurrence: only if 2 channels
   if(channels.length===2){
-    Plotly.newPlot("recurrenceScatterPlot",[{ z: [], type: "heatmap", colorscale: colormap }],
-      {title: 'Recurrence', paper_bgcolor:"#000", plot_bgcolor:"#000", font:{color:"#e0e0e0"}, showlegend:false});
+    Plotly.newPlot("recurrenceScatterPlot", [{ z:[], type:"heatmap", colorscale:colormap }],
+      {title:'Recurrence', paper_bgcolor:"#000", plot_bgcolor:"#000", font:{color:"#e0e0e0"}, showlegend:false});
   }
 }
 
+// Fetch ECG data
 async function fetchData(){
   if(!streaming) return;
-    try{
-  const xorThresholdVal = xorThresholdInput ? (parseFloat(xorThresholdInput.value) || 0.05) : (parseFloat('0.05') || 0.05);
-    const resp=await fetch("/ecg/update",{
+  try{
+    const xorThresholdVal = xorThresholdInput ? parseFloat(xorThresholdInput.value)||0.05 : 0.05;
+    const resp = await fetch("/ecg/update", {
       method:"POST",
       headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({channels:selectedChannels,width:widthSec, polar_mode: polarMode, xor_threshold: xorThresholdVal})
+      body:JSON.stringify({channels:selectedChannels,width:widthSec, polar_mode:polarMode, xor_threshold:xorThresholdVal})
     });
     if(!resp.ok) throw new Error("HTTP "+resp.status);
-    const result=await resp.json();
-    const plotFs=displayFs, maxSamples=Math.round(widthSec*plotFs);
+    const result = await resp.json();
+    const plotFs = displayFs, maxSamples=Math.round(widthSec*plotFs);
 
     selectedChannels.forEach((ch,idx)=>{
       const chunk=result.signals[String(ch)]||[];
@@ -324,81 +403,54 @@ async function fetchData(){
         if(idx===0) globalStart+=drop/plotFs;
       }
       const xvals=channelData[ch].map((_,i)=>globalStart+i/plotFs);
-      if(currentDisplay === 'All' || currentDisplay === 'Time'){
-        Plotly.restyle("timePlot",{x:[xvals],y:[channelData[ch]]},[idx]);
-      }
+      if(currentDisplay==='All'||currentDisplay==='Time') Plotly.restyle("timePlot",{x:[xvals],y:[channelData[ch]]},[idx]);
     });
-    Plotly.relayout("timePlot",{"xaxis.range":[globalStart,globalStart+widthSec]});
+    Plotly.relayout("timePlot",{"xaxis.range":[globalStart,globalStart+widthSec], "yaxis.autorange":true});
 
-    // XOR: only for 1 channel
     if(selectedChannels.length===1){
-      const chXOR = selectedChannels[0];
-      const xorChunk = result.xor[String(chXOR)] || [];
-      const xvalsXOR = xorChunk.map((_, i) => globalStart + i / plotFs);
-      if(currentDisplay === 'All' || currentDisplay === 'XOR'){
-        Plotly.restyle("xorPlot", { x: [xvalsXOR], y: [xorChunk] }, [0]);
+      const chXOR=selectedChannels[0];
+      const xorChunk=result.xor[String(chXOR)]||[];
+      const xvalsXOR=xorChunk.map((_,i)=>globalStart+i/plotFs);
+      if(currentDisplay==='All'||currentDisplay==='XOR'){
+        Plotly.restyle("xorPlot",{x:[xvalsXOR],y:[xorChunk]},[0]);
         if(xvalsXOR.length>0){
-          const xMin = xvalsXOR[0], xMax = xvalsXOR[xvalsXOR.length - 1];
-          let yMin=0, yMax=0;
-          if(xorChunk.length>0){
-            yMin = Math.min(...xorChunk)-0.01;
-            yMax = Math.max(...xorChunk)+0.01;
-          }
-          Plotly.relayout("xorPlot", { "xaxis.range": [xMin, xMax], "yaxis.range": [yMin, yMax] });
+          const xMin=xvalsXOR[0], xMax=xvalsXOR[xvalsXOR.length-1];
+          let yMin=0,yMax=0;
+          if(xorChunk.length>0){ yMin=Math.min(...xorChunk)-0.01; yMax=Math.max(...xorChunk)+0.01; }
+          Plotly.relayout("xorPlot", {"xaxis.range":[xMin,xMax], "yaxis.range":[yMin,yMax]});
         }
       }
     }
 
-    const rArr=[],thetaArr=[];
-    selectedChannels.forEach((ch, idx)=>{
+    const rArr=[], thetaArr=[];
+    selectedChannels.forEach(ch=>{
       const polar=result.polar[String(ch)]||{r:[],theta:[]};
-      // For cumulative mode, polar.r may be longer; Plotly.restyle expects arrays matching traces
-      rArr.push(polar.r);
-      thetaArr.push(polar.theta);
+      rArr.push(polar.r); thetaArr.push(polar.theta);
     });
-    if(currentDisplay === 'All' || currentDisplay === 'Polar'){
-      Plotly.restyle("polarPlot",{r:rArr,theta:thetaArr});
-    }
+    if(currentDisplay==='All'||currentDisplay==='Polar') Plotly.restyle("polarPlot",{r:rArr,theta:thetaArr});
 
-    // Recurrence: only for 2 channels
     if(selectedChannels.length===2){
       const colormapData=result.colormap||[];
-      if(currentDisplay === 'All' || currentDisplay === 'Recurrence'){
-        Plotly.restyle("recurrenceScatterPlot",{z:[colormapData], colorscale: colormap});
+      if(currentDisplay==='All'||currentDisplay==='Recurrence') Plotly.restyle("recurrenceScatterPlot",{z:[colormapData], colorscale:colormap});
+    }
+
+    // Update predictions
+    if(filesUploaded){
+      const pred=result.prediction||{};
+      let disp=null;
+      if(pred && typeof pred==='object'){ disp=pred.smoothed||pred.raw||pred; }
+      if(!disp || !disp.label){
+        document.getElementById("predictionResult").innerText="N/A";
+        document.getElementById("predictionDescription").innerText="";
+        document.getElementById("diseaseName").innerText="";
+      } else {
+        document.getElementById("predictionResult").innerText = disp.label || "N/A";
+        document.getElementById("predictionDescription").innerText = disp.description || "";
+        document.getElementById("diseaseName").innerText = disp.disease_name || "";
       }
     }
 
-    // Prediction: server may return { raw: {...}, smoothed: {...} } or the old flat object
-    const pred = result.prediction || {};
-    // choose smoothed if available, otherwise raw, otherwise pred itself
-    let disp = null;
-    if(pred && typeof pred === 'object'){
-      if(pred.smoothed) disp = pred.smoothed;
-      else if(pred.raw) disp = pred.raw;
-      else disp = pred;
-    }
-    if(!disp || !disp.label){
-      document.getElementById("predictionResult").innerText = "N/A";
-      document.getElementById("predictionDescription").innerText = "";
-      document.getElementById("diseaseName").innerText = "";
-    } else {
-      document.getElementById("predictionResult").innerText = disp.label || "N/A";
-      document.getElementById("predictionDescription").innerText = disp.description || "";
-      document.getElementById("diseaseName").innerText = disp.disease_name || disp.disease_name || "";
-    }
-    // Recurrence prediction (2D model), show confidence if available
-    try{
-      const rec = result.recurrence_prediction;
-      if(rec && rec.label){
-        // append recurrence info to the description area
-        const descEl = document.getElementById("predictionDescription");
-        const prev = descEl.innerText || "";
-        const recTxt = `Recurrence: ${rec.label} (conf=${(rec.confidence||0).toFixed(2)})`;
-        descEl.innerText = prev ? prev + " | " + recTxt : recTxt;
-      }
-    }catch(e){/* ignore */}
-
-  }catch(err){
+  } catch(err){
     console.error(err);
     streaming=false;
     if(intervalId) clearInterval(intervalId);
