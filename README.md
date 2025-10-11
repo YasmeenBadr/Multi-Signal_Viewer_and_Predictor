@@ -149,7 +149,7 @@ The following datasets were used for training and evaluation of the disease clas
 - Sleep disorder: https://www.physionet.org/content/sleep-edfx/1.0.0/
 - Parkinson: https://www.kaggle.com/datasets/s3programmer/parkison-diseases-eeg-dataset
 
-Full source code and implementation details are available in its dedicated repository:
+Our full source code and implementation details we made are available in its dedicated repository:
 
 🔗 **[EEGPT Disease Classification Repository](https://github.com/YasmeenBadr/EEG-Model_for_disease_classification)**
 
