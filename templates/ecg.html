@@ -192,6 +192,7 @@
           <h6>Prediction</h6>
           <div id="predictionResult" class="prediction-result">Waiting for data...</div>
           <div id="predictionDescription" style="margin-top:8px; color:#ccc; font-size:0.9rem;"></div>
+          <div id="recurrencePrediction" class="text-info" style="margin-top:8px; font-size:0.9rem;"></div>
           <div id="diseaseName" class="disease-name"></div>
         </div>
         <button class="btn btn-primary w-100" style="color:#00eaff;" type="submit">Start Streaming</button>
@@ -451,28 +452,66 @@ async function fetchData(){
       if(currentDisplay==='All'||currentDisplay==='Recurrence') Plotly.restyle("recurrenceScatterPlot",{z:[colormapData], colorscale:colormap});
     }
 
-    if(filesUploaded){
-      const pred=result.prediction||{};
-      let disp=null;
-      if(pred && typeof pred==='object'){ disp=pred.smoothed||pred.raw||pred; }
-      if(!disp || !disp.label){
-        document.getElementById("predictionResult").innerText="N/A";
-        document.getElementById("predictionDescription").innerText="";
-        document.getElementById("diseaseName").innerText="";
-      } else {
-        document.getElementById("predictionResult").innerText = disp.label || "N/A";
-        document.getElementById("predictionDescription").innerText = disp.description || "";
-        document.getElementById("diseaseName").innerText = disp.disease_name || "";
-      }
-    }
+   // === Restored + clearer prediction logic ===
+if(filesUploaded){
+  const pred=result.prediction||{};
+  const rec=result.recurrence_prediction||{};
+  const predRes=document.getElementById("predictionResult");
+  const predDesc=document.getElementById("predictionDescription");
+  const recEl=document.getElementById("recurrencePrediction");
+  const diseaseEl=document.getElementById("diseaseName");
 
-  } catch(err){
+  // --- Normal ECG prediction ---
+  let disp=(pred&&typeof pred==='object')?(pred.smoothed||pred.raw||pred):null;
+  if(!disp||!disp.label){
+    predRes.innerText="N/A";
+    predDesc.innerText="";
+    diseaseEl.innerText="";
+  }else{
+    predRes.innerText=disp.label||"N/A";
+    predDesc.innerText=disp.description||"";
+    diseaseEl.innerText=disp.disease_name||"";
+  }
+
+  // --- Recurrence prediction ---
+  if(rec&&rec.label){
+    const conf=rec.confidence!==undefined?` (Confidence: ${(rec.confidence*100).toFixed(1)}%)`:"";
+    recEl.innerText=`Recurrence Prediction: ${rec.label}${conf}`;
+  }else{
+    recEl.innerText="";
+  }
+}
+}catch(err){
     console.error(err);
     streaming=false;
     if(intervalId) clearInterval(intervalId);
     alert("Connection lost or server error — check console.");
   }
 }
+    // === Restored prediction logic ===
+    if(filesUploaded){
+      const pred=result.prediction||{};
+      let disp=(pred&&typeof pred==='object')?(pred.smoothed||pred.raw||pred):null;
+      if(!disp||!disp.label){
+        document.getElementById("predictionResult").innerText="N/A";
+        document.getElementById("predictionDescription").innerText="";
+        document.getElementById("diseaseName").innerText="";
+      }else{
+        document.getElementById("predictionResult").innerText=disp.label||"N/A";
+        document.getElementById("predictionDescription").innerText=disp.description||"";
+        document.getElementById("diseaseName").innerText=disp.disease_name||"";
+      }
+      try{
+        const rec=result.recurrence_prediction;
+        if(rec&&rec.label){
+          const descEl=document.getElementById("predictionDescription");
+          const prev=descEl.innerText||"";
+          const recTxt=`Recurrence: ${rec.label} (conf=${(rec.confidence||0).toFixed(2)})`;
+          descEl.innerText=prev?prev+" | "+recTxt:recTxt;
+        }
+      }catch(e){}
+    }
+
 </script>
 </body>
 </html>
