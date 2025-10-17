@@ -175,6 +175,48 @@
             color: var(--text-muted);
             font-size: 13px;
         }
+
+
+        .custom-label {
+            color: var(--text-light);
+        }
+
+        .custom-text {
+            color: var(--text-light);
+        }
+
+
+        audio {
+            background-color: #1A1A1A;
+            border: 1px solid var(--glass-border);
+            border-radius: 8px;
+            padding: 5px;
+            filter: brightness(0.9) saturate(1.2);
+        }
+
+        audio::-webkit-media-controls-panel {
+            background-color: #1A1A1A;
+        }
+
+        audio::-webkit-media-controls-play-button,
+        audio::-webkit-media-controls-mute-button {
+            filter: brightness(1.5) saturate(1.5);
+        }
+
+        audio::-webkit-media-controls-timeline {
+            border-radius: 4px;
+        }
+
+        audio::-webkit-media-controls-current-time-display,
+        audio::-webkit-media-controls-time-remaining-display {
+            color: var(--text-light);
+        }
+
+        /* Hover effect for audio player */
+        audio:hover {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 10px rgba(0, 232, 255, 0.2);
+        }
     </style>
 </head>
 
@@ -182,18 +224,26 @@
     <div class="container mt-5">
 
         <h1 class="mb-2 text-center">RADAR Signal Analysis</h1>
-        <p class="text-center mb-5 lead fw-light">Select a category below to analyze signals related to Radar systems.</p>
+        <p class="text-center mb-5 lead fw-light">Select a category below to analyze signals related to Radar systems.
+        </p>
 
         <ul class="nav nav-tabs mb-4 justify-content-center" id="radarTabs" role="tablist">
             <li class="nav-item" role="presentation">
-                <button class="nav-link active" id="drone-tab" data-bs-toggle="tab" data-bs-target="#drone" type="button"
-                    role="tab">Drone Detection</button>
+                <button class="nav-link active" id="drone-tab" data-bs-toggle="tab" data-bs-target="#drone"
+                    type="button" role="tab">Drone Detection</button>
             </li>
 
             <li class="nav-item" role="presentation">
-                <button class="nav-link" id="sar-tab" data-bs-toggle="tab" data-bs-target="#sar" type="button" role="tab">SAR
+                <button class="nav-link" id="sar-tab" data-bs-toggle="tab" data-bs-target="#sar" type="button"
+                    role="tab">SAR
                     Analysis</button>
             </li>
+
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="downsample-tab" data-bs-toggle="tab" data-bs-target="#downsample"
+                    type="button" role="tab">Downsampling Demo</button>
+            </li>
+
         </ul>
 
         <div class="tab-content" id="radarTabsContent">
@@ -201,7 +251,8 @@
             <div class="tab-pane fade show active" id="drone" role="tabpanel">
                 <div class="card p-4">
                     <h2>Acoustic Drone Detection</h2>
-                    <p>Upload an audio recording (.wav or .mp3) to detect whether a drone's acoustic signature is present.</p>
+                    <p>Upload an audio recording (.wav or .mp3) to detect whether a drone's acoustic signature is
+                        present.</p>
                     <form id="droneForm" enctype="multipart/form-data">
                         <input type="file" name="file" class="form-control mb-3" accept=".wav,.mp3" required>
                         <button type="submit" class="btn btn-custom w-100"> Analyze Drone Audio</button>
@@ -217,7 +268,8 @@
                     <p>Upload a Sentinel-1 GRD (.tif) file for backscatter visualization and analysis.</p>
 
                     <form id="sarForm" enctype="multipart/form-data">
-                        <input type="file" name="file" id="sar-file" class="form-control mb-3" accept=".tif,.tiff" required>
+                        <input type="file" name="file" id="sar-file" class="form-control mb-3" accept=".tif,.tiff"
+                            required>
                         <button type="submit" class="btn btn-custom w-100">Analyze SAR Image</button>
                     </form>
 
@@ -247,6 +299,45 @@
                     </div>
                 </div>
             </div>
+
+
+            <div class="tab-pane fade" id="downsample" role="tabpanel">
+                <div class="card p-4">
+                    <h2>Audio Downsampling & Aliasing</h2>
+                    <p>Upload a drone audio file and downsample it to see how aliasing affects detection accuracy.</p>
+
+
+                    <form id="downsampleForm" enctype="multipart/form-data">
+                        <!-- File Input -->
+                        <div class="mb-3">
+                            <label for="downsample-file" class="form-label custom-label">Audio File (.wav or
+                                .mp3)</label>
+                            <input type="file" name="file" id="downsample-file" class="form-control" accept=".wav,.mp3"
+                                required>
+                        </div>
+
+                        <!-- Sample Rate Selector -->
+                        <div class="mb-3">
+                            <label for="sample-rate" class="form-label custom-label">
+                                Target Sample Rate: <span id="sample-rate-value"
+                                    style="color: var(--primary-color);">8000</span> Hz
+                            </label>
+                            <input type="range" class="form-range" id="sample-rate" name="target_sr" min="2000"
+                                max="15000" step="1000" value="8000">
+                            <div class="d-flex justify-content-between small custom-text">
+                                <span>2 kHz (Heavy Aliasing)</span>
+                                <span>15 kHz (Minimal Aliasing)</span>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-custom w-100">🔬 Analyze with Downsampling</button>
+                    </form>
+
+                    <!-- Results Box -->
+                    <div id="downsampleResultBox" class="mt-4"></div>
+                </div>
+            </div>
+
 
             <div class="text-center mt-5 mb-5">
                 <a href="/" class="btn btn-outline-light">⬅ Back to Home</a>
@@ -355,6 +446,141 @@
             }
         });
     </script>
+
+    <!-- DOWNSAMPLING SCRIPT-->
+
+    <script>
+        // Update sample rate display
+        const sampleRateSlider = document.getElementById('sample-rate');
+        const sampleRateValue = document.getElementById('sample-rate-value');
+
+        sampleRateSlider.addEventListener('input', function () {
+            sampleRateValue.textContent = this.value;
+        });
+
+        // Form submission handler
+        document.getElementById("downsampleForm").addEventListener("submit", async function (e) {
+            e.preventDefault();
+
+            const formData = new FormData(this);
+            const resultBox = document.getElementById("downsampleResultBox");
+
+            // Add loading state
+            resultBox.innerHTML = `
+            <div class="alert alert-info">
+                <div class="text-center" style="color: var(--primary-color) !important;">
+                    <strong>Analyzing...</strong> Processing original and downsampled audio.
+                </div>
+            </div>`;
+
+            try {
+                const response = await fetch("/radar/analyze_downsampled", {
+                    method: "POST",
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error("Server error or file type issue.");
+                }
+
+                const data = await response.json();
+
+                // Determine if classification changed
+                const changedClass = data.comparison.classification_changed;
+                const changeColor = changedClass ? '#FF4444' : '#00E8FF';
+                const changeIcon = changedClass ? '⚠️' : '✓';
+                const changeText = changedClass ? 'Classification Changed!' : 'Same Classification';
+
+                resultBox.innerHTML = `
+                <div class="row">
+                    <!-- Original Analysis Card -->
+                    <div class="col-md-6 mb-3">
+                        <div class="card p-3 h-100">
+                            <h5 class="text-center mb-3" style="color: var(--primary-color);">
+                                📡 Original Audio (16 kHz)
+                            </h5>
+                            <div class="text-center">
+                                <p class="mb-2"><strong>Prediction:</strong></p>
+                                <h4 style="color: var(--primary-color);">${data.original.predicted_class}</h4>
+                                <p class="mt-3 mb-2"><strong>Confidence:</strong></p>
+                                <h4 style="color: var(--primary-color);">${(data.original.confidence * 100).toFixed(2)}%</h4>
+                                
+                                <!-- Audio Player -->
+                                <div class="mt-4">
+                                    <p class="mb-2 small text-muted">🔊 Listen to Original</p>
+                                    <audio controls style="width: 100%; max-width: 300px;">
+                                        <source src="${data.original.audio_url}" type="audio/wav">
+                                        Your browser does not support audio playback.
+                                    </audio>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Downsampled Analysis Card -->
+                    <div class="col-md-6 mb-3">
+                        <div class="card p-3 h-100">
+                            <h5 class="text-center mb-3" style="color: ${changeColor};">
+                                🔻 Downsampled Audio (${data.downsampled.sample_rate} Hz)
+                            </h5>
+                            <div class="text-center">
+                                <p class="mb-2"><strong>Prediction:</strong></p>
+                                <h4 style="color: ${changeColor};">${data.downsampled.predicted_class}</h4>
+                                <p class="mt-3 mb-2"><strong>Confidence:</strong></p>
+                                <h4 style="color: ${changeColor};">${(data.downsampled.confidence * 100).toFixed(2)}%</h4>
+                                
+                                <!-- Audio Player -->
+                                <div class="mt-4">
+                                    <p class="mb-2 small text-muted">🔊 Listen to Downsampled</p>
+                                    <audio controls style="width: 100%; max-width: 300px;">
+                                        <source src="${data.downsampled.audio_url}" type="audio/wav">
+                                        Your browser does not support audio playback.
+                                    </audio>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Comparison Stats Card -->
+                    <div class="col-12">
+                        <div class="card p-4">
+                            <h5 class="text-center mb-4" style="color: var(--primary-color);">📊 Comparison Results</h5>
+                            <div class="row text-center">
+                                <div class="col-md-4 mb-3">
+                                    <p class="text-muted mb-1">Confidence Drop</p>
+                                    <h4 style="color: var(--primary-color);">${(Math.abs(data.comparison.confidence_drop) * 100).toFixed(2)}%</h4>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <p class="text-muted mb-1">Status</p>
+                                    <h4 style="color: ${changeColor};">${changeIcon} ${changeText}</h4>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <p class="text-muted mb-1">Sample Rate Used</p>
+                                    <h4 style="color: var(--primary-color);">${data.downsampled.sample_rate} Hz</h4>
+                                </div>
+                            </div>
+                            ${changedClass ? `
+                                <div class="alert alert-info mt-3 text-center" style="background-color: rgba(255, 68, 68, 0.1); border-color: #FF4444;">
+                                    <strong style="color: #FF4444;">Aliasing Effect Detected!</strong><br>
+                                    <span style="color: var(--text-light);">The downsampled audio caused the model to change its prediction due to frequency distortion.</span>
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                </div>`;
+
+            } catch (err) {
+                console.error(err);
+                resultBox.innerHTML = `
+                <div class="alert alert-danger">
+                    <strong>Error:</strong> Could not analyze file. Check the server connection or file format.
+                </div>`;
+            }
+        });
+    </script>
+
+
+
 
 </body>
 
