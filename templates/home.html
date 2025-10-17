@@ -37,6 +37,25 @@
             transition: all 0.3s;
             border: 2px solid var(--color-primary);
         }
+        /* Ensure the voice card aligns its content */
+        .voice-card-content {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            justify-content: center;
+            gap: 1.5rem;
+        }
+        /* Ensure responsive icons */
+        .card-icon svg {
+            width: 2rem;
+            height: 2rem;
+        }
+        @media (min-width: 768px) {
+            .card-icon svg {
+                width: 3rem;
+                height: 3rem;
+            }
+        }
     </style>
 </head>
 <body class="min-h-screen flex items-center justify-center p-4">
@@ -51,7 +70,7 @@
             </p>
         </header>
 
-        <!-- Signal Cards -->
+        <!-- Signal Cards Grid (The original 4 cards) -->
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             
             <!-- ECG Card -->
@@ -102,6 +121,30 @@
                 </div>
             </a>
 
+        </div>
+
+        <!-- VOICE SAMPLING & RECOGNITION SECTION (WIDER AND CENTERED) -->
+        <div class="mt-12 pt-8 border-t border-gray-700/50">
+            <h2 class="text-3xl font-bold text-center mb-6 text-white" style="color: var(--color-primary);">
+                Voice Processing Suite
+            </h2>
+            <div class="flex justify-center px-4 sm:px-0">
+                <!-- VOICE Card - Made wider (max-w-2xl) and centered -->
+                <a href="/voice" class="card-link block rounded-xl p-8 bg-[var(--color-card)] text-white hover:bg-[var(--color-primary)] hover:text-[var(--color-dark)] w-full lg:max-w-2xl">
+                    <div class="voice-card-content">
+                        <!-- Microphone Icon SVG -->
+                        <div class="card-icon p-3 rounded-full flex-shrink-0">
+                            <svg class="w-12 h-12 md:w-16 md:h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7v0a7 7 0 01-7-7v0m14 0h1a1 1 0 011 1v3a4 4 0 01-4 4H7a4 4 0 01-4-4v-3a1 1 0 011-1h1m11 0V9a7 7 0 00-7-7v0a7 7 0 00-7 7v2m7 5v0h0m0 0h.01"></path></svg>
+                        </div>
+                        <div class="text-left flex-grow">
+                            <h2 class="text-2xl md:text-3xl font-extrabold uppercase tracking-widest">VOICE</h2>
+                            <p class="text-lg mt-1 text-gray-400 group-hover:text-[var(--color-dark)]">
+                                Record, Analyze, and Process Audio Signals for Speech Recognition.
+                            </p>
+                        </div>
+                    </div>
+                </a>
+            </div>
         </div>
         
         <!-- Footer / Credits -->

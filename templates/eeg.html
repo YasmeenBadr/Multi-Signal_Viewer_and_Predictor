@@ -131,6 +131,13 @@
                                     value="1.0" min="0.1" max="5.0" step="0.1">
                         </div>
                     </div>
+                    <div class="mb-4">
+                        <label for="fsSlider" class="block text-xs font-medium mb-1 text-gray-400">Sampling Frequency (Hz)
+                            <span id="fsValue" class="ml-2 text-accent font-bold"></span>
+                        </label>
+                        <input type="range" id="fsSlider" min="1" max="160" value="160" step="1" class="w-full">
+                        <p class="text-[10px] text-gray-400 mt-1">Adjusts visualization sampling up to the file's FS.</p>
+                    </div>
                     <div id="streamingButtons" class="mt-4 mb-6">
                         <div class="flex gap-2 mb-2">
                             <button type="button" id="startContinueButton" class="flex-1 flex items-center justify-center bg-accent hover:bg-accent-hover text-text-dark font-extrabold py-3 rounded-xl transition duration-200 shadow-lg text-sm" >
@@ -270,6 +277,11 @@
         const BASE_INTERVAL_MS = 100; 
         
         let xorPreviousWindow = {};
+        // XOR animation state per channel
+        let xorPhase = {}; // 'forward' | 'reverse'
+        let xorShownForward = {};
+        let xorReverseIndex = {}; // number of points revealed in reverse
+        let xorSnapshot = {}; // {xForward, yForward, xReverse, yReverse}
         
         // --- POLAR MODE VARIABLE ---
         let isCumulativePolar = false;
@@ -301,6 +313,8 @@
         const channelSelectionContainer = document.getElementById('channelSelectionContainer'); 
         const speedMultiplierInput = document.getElementById('speedMultiplier');
         const widthInput = document.getElementById('width'); 
+        const fsSlider = document.getElementById('fsSlider');
+        const fsValue = document.getElementById('fsValue');
         
     // New Controls
     const polarModeContainer = document.getElementById('polarModeContainer');
@@ -423,6 +437,13 @@
         speedMultiplierInput.addEventListener('input', resetStreamingInterval);
         widthInput.addEventListener('change', () => {
              width = parseFloat(widthInput.value);
+        });
+        function updateFs(newFs) {
+            fs = Math.max(1, parseInt(newFs || fs, 10));
+            if (fsValue) fsValue.textContent = `${fs} Hz`;
+        }
+        fsSlider.addEventListener('input', (e) => {
+            updateFs(e.target.value);
         });
 
         // --- Button State Management ---
@@ -580,6 +601,12 @@
             .then(result => {
                 if (result.success) {
                     fs = result.fs;
+                    // Configure FS slider bounds and current value to match the file
+                    if (fsSlider) {
+                        fsSlider.max = String(fs);
+                        fsSlider.value = String(fs);
+                    }
+                    updateFs(fs);
                     
                     channelNameMap = {};
                     channelIndexToOriginalName = {};
@@ -662,6 +689,10 @@
             isStreaming = false;
             isPaused = false;
             xorPreviousWindow = {}; 
+            xorPhase = {};
+            xorShownForward = {};
+            xorReverseIndex = {};
+            xorSnapshot = {};
             bandPowerSMABuffer = []; 
             bandPowerYRange = 500000; 
             isCumulativePolar = false; // Reset polar mode flag
@@ -848,7 +879,8 @@
                 const singlePlotDiv = document.createElement('div');
                 singlePlotDiv.id = 'single-plot';
                 singlePlotDiv.style.width = '100%';
-                singlePlotDiv.style.height = '100%'; 
+                // Make XOR plot visually taller for clarity
+                singlePlotDiv.style.height = (mode === "xor") ? '650px' : '100%'; 
                 plotDiv.appendChild(singlePlotDiv);
 
                 const singlePlotId = 'single-plot';
@@ -895,17 +927,25 @@
                     };
                 } else if (mode === "xor") {
                     const channelName = channelIndexToOriginalName[selected[0].toString()];
-                    traces = [{ 
-                        x: [], y: [], mode: "lines", 
-                        line: { color: "#00eaff", width: 2 }, 
-                        name: "XOR Difference" 
-                    }];
+                    traces = [
+                        { // Forward raw signal line
+                            x: [], y: [], mode: "lines",
+                            line: { color: "#00eaff", width: 2 },
+                            name: "Forward"
+                        },
+                        { // Reverse abnormality markers
+                            x: [], y: [], mode: "markers",
+                            marker: { color: "#FF0000", size: 6, symbol: "x" },
+                            name: "Abnormalities (Reverse)"
+                        }
+                    ];
                     layout = {
                         title: `EEG - XOR Graph - ${channelName} - Window: ${width}s`,
                         paper_bgcolor: "#000000", plot_bgcolor: "#000000",
                         font: { color: "#e5e7eb", family: "Inter" },
-                        xaxis: { title: "Time (s)", color: "#e5e7eb", gridcolor: "#374151", range: [0, width] },
-                        yaxis: { title: "XOR Difference (µV)", color: "#e5e7eb", gridcolor: "#374151" }
+                        xaxis: { title: "Time (s)", color: "#e5e7eb", gridcolor: "#374151", range: [0, width * 2] },
+                        yaxis: { title: "Amplitude / XOR", color: "#e5e7eb", gridcolor: "#374151" },
+                        height: 650
                     };
                 }
                 
@@ -991,7 +1031,7 @@
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     // Send all selected channels for averaging in the backend
-                    body: JSON.stringify({ channels: selected, width }) 
+                    body: JSON.stringify({ channels: selected, width, mode: graphModeSelector.value }) 
                 });
                 if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                 const result = await response.json();
@@ -1121,6 +1161,11 @@
                     
                     if (currentBuffer.length >= chunkSize) {
                         
+                        // Prefer server-side XOR if provided
+                        if (Array.isArray(result.xor) && result.xor.length > 0) {
+                            xorResult = result.xor;
+                            xorTime = currentTime;
+                        } else {
                         if (xorPreviousWindow[chIndex] && xorPreviousWindow[chIndex].length === chunkSize) {
                             const chunk1 = xorPreviousWindow[chIndex]; 
                             const chunk2 = currentBuffer;              
@@ -1147,20 +1192,75 @@
                             xorResult = currentBuffer;
                             xorTime = currentTime;
                         }
+                        }
                         
                         if (windowBeforeUpdate) {
                              xorPreviousWindow[chIndex] = windowBeforeUpdate.slice(-chunkSize);
                         }
 
-                        Plotly.restyle(singlePlotId, { 
-                            x: [xorTime.slice(-chunkSize)], 
-                            y: [xorResult.slice(-chunkSize)] 
-                        });
-                        
-                        const xmin = globalTime - width;
-                        const xmax = globalTime;
+                        // Build forward and reverse arrays for this completed window
+                        // Use relative time positions (0 to width) instead of absolute time
+                        const forwardXFull = Array.from({length: chunkSize}, (_, i) => (i / fs));
+                        const forwardYFull = currentBuffer.slice(-chunkSize);
+                        const reverseXFull = [...forwardXFull].reverse();
+                        const reverseYFull = [...xorResult.slice(-chunkSize)].reverse();
+
+                        // Initialize animation state per channel if needed
+                        if (!xorPhase[chIndex]) {
+                            xorPhase[chIndex] = 'forward';
+                            xorShownForward[chIndex] = false;
+                            xorReverseIndex[chIndex] = 0;
+                        }
+
+                        // Snapshot this window for consistent reverse playback
+                        xorSnapshot[chIndex] = {
+                            xForward: forwardXFull,
+                            yForward: forwardYFull,
+                            xReverse: reverseXFull,
+                            yReverse: reverseYFull
+                        };
+
+                        // Phase 1: Show full forward line once, no dots
+                        if (xorPhase[chIndex] === 'forward' && !xorShownForward[chIndex]) {
+                            Plotly.restyle(singlePlotId, { 
+                                x: [forwardXFull, []], 
+                                y: [forwardYFull, []]
+                            });
+                            xorShownForward[chIndex] = true;
+                            xorReverseIndex[chIndex] = 0;
+                        } else {
+                            // Phase 2: Erase progressively and reveal reverse dots progressively
+                            xorPhase[chIndex] = 'reverse';
+
+                            // Reveal rate matching earlier version (~10% per tick)
+                            const revealPerTick = Math.max(1, Math.floor(chunkSize * 0.10));
+                            xorReverseIndex[chIndex] = Math.min(chunkSize, xorReverseIndex[chIndex] + revealPerTick);
+
+                            const keepCount = Math.max(0, chunkSize - xorReverseIndex[chIndex]);
+                            const forwardXPartial = xorSnapshot[chIndex].xForward.slice(0, keepCount);
+                            const forwardYPartial = xorSnapshot[chIndex].yForward.slice(0, keepCount);
+                            const reverseXPartial = xorSnapshot[chIndex].xReverse.slice(0, xorReverseIndex[chIndex]);
+                            const reverseYPartial = xorSnapshot[chIndex].yReverse.slice(0, xorReverseIndex[chIndex]);
+
+                            Plotly.restyle(singlePlotId, { 
+                                x: [forwardXPartial, reverseXPartial], 
+                                y: [forwardYPartial, reverseYPartial]
+                            });
+
+                            // When done, reset to allow next window cycle
+                            if (xorReverseIndex[chIndex] >= chunkSize) {
+                                xorPhase[chIndex] = 'forward';
+                                xorShownForward[chIndex] = false;
+                                xorReverseIndex[chIndex] = 0;
+                            }
+                        }
+
+                        // Widen x-axis to display last two windows
+                        const span = width * 2;
+                        const wideXmin = Math.max(0, globalTime - span);
+                        const wideXmax = wideXmin + span;
                         Plotly.relayout(singlePlotId, { 
-                            'xaxis.range': [xmin, xmax],
+                            'xaxis.range': [wideXmin, wideXmax],
                             'title': `EEG - XOR Graph - ${channelIndexToOriginalName[chIndex.toString()]} - Window: ${width}s (Time: ${globalTime.toFixed(2)}s)`
                         });
                     }

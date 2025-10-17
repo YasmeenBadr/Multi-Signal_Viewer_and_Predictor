@@ -1,5 +1,6 @@
 from flask import Flask, render_template
-from signals import eeg, ecg, radar, doppler , sar
+# Added 'voice' to the imports to reflect the new module/blueprint
+from signals import eeg, ecg, radar, doppler , sar, voice 
 
 app = Flask(__name__)
 
@@ -8,7 +9,9 @@ app.secret_key = 'a_secure_and_random_string_of_your_choice_1234567890'
 
 @app.route("/")
 def home():
-    return render_template("home.html")
+    # Assuming 'home.html' is the dashboard where the links are
+    return render_template("home.html") 
+
 #
 # EEG routes
 app.register_blueprint(eeg.bp, url_prefix="/eeg")
@@ -25,6 +28,9 @@ app.register_blueprint(doppler.bp, url_prefix="/doppler")
 
 # SAR routes
 app.register_blueprint(sar.bp, url_prefix="/sar")
+
+# VOICE routes - New registration for the Voice Processing Suite link
+app.register_blueprint(voice.bp, url_prefix="/voice")
 
 if __name__ == "__main__":
     app.run(debug=True)

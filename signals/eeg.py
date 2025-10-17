@@ -24,6 +24,11 @@ eeg_data = EEGData()
 INITIAL_OFFSET_SAMPLES = 0  # Will be calculated after file load
 CHUNK_SAMPLES = 16          # Default, will be recalculated
 
+# --- SERVER-SIDE XOR STATE ---
+# Maintains rolling buffers and previous window per channel for XOR mode
+_XOR_BUFFERS: Dict[int, List[float]] = {}
+_XOR_PREV_WINDOWS: Dict[int, List[float]] = {}
+
 # Define EEG Frequency Bands (Kept for band power calc)
 BANDS = {
     'Delta': (0.5, 4), 'Theta': (4, 8), 'Alpha': (8, 13), 
@@ -640,6 +645,8 @@ def update():
     
     data = request.get_json()
     channels = data.get("channels", [])
+    mode = data.get("mode", "time")
+    width = float(data.get("width", 5))
     
     samples_to_send = CHUNK_SAMPLES 
 
@@ -680,11 +687,64 @@ def update():
     # Build response
     signals = {str(ch): picked[i].tolist() for i, ch in enumerate(channels)}
 
-    return jsonify({
-        "n_samples": picked.shape[1], 
+    response = {
+        "n_samples": picked.shape[1],
         "signals": signals,
-        "band_power": band_power_data 
-    })
+        "band_power": band_power_data
+    }
+
+    # Server-side XOR computation for single-channel XOR mode
+    try:
+        if mode == "xor" and len(channels) == 1 and picked.shape[0] == 1:
+            ch = int(channels[0])
+            new_samples = signals[str(ch)]
+
+            # Initialize buffers if not present
+            if ch not in _XOR_BUFFERS:
+                _XOR_BUFFERS[ch] = []
+            if ch not in _XOR_PREV_WINDOWS:
+                _XOR_PREV_WINDOWS[ch] = []
+
+            # Rolling buffer to maintain last window seconds of data
+            chunk_size = max(1, int(width * eeg_data.fs))
+
+            buf = _XOR_BUFFERS[ch]
+            buf.extend(new_samples)
+            if len(buf) > chunk_size:
+                del buf[0:len(buf) - chunk_size]
+
+            xor_series = buf.copy()
+            if len(buf) == chunk_size:
+                prev_window = _XOR_PREV_WINDOWS.get(ch, [])
+                if len(prev_window) == chunk_size:
+                    # Binary XOR based on mid-level threshold, comparing current window
+                    # with reversed previous window (to mimic forward vs reverse pairing)
+                    combined = np.array(buf + prev_window, dtype=float)
+                    y_min = float(np.min(combined)) if combined.size > 0 else 0.0
+                    y_max = float(np.max(combined)) if combined.size > 0 else 1.0
+                    y_range = max(1e-9, y_max - y_min)
+                    threshold = (y_max + y_min) / 2.0
+
+                    mapped_high = y_min - 0.1 * y_range + 0.85 * (1.2 * y_range)
+                    mapped_low = y_min - 0.1 * y_range + 0.15 * (1.2 * y_range)
+
+                    xor_series = []
+                    for i in range(chunk_size):
+                        cur_val = buf[i]
+                        prev_val = prev_window[chunk_size - 1 - i]
+                        cur_bit = 1 if cur_val > threshold else 0
+                        prev_bit = 1 if prev_val > threshold else 0
+                        bit = cur_bit ^ prev_bit
+                        xor_series.append(mapped_high if bit == 1 else mapped_low)
+
+                # Update previous window after computing
+                _XOR_PREV_WINDOWS[ch] = buf[-chunk_size:].copy()
+
+            response["xor"] = xor_series
+    except Exception as xor_err:
+        print(f"XOR computation error: {xor_err}")
+
+    return jsonify(response)
 
 
 # --- PREDICTION ROUTE ---
