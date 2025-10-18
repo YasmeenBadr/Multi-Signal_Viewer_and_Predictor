@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EEG Sampling Analysis - Undersampling & Oversampling Effects</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'primary-bg': '#0a0a0a',
+                        'secondary-bg': '#1f2937',
+                        'accent': '#00eaff',
+                        'accent-hover': '#00bcd4',
+                        'text-light': '#e5e7eb',
+                        'text-dark': '#030712',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background: #000 !important; }
+        .bg-primary-bg, .bg-secondary-bg, .sidebar, .container, .rounded-xl, .p-6, .shadow-2xl, 
+        .p-4, .bg-gray-700, .bg-gray-800, div[class*="bg-"] {
+            background: #000 !important;
+        }
+        .text-text-light, .text-gray-300, .text-gray-400, .text-accent, .text-accent-hover {
+            color: #fff !important;
+        }
+        .border-gray-600, .border-gray-700 {
+            border-color: #333 !important;
+        }
+        input, select, textarea {
+            background: #000 !important;
+            color: #fff !important;
+            border-color: #333 !important;
+        }
+        label { color: #fff !important; }
+        .chart-container { height: 400px; }
+        .signal-plot { height: 300px; }
+    </style>
+</head>
+<body class="min-h-screen bg-primary-bg text-text-light p-4">
+    <div class="container mx-auto">
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-3xl font-extrabold" style="color:#00eaff;">EEG Sampling Analysis</h1>
+            <a href="/eeg" class="bg-accent text-black px-4 py-2 rounded-lg hover:bg-accent-hover transition duration-200">
+                ← Back to EEG Viewer
+            </a>
+        </div>
+        
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Control Panel -->
+            <div class="lg:col-span-1 bg-secondary-bg p-6 rounded-xl shadow-2xl">
+                <h2 class="text-xl font-bold text-accent mb-4">Analysis Controls</h2>
+                
+                <!-- File Upload -->
+                <div class="mb-4">
+                    <label class="block text-sm font-medium mb-2">Upload EEG File</label>
+                    <input type="file" id="fileInput" accept=".edf" class="w-full p-2 border rounded-lg">
+                    <button id="uploadBtn" class="w-full mt-2 bg-accent text-black py-2 px-4 rounded-lg hover:bg-accent-hover transition duration-200">
+                        Upload File
+                    </button>
+                </div>
+                
+                <!-- Channel Selection -->
+                <div class="mb-4">
+                    <label class="block text-sm font-medium mb-2">Select Channel</label>
+                    <select id="channelSelect" class="w-full p-2 border rounded-lg" disabled>
+                        <option value="">No file loaded</option>
+                    </select>
+                </div>
+                
+                <!-- Condition Type -->
+                <div class="mb-4">
+                    <label class="block text-sm font-medium mb-2">Condition Type</label>
+                    <select id="conditionSelect" class="w-full p-2 border rounded-lg">
+                        <option value="normal">Normal</option>
+                        <option value="epilepsy">Epilepsy</option>
+                    </select>
+                </div>
+                
+                <!-- Analysis Button -->
+                <button id="analyzeBtn" class="w-full bg-accent text-black py-2 px-4 rounded-lg hover:bg-accent-hover transition duration-200" disabled>
+                    Analyze Sampling Effects
+                </button>
+                
+                <!-- Status -->
+                <div id="status" class="mt-4 p-3 rounded-lg bg-gray-800 text-sm">
+                    Ready to analyze
+                </div>
+            </div>
+            
+            <!-- Results Panel -->
+            <div class="lg:col-span-2 space-y-6">
+                <!-- Signal Visualization -->
+                <div class="bg-secondary-bg p-6 rounded-xl shadow-2xl">
+                    <h2 class="text-xl font-bold text-accent mb-4">Signal Comparison</h2>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium mb-2">Target Sampling Rate (Hz)</label>
+                        <input type="range" id="samplingRateSlider" min="10" max="500" value="160" class="w-full">
+                        <div class="flex justify-between text-sm text-gray-400">
+                            <span>10 Hz</span>
+                            <span id="currentRate">160 Hz</span>
+                            <span>500 Hz</span>
+                        </div>
+                    </div>
+                    <div id="signalPlot" class="signal-plot"></div>
+                </div>
+                
+                <!-- Confusion Matrix Results -->
+                <div class="bg-secondary-bg p-6 rounded-xl shadow-2xl">
+                    <h2 class="text-xl font-bold text-accent mb-4">Confusion Matrix Analysis</h2>
+                    <div id="confusionMatrixResults" class="space-y-4">
+                        <p class="text-gray-400">Run analysis to see results</p>
+                    </div>
+                    <div id="loadingIndicator" class="hidden text-center py-4">
+                        <div class="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-accent"></div>
+                        <p class="text-sm text-gray-400 mt-2">Analyzing sampling effects...</p>
+                    </div>
+                </div>
+                
+                <!-- Performance Metrics -->
+                <div class="bg-secondary-bg p-6 rounded-xl shadow-2xl">
+                    <h2 class="text-xl font-bold text-accent mb-4">Performance Metrics</h2>
+                    <div class="chart-container">
+                        <div id="performanceChart" style="height: 400px;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentData = null;
+        let analysisResults = null;
+        let updateTimeout = null;
+        
+        // DOM elements
+        const fileInput = document.getElementById('fileInput');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const channelSelect = document.getElementById('channelSelect');
+        const conditionSelect = document.getElementById('conditionSelect');
+        const analyzeBtn = document.getElementById('analyzeBtn');
+        const status = document.getElementById('status');
+        const samplingRateSlider = document.getElementById('samplingRateSlider');
+        const currentRate = document.getElementById('currentRate');
+        const signalPlot = document.getElementById('signalPlot');
+        const confusionMatrixResults = document.getElementById('confusionMatrixResults');
+        const performanceChart = document.getElementById('performanceChart');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        
+        // Event listeners
+        uploadBtn.addEventListener('click', uploadFile);
+        analyzeBtn.addEventListener('click', runAnalysis);
+        samplingRateSlider.addEventListener('input', function() {
+            updateSignalPlot();
+            
+            // Debounce the real-time analysis to prevent too many API calls
+            if (updateTimeout) {
+                clearTimeout(updateTimeout);
+            }
+            updateTimeout = setTimeout(() => {
+                updateRealTimeAnalysis();
+            }, 500); // Wait 500ms after user stops moving slider
+        });
+        
+        // Update slider display
+        samplingRateSlider.addEventListener('input', function() {
+            currentRate.textContent = this.value + ' Hz';
+        });
+        
+        async function uploadFile() {
+            const file = fileInput.files[0];
+            if (!file) {
+                updateStatus('Please select a file', 'error');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            try {
+                updateStatus('Uploading file...', 'info');
+                const response = await fetch('/eeg/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    updateStatus('File uploaded successfully', 'success');
+                    
+                    // Populate channel select
+                    channelSelect.innerHTML = '';
+                    Object.entries(result.channels).forEach(([index, name]) => {
+                        const option = document.createElement('option');
+                        option.value = index;
+                        option.textContent = `${index}: ${name}`;
+                        channelSelect.appendChild(option);
+                    });
+                    
+                    channelSelect.disabled = false;
+                    analyzeBtn.disabled = false;
+                    currentData = result;
+                } else {
+                    updateStatus('Upload failed: ' + result.message, 'error');
+                }
+            } catch (error) {
+                updateStatus('Upload error: ' + error.message, 'error');
+            }
+        }
+        
+        async function runAnalysis() {
+            if (!currentData) {
+                updateStatus('Please upload a file first', 'error');
+                return;
+            }
+            
+            const selectedChannel = channelSelect.value;
+            const conditionType = conditionSelect.value;
+            
+            if (!selectedChannel) {
+                updateStatus('Please select a channel', 'error');
+                return;
+            }
+            
+            try {
+                updateStatus('Running analysis...', 'info');
+                analyzeBtn.disabled = true;
+                
+                const response = await fetch('/eeg/analyze-sampling', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        channels: [parseInt(selectedChannel)],
+                        condition_type: conditionType
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    analysisResults = result;
+                    updateStatus('Analysis completed successfully', 'success');
+                    displayResults(result);
+                    updateSignalPlot();
+                } else {
+                    updateStatus('Analysis failed: ' + result.message, 'error');
+                }
+            } catch (error) {
+                updateStatus('Analysis error: ' + error.message, 'error');
+            } finally {
+                analyzeBtn.disabled = false;
+            }
+        }
+        
+        async function updateSignalPlot() {
+            if (!currentData) return;
+            
+            const targetFs = parseInt(samplingRateSlider.value);
+            const selectedChannel = channelSelect.value;
+            
+            if (!selectedChannel) return;
+            
+            try {
+                const response = await fetch('/eeg/get-sampling-signal', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        channels: [parseInt(selectedChannel)],
+                        target_fs: targetFs
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    plotSignals(result.original_signal, result.resampled_signal);
+                }
+            } catch (error) {
+                console.error('Error updating signal plot:', error);
+            }
+        }
+        
+        async function updateRealTimeAnalysis() {
+            if (!currentData || !analysisResults) return;
+            
+            const targetFs = parseInt(samplingRateSlider.value);
+            const selectedChannel = channelSelect.value;
+            const conditionType = conditionSelect.value;
+            
+            if (!selectedChannel) return;
+            
+            try {
+                // Show loading indicator
+                loadingIndicator.classList.remove('hidden');
+                confusionMatrixResults.innerHTML = '';
+                
+                // Get real-time analysis for the current sampling rate
+                const response = await fetch('/eeg/analyze-single-sampling', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        channels: [parseInt(selectedChannel)],
+                        target_fs: targetFs,
+                        condition_type: conditionType
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    displaySingleSamplingResult(result, targetFs);
+                } else {
+                    confusionMatrixResults.innerHTML = `<div class="text-center p-4 text-sm text-red-400">Error: ${result.message}</div>`;
+                }
+            } catch (error) {
+                console.error('Error updating real-time analysis:', error);
+                confusionMatrixResults.innerHTML = `<div class="text-center p-4 text-sm text-red-400">Analysis failed. Please try again.</div>`;
+            } finally {
+                // Hide loading indicator
+                loadingIndicator.classList.add('hidden');
+            }
+        }
+        
+        function plotSignals(original, resampled) {
+            const trace1 = {
+                x: original.time,
+                y: original.data,
+                type: 'scatter',
+                mode: 'lines',
+                name: `Original (${original.fs} Hz)`,
+                line: { color: '#00eaff', width: 2 }
+            };
+            
+            const trace2 = {
+                x: resampled.time,
+                y: resampled.data,
+                type: 'scatter',
+                mode: 'lines',
+                name: `Resampled (${resampled.fs} Hz)`,
+                line: { color: '#ff6b6b', width: 2 }
+            };
+            
+            const layout = {
+                title: 'Signal Comparison: Original vs Resampled',
+                xaxis: { title: 'Time (s)', color: '#fff' },
+                yaxis: { title: 'Amplitude', color: '#fff' },
+                plot_bgcolor: '#000',
+                paper_bgcolor: '#000',
+                font: { color: '#fff' },
+                legend: { x: 0, y: 1 }
+            };
+            
+            Plotly.newPlot(signalPlot, [trace1, trace2], layout, {responsive: true});
+        }
+        
+        function displayResults(results) {
+            // Display confusion matrix results
+            confusionMatrixResults.innerHTML = '';
+            
+            Object.entries(results.results).forEach(([fs, data]) => {
+                if (data.error) {
+                    const errorDiv = document.createElement('div');
+                    errorDiv.className = 'p-4 bg-red-900/20 border border-red-500 rounded-lg';
+                    errorDiv.innerHTML = `
+                        <h3 class="font-bold text-red-400">Error at ${fs} Hz</h3>
+                        <p class="text-red-300">${data.error}</p>
+                    `;
+                    confusionMatrixResults.appendChild(errorDiv);
+                    return;
+                }
+                
+                const metrics = data.metrics;
+                const card = document.createElement('div');
+                card.className = 'p-4 bg-gray-800 rounded-lg border border-gray-600';
+                card.innerHTML = `
+                    <div class="flex justify-between items-start mb-3">
+                        <h3 class="font-bold text-accent">${fs} Hz (${data.sampling_ratio.toFixed(2)}x)</h3>
+                        <span class="text-sm text-gray-400">${data.resampled_length} samples</span>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4 mb-3">
+                        <div>
+                            <h4 class="font-semibold text-gray-300 mb-2">Confusion Matrix</h4>
+                            <div class="grid grid-cols-2 gap-1 text-sm">
+                                <div class="bg-green-900/30 p-2 rounded text-center">
+                                    <div class="text-green-400 font-bold">${metrics.true_negative}</div>
+                                    <div class="text-xs text-gray-400">TN</div>
+                                </div>
+                                <div class="bg-red-900/30 p-2 rounded text-center">
+                                    <div class="text-red-400 font-bold">${metrics.false_positive}</div>
+                                    <div class="text-xs text-gray-400">FP</div>
+                                </div>
+                                <div class="bg-red-900/30 p-2 rounded text-center">
+                                    <div class="text-red-400 font-bold">${metrics.false_negative}</div>
+                                    <div class="text-xs text-gray-400">FN</div>
+                                </div>
+                                <div class="bg-green-900/30 p-2 rounded text-center">
+                                    <div class="text-green-400 font-bold">${metrics.true_positive}</div>
+                                    <div class="text-xs text-gray-400">TP</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <h4 class="font-semibold text-gray-300 mb-2">Metrics</h4>
+                            <div class="space-y-1 text-sm">
+                                <div class="flex justify-between">
+                                    <span>Accuracy:</span>
+                                    <span class="text-accent">${(metrics.accuracy * 100).toFixed(1)}%</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span>Precision:</span>
+                                    <span class="text-accent">${(metrics.precision * 100).toFixed(1)}%</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span>Recall:</span>
+                                    <span class="text-accent">${(metrics.recall * 100).toFixed(1)}%</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span>F1-Score:</span>
+                                    <span class="text-accent">${(metrics.f1_score * 100).toFixed(1)}%</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="text-xs text-gray-400">
+                        SNR: ${data.signal_quality.snr.toFixed(2)} | 
+                        Variance: ${data.signal_quality.variance.toFixed(4)} | 
+                        Range: ${data.signal_quality.range.toFixed(4)}
+                    </div>
+                `;
+                confusionMatrixResults.appendChild(card);
+            });
+            
+            // Create performance chart
+            createPerformanceChart(results.results);
+        }
+        
+        function displaySingleSamplingResult(result, targetFs) {
+            // Clear existing results and show only current sampling rate
+            confusionMatrixResults.innerHTML = '';
+            
+            const data = result.result;
+            const metrics = data.metrics;
+            
+            const card = document.createElement('div');
+            card.className = 'p-4 bg-gray-800 rounded-lg border border-accent';
+            card.innerHTML = `
+                <div class="flex justify-between items-start mb-3">
+                    <h3 class="font-bold text-accent">${targetFs} Hz (${data.sampling_ratio.toFixed(2)}x) - Real-time</h3>
+                    <span class="text-sm text-gray-400">${data.resampled_length} samples</span>
+                </div>
+                
+                <div class="grid grid-cols-2 gap-4 mb-3">
+                    <div>
+                        <h4 class="font-semibold text-gray-300 mb-2">Confusion Matrix</h4>
+                        <div class="grid grid-cols-2 gap-1 text-sm">
+                            <div class="bg-green-900/30 p-2 rounded text-center">
+                                <div class="text-green-400 font-bold">${metrics.true_negative}</div>
+                                <div class="text-xs text-gray-400">TN</div>
+                            </div>
+                            <div class="bg-red-900/30 p-2 rounded text-center">
+                                <div class="text-red-400 font-bold">${metrics.false_positive}</div>
+                                <div class="text-xs text-gray-400">FP</div>
+                            </div>
+                            <div class="bg-red-900/30 p-2 rounded text-center">
+                                <div class="text-red-400 font-bold">${metrics.false_negative}</div>
+                                <div class="text-xs text-gray-400">FN</div>
+                            </div>
+                            <div class="bg-green-900/30 p-2 rounded text-center">
+                                <div class="text-green-400 font-bold">${metrics.true_positive}</div>
+                                <div class="text-xs text-gray-400">TP</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <h4 class="font-semibold text-gray-300 mb-2">Metrics</h4>
+                        <div class="space-y-1 text-sm">
+                            <div class="flex justify-between">
+                                <span>Accuracy:</span>
+                                <span class="text-accent">${(metrics.accuracy * 100).toFixed(1)}%</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>Precision:</span>
+                                <span class="text-accent">${(metrics.precision * 100).toFixed(1)}%</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>Recall:</span>
+                                <span class="text-accent">${(metrics.recall * 100).toFixed(1)}%</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>F1-Score:</span>
+                                <span class="text-accent">${(metrics.f1_score * 100).toFixed(1)}%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="text-xs text-gray-400">
+                    SNR: ${data.signal_quality.snr.toFixed(2)} | 
+                    Variance: ${data.signal_quality.variance.toFixed(4)} | 
+                    Range: ${data.signal_quality.range.toFixed(4)}
+                </div>
+            `;
+            confusionMatrixResults.appendChild(card);
+        }
+        
+        function createPerformanceChart(results) {
+            const samplingRates = [];
+            const accuracies = [];
+            const precisions = [];
+            const recalls = [];
+            const f1Scores = [];
+            
+            Object.entries(results).forEach(([fs, data]) => {
+                if (!data.error) {
+                    samplingRates.push(`${fs} Hz`);
+                    accuracies.push(data.metrics.accuracy * 100);
+                    precisions.push(data.metrics.precision * 100);
+                    recalls.push(data.metrics.recall * 100);
+                    f1Scores.push(data.metrics.f1_score * 100);
+                }
+            });
+            
+            // Use Plotly instead of Chart.js for better compatibility
+            const trace1 = {
+                x: samplingRates,
+                y: accuracies,
+                type: 'scatter',
+                mode: 'lines+markers',
+                name: 'Accuracy',
+                line: { color: '#00eaff', width: 3 },
+                marker: { size: 8 }
+            };
+            
+            const trace2 = {
+                x: samplingRates,
+                y: precisions,
+                type: 'scatter',
+                mode: 'lines+markers',
+                name: 'Precision',
+                line: { color: '#ff6b6b', width: 3 },
+                marker: { size: 8 }
+            };
+            
+            const trace3 = {
+                x: samplingRates,
+                y: recalls,
+                type: 'scatter',
+                mode: 'lines+markers',
+                name: 'Recall',
+                line: { color: '#4ecdc4', width: 3 },
+                marker: { size: 8 }
+            };
+            
+            const trace4 = {
+                x: samplingRates,
+                y: f1Scores,
+                type: 'scatter',
+                mode: 'lines+markers',
+                name: 'F1-Score',
+                line: { color: '#ffe66d', width: 3 },
+                marker: { size: 8 }
+            };
+            
+            const layout = {
+                title: {
+                    text: 'Performance Metrics vs Sampling Rate',
+                    font: { color: '#fff', size: 16 }
+                },
+                xaxis: { 
+                    title: 'Sampling Rate (Hz)', 
+                    color: '#fff',
+                    gridcolor: '#333',
+                    zerolinecolor: '#333'
+                },
+                yaxis: { 
+                    title: 'Performance (%)', 
+                    color: '#fff',
+                    gridcolor: '#333',
+                    zerolinecolor: '#333',
+                    range: [0, 100]
+                },
+                plot_bgcolor: '#000',
+                paper_bgcolor: '#000',
+                font: { color: '#fff' },
+                legend: { 
+                    x: 0, 
+                    y: 1,
+                    font: { color: '#fff' }
+                },
+                margin: { l: 60, r: 30, t: 60, b: 60 }
+            };
+            
+            // Use Plotly directly in the performanceChart div
+            Plotly.newPlot('performanceChart', [trace1, trace2, trace3, trace4], layout, {
+                responsive: true,
+                displayModeBar: true,
+                modeBarButtonsToRemove: ['pan2d', 'lasso2d', 'select2d']
+            });
+        }
+        
+        function updateStatus(message, type) {
+            status.textContent = message;
+            status.className = `mt-4 p-3 rounded-lg text-sm ${
+                type === 'error' ? 'bg-red-900/20 text-red-400' :
+                type === 'success' ? 'bg-green-900/20 text-green-400' :
+                type === 'info' ? 'bg-blue-900/20 text-blue-400' :
+                'bg-gray-800 text-gray-400'
+            }`;
+        }
+    </script>
+</body>
+</html>
