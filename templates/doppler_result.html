@@ -5,33 +5,51 @@
   <title>Doppler Generation Result</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
   <style>
-    body { 
-      background:#000; 
-      color:#e0e0e0; 
-      text-align:center; 
-      font-family:"Times New Roman"; 
+    body {
+      background:#000;
+      color:#e0e0e0;
+      text-align:center;
+      font-family:"Inter", sans-serif;
     }
-    h1 { color:#00eaff; }
+    h1 { color:#00eaff; font-weight:bold; }
+    h2 { color:#00eaff; margin-top: 30px; }
     .doppler-btn { background-color: #00eaff; border: none; color: black; font-weight: bold; }
     .doppler-btn:hover { background-color: #00c0cc; color: white; }
     .back-btn { background-color: white; border: none; color: black; font-weight: bold; }
     .back-btn:hover { background-color: #e0e0e0; color: black; }
-    canvas { background: #111; margin-top: 20px; }
+    canvas { background: #111; margin-top: 20px; border-radius: 8px; }
+    p, li { font-size: 1.1rem; }
+    #sampling_status { 
+      font-weight: bold; 
+      font-size: 1.2rem; 
+      margin-top: 10px; 
+    }
+    .status-good { color: #00ff00; }
+    .status-warning { color: #ffea00; }
+    .status-danger { color: #ff0000; }
   </style>
 </head>
 <body>
   <div class="container mt-5">
     <h1>Doppler Generation Result</h1>
-    
+   
     <!-- Parameters -->
     <div id="result-details" class="mb-4">
-        <p>Parameters used:</p>
-        <ul>
+        <p><strong>Parameters used:</strong></p>
+        <ul style="list-style:none;">
             <li>Velocity: {{ v }} m/s</li>
-            <li>Frequency: {{ f0 }} Hz</li>
+            <li>Horn Frequency: {{ f0 }} Hz</li>
+            <li>Sampling Frequency: {{ fs_user }} Hz</li>
+            <li>Max Signal Frequency: {{ max_freq }} Hz</li>
+            <li>Nyquist Rate Required: {{ nyquist_freq }} Hz</li>
         </ul>
     </div>
-
+    
+    <!-- Sampling Status -->
+    <p id="sampling_status" class="{% if 'Aliasing' in sampling_status or 'Undersampled' in sampling_status %}status-danger{% elif 'Near' in sampling_status or 'Marginal' in sampling_status %}status-warning{% else %}status-good{% endif %}">
+      Sampling Condition: {{ sampling_status }}
+    </p>
+    
     <!-- Audio Player -->
     <div id="audio-player-container" class="mb-4">
         <h2>Generated Sound</h2>
@@ -40,58 +58,53 @@
             Your browser does not support the audio element.
         </audio>
         <br>
-        <a href="{{ url_for('doppler.serve_audio', file_id=audio_file_id) }}" 
-           download="doppler_v{{ v }}_f{{ f0 }}.wav" class="btn doppler-btn mt-2">Download WAV File</a>
+        <a href="{{ url_for('doppler.serve_audio', file_id=audio_file_id) }}"
+           download="doppler_v{{ v }}_f{{ f0 }}_fs{{ fs_user }}.wav"
+           class="btn doppler-btn mt-3">Download WAV File</a>
     </div>
-
+    
     <!-- Signal Plot -->
     <div>
-        <h2>Doppler Signal Plot</h2>
-        <canvas id="signalPlot" width="800" height="300"></canvas>
+        <h2>Time-Domain Signal</h2>
+        <canvas id="signalPlot" width="800" height="350"></canvas>
     </div>
-
+    
     <!-- Return Button -->
-    <a href="{{ url_for('doppler.index') }}" class="btn back-btn mt-5">Return to Generator</a>
+    <a href="{{ url_for('doppler.index') }}" class="btn back-btn mt-5 mb-5">⬅ Return to Generator</a>
   </div>
-
+  
   <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script>
     const xData = JSON.parse('{{ x_plot_json | tojson | safe }}');
     const yData = JSON.parse('{{ y_plot_json | tojson | safe }}');
-
     const ctx = document.getElementById('signalPlot').getContext('2d');
     new Chart(ctx, {
         type: 'line',
         data: {
             labels: xData,
             datasets: [{
-                label: 'Doppler Signal',
+                label: 'Generated Doppler Signal',
                 data: yData,
                 borderColor: 'rgba(0, 234, 255, 1)',
                 borderWidth: 1,
-                pointRadius: 0
+                pointRadius: 0,
+                fill: false
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            animation: false,  // رسم ثابت بدون حركة
+            animation: false,
             scales: {
-                x: { 
+                x: {
                     title: { display: true, text: 'Time (s)', color: '#e0e0e0' },
-                    ticks: { 
-                        color: '#e0e0e0', 
-                        callback: value => Number(value).toFixed(2)  // رقمين عشري
-                    },
-                    grid: { color: '#333' }  // خطوط الشبكة واضحة
+                    ticks: { color: '#e0e0e0', callback: value => Number(value).toFixed(2) },
+                    grid: { color: '#333' }
                 },
-                y: { 
+                y: {
                     title: { display: true, text: 'Amplitude', color: '#e0e0e0' },
-                    ticks: { 
-                        color: '#e0e0e0',
-                        callback: value => Number(value).toFixed(2)
-                    },
+                    ticks: { color: '#e0e0e0', callback: value => Number(value).toFixed(2) },
                     grid: { color: '#333' }
                 }
             },

@@ -1,54 +1,44 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <title>Doppler Viewer</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
     <style>
-        /* --- Modern UI Color Palette --- */
         :root {
             --bg-dark: #0A0A0A;
-            /* Almost black */
             --bg-card: #141414;
-            /* Slightly lighter card background */
             --primary-color: #00E8FF;
-            /* Neon/Cyber Blue */
             --text-light: #E0E0E0;
-            /* Light text color (White/Light Grey) */
             --glass-border: rgba(0, 232, 255, 0.2);
             --glass-shadow: rgba(0, 232, 255, 0.1);
         }
 
         body {
             background: var(--bg-dark);
-            /* Default text color is bright white */
             color: var(--text-light); 
             font-family: 'Inter', sans-serif;
-            transition: background 0.5s ease;
         }
 
-        /* --- Typography & Headers --- */
         h1 {
             color: var(--primary-color);
             text-shadow: 0 0 8px var(--glass-shadow);
             font-weight: 700;
             text-align: center;
         }
+        
         h2 {
             color: var(--primary-color);
             font-weight: 600;
             margin-bottom: 1rem;
         }
 
-        /* --- Cards (Glassmorphism Effect) --- */
         .card {
             background-color: var(--bg-card);
             border: 1px solid var(--glass-border);
             box-shadow: 0 8px 32px var(--glass-shadow);
             backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
             border-radius: 12px;
             transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
             text-align: left; 
@@ -59,7 +49,6 @@
             box-shadow: 0 12px 40px var(--glass-shadow);
         }
 
-        /* --- Custom Button --- */
         .btn-custom {
             background-color: var(--primary-color);
             color: var(--bg-dark);
@@ -67,8 +56,7 @@
             border: none;
             padding: 10px 20px;
             border-radius: 8px;
-            letter-spacing: 0.5px;
-            transition: background-color 0.3s, transform 0.1s, box-shadow 0.3s;
+            transition: all 0.3s;
         }
 
         .btn-custom:hover {
@@ -78,7 +66,6 @@
             transform: translateY(-2px);
         }
         
-        /* --- Outline Button (Back to Home) --- */
         .btn-outline-light {
             border-color: var(--text-light); 
             color: var(--text-light);      
@@ -91,13 +78,10 @@
             background-color: transparent;
         }
         
-        /* --- Form Elements --- */
-        .form-control {
+        .form-control, .form-range {
             background-color: #1A1A1A;
             border: 1px solid var(--glass-border);
             color: var(--text-light);
-            box-shadow: none;
-            transition: border-color 0.3s, box-shadow 0.3s;
         }
 
         .form-control:focus {
@@ -107,17 +91,57 @@
             box-shadow: 0 0 0 0.25rem rgba(0, 232, 255, 0.25);
         }
 
-        /* --- Hints and Utility --- */
+        .form-range::-webkit-slider-thumb {
+            background: var(--primary-color);
+        }
+
+        .form-range::-moz-range-thumb {
+            background: var(--primary-color);
+        }
+
         .hint {
-            /* Keep it slightly muted for secondary text inside forms */
             color: var(--text-light); 
             font-size: 0.9rem;
         }
         
-        /* Ensure the main descriptive paragraph below H1 is white */
         .descriptive-text {
             color: var(--text-light) !important;
-            font-size: 1.1rem; /* Slightly larger for emphasis */
+            font-size: 1.1rem;
+        }
+
+        .sampling-info {
+            background: rgba(0, 232, 255, 0.1);
+            border-left: 4px solid var(--primary-color);
+            padding: 12px;
+            margin: 15px 0;
+            border-radius: 5px;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 15px;
+            font-size: 0.85rem;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+
+        .status-good {
+            background: rgba(0, 255, 0, 0.2);
+            color: #00ff00;
+            border: 1px solid #00ff00;
+        }
+
+        .status-warning {
+            background: rgba(255, 200, 0, 0.2);
+            color: #ffc800;
+            border: 1px solid #ffc800;
+        }
+
+        .status-danger {
+            background: rgba(255, 0, 0, 0.2);
+            color: #ff0000;
+            border: 1px solid #ff0000;
         }
 
         hr {
@@ -125,13 +149,10 @@
         }
     </style>
 </head>
-
 <body>
     <div class="container mt-5" style="max-width: 700px;">
-
         <h1>Doppler Signal Analysis</h1>
-        <p class="text-center mb-5 descriptive-text">Visualize and simulate the Doppler effect using audio files and physical parameters.</p>
-
+        <p class="text-center mb-5 descriptive-text">Visualize and simulate the Doppler effect with Nyquist sampling control</p>
 
         <div class="card p-4 mb-4">
             <h2><i class="bi bi-broadcast"></i> Velocity Detection</h2>
@@ -139,9 +160,9 @@
             
             <button id="detect-btn" class="btn btn-custom w-100">📡 Begin Detection</button>
             
-            <form id="detect-form" method="POST" action="/doppler/upload" enctype="multipart/form-data">
+            <form id="detect-form" method="POST" action="/doppler/upload" enctype="multipart/form-data" style="display:none;">
                 <hr class="mt-4 mb-3">
-                <p class="hint">Upload a **.wav** file (e.g., recorded sound of a passing object).</p>
+                <p class="hint">Upload a .wav file (e.g., recorded sound of a passing object).</p>
                 <input type="file" name="audio_file" accept=".wav" class="form-control" required>
                 <button type="submit" class="btn btn-custom mt-3 w-100">Upload & Detect Speed</button>
             </form>
@@ -149,50 +170,144 @@
 
         <div class="card p-4 mt-4">
             <h2><i class="bi bi-soundwave"></i> Generate Doppler Sound</h2>
-            <p>Simulate the Doppler effect by setting source velocity and frequency.</p>
-            <form method="POST" action="{{ url_for('doppler.generate') }}" class="mt-4">
+            <p>Simulate the Doppler effect and experiment with sampling rates</p>
+            
+            <form method="POST" action="{{ url_for('doppler.generate') }}" class="mt-4" id="generateForm">
                 <div class="row">
                     <div class="col-md-6 mb-3">
-                        <input type="number" step="0.1" min="0" name="velocity" class="form-control" placeholder="Velocity (m/s) — e.g. 10, 30" required>
+                        <label class="form-label">Velocity (m/s)</label>
+                        <input type="number" step="0.1" min="0" name="velocity" id="velocityInput"
+                               class="form-control" placeholder="e.g. 10, 30" value="10" required>
                     </div>
                     <div class="col-md-6 mb-3">
-                        <input type="number" step="1" min="20" name="frequency" class="form-control" placeholder="Source Frequency (Hz) — e.g. 150 or 400" required>
+                        <label class="form-label">Source Frequency (Hz)</label>
+                        <input type="number" step="1" min="20" name="frequency" id="frequencyInput"
+                               class="form-control" placeholder="e.g. 150, 400" value="150" required>
                     </div>
                 </div>
+
                 <input type="hidden" name="distance" value="5">
                 <input type="hidden" name="duration" value="6">
-                <button type="submit" class="btn btn-custom w-100">🔊 Generate Simulation</button>
+
+                <!-- Dynamic Sampling Frequency Slider -->
+                <div class="mt-4">
+                    <label class="form-label">
+                        Sampling Frequency (Hz)
+                        <span id="samplingStatus" class="status-badge status-good">✓ Good</span>
+                    </label>
+                    <input type="range" class="form-range" id="samplingSlider" name="sampling_freq" 
+                           min="500" max="5000" step="100" value="5000">
+                    
+                    <div class="d-flex justify-content-between mt-2">
+                        <small id="minLabel">500 Hz</small>
+                        <strong id="samplingValue" style="color: var(--primary-color);">5000 Hz</strong>
+                        <small id="maxLabel">5000 Hz</small>
+                    </div>
+
+                    <div class="sampling-info" id="samplingInfo">
+                        <strong>📊 Sampling Analysis:</strong><br>
+                        <span id="nyquistInfo">Set frequency to see analysis</span>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-custom w-100 mt-3">🔊 Generate Simulation</button>
             </form>
 
             <div class="hint mt-3">
-                Recommended test parameters: Velocity = 0, 10, 30 m/s. Frequency = 150–400 Hz.
+                <strong>💡 Tip:</strong> Try lowering the sampling rate below the Nyquist frequency to observe aliasing!
             </div>
         </div>
 
         <div class="text-center mt-5 mb-5">
-            <a href="/" class="btn btn-outline-light">⬅ Back to Home</a>
+            <a href="/" class="btn btn-outline-light">⬅️ Back to Home</a>
         </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     
     <script>
-        // إظهار/إخفاء الفورم عند الضغط على زر Detect
+        // Toggle detection form
         document.getElementById("detect-btn").addEventListener("click", function() {
             const form = document.getElementById("detect-form");
-            // Toggle display
             const isVisible = form.style.display === "block";
             form.style.display = isVisible ? "none" : "block";
-            
-            // Change the button text based on state
             this.textContent = isVisible ? '📡 Begin Detection' : 'Hide Upload Form';
         });
 
-        // Ensure form is hidden on load
-        document.addEventListener('DOMContentLoaded', () => {
-            document.getElementById("detect-form").style.display = "none";
-        });
+        // Dynamic sampling slider based on frequency
+        const velocityInput = document.getElementById('velocityInput');
+        const frequencyInput = document.getElementById('frequencyInput');
+        const samplingSlider = document.getElementById('samplingSlider');
+        const samplingValue = document.getElementById('samplingValue');
+        const samplingStatus = document.getElementById('samplingStatus');
+        const nyquistInfo = document.getElementById('nyquistInfo');
+        const minLabel = document.getElementById('minLabel');
+        const maxLabel = document.getElementById('maxLabel');
+
+        function updateSliderRange() {
+            const f0 = parseFloat(frequencyInput.value) || 150;
+            
+            // Calculate max frequency (considering harmonics)
+            const maxFreq = f0 * 3;
+            const nyquistFreq = maxFreq * 2;
+            
+            // Set slider range: from 50% of Nyquist to 3× Nyquist
+            const sliderMin = Math.max(100, Math.floor(nyquistFreq * 0.5));
+            const sliderMax = Math.ceil(nyquistFreq * 3);
+            const sliderStep = Math.ceil((sliderMax - sliderMin) / 100);
+            
+            samplingSlider.min = sliderMin;
+            samplingSlider.max = sliderMax;
+            samplingSlider.step = sliderStep;
+            
+            // Set default to 2× Nyquist (proper sampling)
+            samplingSlider.value = Math.min(nyquistFreq * 2, sliderMax);
+            
+            // Update labels
+            minLabel.textContent = sliderMin + ' Hz';
+            maxLabel.textContent = sliderMax + ' Hz';
+            
+            updateSamplingStatus();
+        }
+
+        function updateSamplingStatus() {
+            const f0 = parseFloat(frequencyInput.value) || 150;
+            const fs = parseFloat(samplingSlider.value);
+            
+            const maxFreq = f0 * 3;
+            const nyquistFreq = maxFreq * 2;
+            const ratio = fs / nyquistFreq;
+            
+            samplingValue.textContent = fs + ' Hz';
+            
+            // Update status badge
+            if (fs >= nyquistFreq) {
+                samplingStatus.textContent = '✓ Properly Sampled';
+                samplingStatus.className = 'status-badge status-good';
+            } else if (fs >= nyquistFreq * 0.8) {
+                samplingStatus.textContent = '⚠️ Near Nyquist';
+                samplingStatus.className = 'status-badge status-warning';
+            } else {
+                samplingStatus.textContent = '❌ Undersampled';
+                samplingStatus.className = 'status-badge status-danger';
+            }
+            
+            // Update info
+            nyquistInfo.innerHTML = `
+                Signal max frequency: <strong>${maxFreq.toFixed(0)} Hz</strong><br>
+                Nyquist rate required: <strong>${nyquistFreq.toFixed(0)} Hz</strong><br>
+                Current sampling: <strong>${fs.toFixed(0)} Hz</strong> (${ratio.toFixed(2)}× Nyquist)<br>
+                ${fs < nyquistFreq ? '<span style="color:#ff0000;">⚠️ Aliasing will occur!</span>' : '<span style="color:#00ff00;">✓ No aliasing</span>'}
+            `;
+        }
+
+        // Event listeners
+        frequencyInput.addEventListener('input', updateSliderRange);
+        velocityInput.addEventListener('input', updateSliderRange);
+        samplingSlider.addEventListener('input', updateSamplingStatus);
+
+        // Initialize on load
+        updateSliderRange();
     </script>
 </body>
-
 </html>
