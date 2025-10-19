@@ -31,35 +31,22 @@ def generate():
         f0 = float(request.form.get("frequency", 440.0))
         fs_user = float(request.form.get("sampling_freq", 2000))
         d0 = float(request.form.get("distance", 10.0))
-        duration = float(request.form.get("duration", 6.0))  # CHANGED to 6 seconds
+        duration = float(request.form.get("duration", 6.0))
 
         print(f"Generating: v={v}, f0={f0}, fs={fs_user}")
 
-        # Set reasonable limits for audio playback
-        fs_user = max(500, min(fs_user, 48000))
-        fs = int(fs_user)
-        
         # ALWAYS generate at high quality first for comparison
         fs_high = 44100
         N_high = int(duration * fs_high)
         t_high = np.linspace(0, duration, N_high, endpoint=False)
 
-        # ==================== IMPROVED DOPPLER SHIFT MODEL ====================
-        # Car starts 50m away, passes at closest point d0, and continues to 50m away
-        # This creates a more realistic Doppler effect
-        
-        # Time when car is closest to observer (middle of duration)
+        # ==================== DOPPLER SHIFT MODEL ====================
         t_closest = duration / 2.0
+        x0 = -50.0
+        x = x0 + v * t_high
         
-        # Car position - starts from left, passes observer, continues to right
-        # Using a more realistic trajectory
-        x0 = -50.0  # Start 50m to the left
-        x = x0 + v * t_high  # Position over time
-        
-        # Distance from observer (who is at x=0, y=d0)
         r = np.sqrt(x**2 + d0**2)
         
-        # Radial velocity component (derivative of distance)
         v_radial = np.zeros_like(x)
         for i in range(len(x)):
             if r[i] > 1e-9:
@@ -67,162 +54,129 @@ def generate():
             else:
                 v_radial[i] = 0
         
-        # Doppler shifted frequency (positive when approaching, negative when receding)
         f_inst = f0 * c / (c - v_radial)
-        f_inst = np.clip(f_inst, 50, 20000)  # Extended frequency range
+        f_inst = np.clip(f_inst, 50, 20000)
         
-        # Generate phase with proper frequency integration
         phase = 2.0 * np.pi * np.cumsum(f_inst) / fs_high
         # ============================================================
 
-        # ==================== IMPROVED REALISTIC CAR HORN GENERATION ====================
-        # Real car horns have multiple frequencies, noise, and characteristic attack/decay
-
-        # Base frequencies for a typical car horn (A4 and C5 chords)
-        f1 = f0 * 1.0  # Fundamental
-        f2 = f0 * 1.26  # Major third
-        f3 = f0 * 1.5   # Perfect fifth
-
-        # Generate each frequency component with proper Doppler shift
+        # ==================== REALISTIC CAR HORN GENERATION ====================
         phase1 = 2.0 * np.pi * np.cumsum(f_inst) / fs_high
         phase2 = 2.0 * np.pi * np.cumsum(f_inst * 1.26) / fs_high  
         phase3 = 2.0 * np.pi * np.cumsum(f_inst * 1.5) / fs_high
 
-        # Create the horn sound with multiple harmonics
-        sig_high = (0.6 * np.sin(phase1) +           # Fundamental
-                    0.4 * np.sin(phase2) +           # Major third
-                    0.3 * np.sin(phase3) +           # Perfect fifth
-                    0.2 * np.sin(2 * phase1) +       # 2nd harmonic
-                    0.1 * np.sin(3 * phase1))        # 3rd harmonic
+        sig_high = (0.6 * np.sin(phase1) +
+                    0.4 * np.sin(phase2) +
+                    0.3 * np.sin(phase3) +
+                    0.2 * np.sin(2 * phase1) +
+                    0.1 * np.sin(3 * phase1))
 
-        # Add some very low-level noise for realism (like wind, engine rumble)
         noise_level = 0.02
         environment_noise = np.random.normal(0, noise_level, len(sig_high))
         sig_high += environment_noise
 
-        # Realistic amplitude envelope (distance effect + horn characteristics)
-        # Inverse square law for sound intensity
         base_amp = 1.0 / (r + 1.0)**2
-
-        # Normalize and scale amplitude with dynamic range
         base_amp = base_amp / np.max(base_amp) * 3.0
-        base_amp = np.clip(base_amp, 0.05, 3.0)  # Keep some minimum level
+        base_amp = np.clip(base_amp, 0.05, 3.0)
 
-        # Apply amplitude modulation with realistic horn behavior
         sig_high *= base_amp
 
-        # Add realistic attack and decay
-        attack_time = 0.15  # Horn takes time to reach full volume
-        decay_time = 0.3    # Horn sound doesn't cut off instantly
-
+        attack_time = 0.15
+        decay_time = 0.3
         attack_samples = int(attack_time * fs_high)
         decay_samples = int(decay_time * fs_high)
-
-        # Smooth attack (quick rise)
-        attack_env = np.linspace(0, 1, attack_samples)**0.5  # Faster attack
-        # Smooth decay (slower release)  
-        decay_env = np.linspace(1, 0, decay_samples)**0.7    # Slower decay
-
-        # Apply envelopes
+        attack_env = np.linspace(0, 1, attack_samples)**0.5
+        decay_env = np.linspace(1, 0, decay_samples)**0.7
         sig_high[:attack_samples] *= attack_env
         sig_high[-decay_samples:] *= decay_env
 
-        # Add a slight "buzz" characteristic of real horns
-        buzz_freq = 20  # Hz - Low frequency buzz
+        buzz_freq = 20
         buzz = 0.05 * np.sin(2 * np.pi * buzz_freq * t_high)
-        sig_high += buzz * base_amp  # Buzz amplitude follows main amplitude
+        sig_high += buzz * base_amp
 
-        # Final normalization with careful limiting
-        sig_high = sig_high / (np.max(np.abs(sig_high)) + 1e-9) * 0.8  # Leave some headroom
+        sig_high = sig_high / (np.max(np.abs(sig_high)) + 1e-9) * 0.8
         # ===================================================================
 
         # ==================== GENERATE ALIASED SIGNAL ====================
-        # Create the aliased version for playback
-        if fs != fs_high:
+        # Create aliased signal at user's requested sampling rate
+        target_samples = int(duration * fs_user)
+        
+        if fs_user < fs_high:
             # Simple decimation to cause aliasing
-            decimation_factor = max(1, fs_high // fs)
-            if decimation_factor > 1:
-                sig_aliased = sig_high[::decimation_factor]
-                # Ensure we have the right length
-                target_length = int(duration * fs)
-                if len(sig_aliased) > target_length:
-                    sig_aliased = sig_aliased[:target_length]
-                else:
-                    # Pad if needed
-                    sig_aliased = np.pad(sig_aliased, (0, target_length - len(sig_aliased)))
-            else:
-                sig_aliased = resample(sig_high, int(duration * fs))
+            decimation_factor = int(fs_high / fs_user)
+            sig_aliased = sig_high[::decimation_factor]
+            
+            # Ensure correct length
+            if len(sig_aliased) > target_samples:
+                sig_aliased = sig_aliased[:target_samples]
+            elif len(sig_aliased) < target_samples:
+                sig_aliased = np.pad(sig_aliased, (0, target_samples - len(sig_aliased)))
         else:
-            sig_aliased = sig_high
+            sig_aliased = resample(sig_high, target_samples)
         
         # Create time array for the aliased signal
         t = np.linspace(0, duration, len(sig_aliased), endpoint=False)
 
-        # For very low sampling rates, apply additional filtering to make it audible
-        if fs < 4000:
-            # Add some noise to make low SR audio more audible (reduced from before)
-            noise = np.random.normal(0, 0.03, len(sig_aliased))
-            sig_aliased = sig_aliased + noise
-            sig_aliased = sig_aliased / (np.max(np.abs(sig_aliased)) + 1e-9) * 0.8
-        
-        print(f"Generated {len(sig_aliased)} samples at {fs} Hz")
+        print(f"Generated {len(sig_aliased)} samples at {fs_user} Hz")
         # =================================================================
 
         # ==================== CALCULATE METRICS ====================
-        # Max frequency in original signal
         max_freq_inst = np.max(np.abs(f_inst))
-        max_freq = int(max_freq_inst * 4)  # Including up to 4th harmonic
-        nyquist_freq = 2 * max_freq
+        nyquist_freq = fs_user / 2
         
-        # Determine sampling status
-        if fs_user >= nyquist_freq:
+        if fs_user >= 2 * max_freq_inst:
             sampling_status = "✓ Properly Sampled (No Aliasing)"
             status_class = "good"
-        elif fs_user >= max_freq:  # Above max frequency but below Nyquist
-            sampling_status = "⚠️ Near Nyquist (Marginal)"
+        elif fs_user >= max_freq_inst:
+            sampling_status = "⚠️ Near Nyquist (Marginal Aliasing)"
             status_class = "warning"
         else:
-            sampling_status = "❌ Undersampled (Aliasing Present)"
+            sampling_status = "❌ Undersampled (Severe Aliasing)"
             status_class = "danger"
         
-        print(f"Max freq: {max_freq} Hz, Nyquist: {nyquist_freq} Hz, Status: {sampling_status}")
+        print(f"Max freq: {max_freq_inst:.0f} Hz, Nyquist: {nyquist_freq:.0f} Hz, Status: {sampling_status}")
         # ===========================================================
 
         # ==================== SAVE AUDIO FILE ====================
-        # Use the aliased signal for audio, but ensure minimum 8000Hz for browser compatibility
-        audio_fs = max(8000, fs)  # Minimum 8000Hz for browser playback
-        if audio_fs != fs:
-            # Resample to minimum playable rate while preserving aliasing effects
-            num_samples_audio = int(duration * audio_fs)
-            sig_audio = resample(sig_aliased, num_samples_audio)
+        # CRITICAL FIX: Always use playable sample rate (8000Hz minimum)
+        # but preserve the aliasing effects from the user's selected rate
+        
+        # Use the aliased signal but resample to playable rate
+        audio_fs = 8000  # Fixed playable rate - browsers can handle this
+        
+        # Resample the aliased signal to playable rate WITHOUT anti-aliasing filter
+        num_samples_audio = int(duration * audio_fs)
+        
+        if len(sig_aliased) != num_samples_audio:
+            # Use linear interpolation to preserve aliasing effects
+            indices = np.linspace(0, len(sig_aliased)-1, num_samples_audio)
+            sig_audio = np.interp(indices, np.arange(len(sig_aliased)), sig_aliased)
         else:
             sig_audio = sig_aliased
             
+        # Normalize for WAV file
+        sig_audio = sig_audio / (np.max(np.abs(sig_audio)) + 1e-9) * 0.8
         audio = np.clip(sig_audio * 32767, -32767, 32767).astype(np.int16)
         
         file_id = str(uuid.uuid4())
         filename = os.path.join(TEMP_DIR, f"{file_id}.wav")
         write(filename, audio_fs, audio)
-        print(f"Saved audio: {filename} at {audio_fs} Hz")
+        print(f"Saved audio: {filename} at {audio_fs} Hz (Aliasing from {fs_user} Hz)")
         # ========================================================
 
-        # ==================== IMPROVED VISUALIZATION ====================
-        # Show the COMPLETE signal (all 6 seconds) with better downsampling
-        t_vis = t  # Use the entire time array
-        sig_vis = sig_aliased  # Use the entire signal
+        # ==================== PREPARE VISUALIZATION ====================
+        # Show the COMPLETE signal (all 6 seconds)
+        t_vis = t
+        sig_vis = sig_aliased
 
-        # IMPROVED: Use adaptive downsampling to preserve important features
-        max_points = 3000  # Increased from 2000 to 3000 for better detail
-        
+        # Downsample for plotting
+        max_points = 3000
         if len(t_vis) > max_points:
-            # Use every nth sample instead of linear spacing to preserve high-frequency details
             stride = len(t_vis) // max_points
             if stride < 1:
                 stride = 1
             t_plot = t_vis[::stride]
             sig_plot = sig_vis[::stride]
-            
-            # If we still have too many points, take the first max_points
             if len(t_plot) > max_points:
                 t_plot = t_plot[:max_points]
                 sig_plot = sig_plot[:max_points]
@@ -245,8 +199,8 @@ def generate():
             f0=round(f0, 2),
             fs_user=int(fs_user),
             audio_fs=int(audio_fs),
-            max_freq=max_freq,
-            nyquist_freq=nyquist_freq,
+            max_freq=int(max_freq_inst),
+            nyquist_freq=int(nyquist_freq),
             sampling_status=sampling_status,
             status_class=status_class,
             x_plot_json=json.dumps(x_list),
