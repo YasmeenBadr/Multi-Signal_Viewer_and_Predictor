@@ -694,6 +694,55 @@
             }
         }
 
+        async function classifyReconstructed() {
+            if (!reconstructedBuffer) {
+                messageBox.textContent = "No reconstructed audio available! Enable anti-aliasing filter.";
+                return;
+            }
+
+            classifyReconstructedBtn.disabled = true;
+            messageBox.textContent = "Classifying reconstructed audio... Please wait.";
+
+            try {
+                // Convert reconstructed buffer to WAV file
+                const wavBlob = audioBufferToWav(reconstructedBuffer);
+                const wavFile = new File([wavBlob], 'reconstructed_audio.wav', { type: 'audio/wav' });
+                
+                const formData = new FormData();
+                formData.append('audio', wavFile);
+
+                const response = await fetch('/voice/classify', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.error || 'Classification failed');
+                }
+                
+                // Store and display results
+                const targetRate = parseInt(frequencySlider.value);
+                reconstructedClassification = {
+                    gender: data.gender,
+                    confidence: data.confidence,
+                    pitch: data.pitch,
+                    sampleRate: originalRate,
+                    downsampledFrom: targetRate
+                };
+                
+                displayReconstructedResults(reconstructedClassification);
+                messageBox.textContent = "Reconstructed audio classified successfully!";
+                
+            } catch (error) {
+                messageBox.textContent = "Error: " + error.message;
+                console.error('Classification error:', error);
+            } finally {
+                classifyReconstructedBtn.disabled = false;
+            }
+        }
+
         function displayOriginalResults(data) {
             originalGender.textContent = data.gender.toUpperCase();
             originalConfidence.textContent = (data.confidence * 100).toFixed(1) + '%';
@@ -738,6 +787,30 @@
             }
 
             resampledResults.classList.remove('hidden');
+        }
+
+        function displayReconstructedResults(data) {
+            reconstructedGender.textContent = data.gender.toUpperCase();
+            reconstructedConfidence.textContent = (data.confidence * 100).toFixed(1) + '%';
+            reconstructedPitch.textContent = data.pitch.toFixed(1) + ' Hz';
+            reconstructedSampleRate.textContent = data.sampleRate;
+            reconstructedOriginalRate.textContent = data.downsampledFrom;
+
+            // Reset and apply gender-specific styling
+            reconstructedResults.classList.remove('results-male', 'results-female');
+            reconstructedAccentBar.classList.remove('gender-accent-bar-male', 'gender-accent-bar-female');
+
+            if (data.gender === 'male') {
+                reconstructedResults.classList.add('results-male');
+                reconstructedAccentBar.classList.add('gender-accent-bar-male');
+                reconstructedGender.className = 'text-2xl font-bold text-blue-400';
+            } else {
+                reconstructedResults.classList.add('results-female');
+                reconstructedAccentBar.classList.add('gender-accent-bar-female');
+                reconstructedGender.className = 'text-2xl font-bold text-pink-400';
+            }
+
+            reconstructedResults.classList.remove('hidden');
         }
 
         function displayAliasingAnalysis() {
@@ -795,8 +868,10 @@
             if (originalBuffer) {
                 playOriginalBtn.disabled = false;
                 playSampledBtn.disabled = false;
+                playReconstructedBtn.disabled = false;
                 classifyOriginalBtn.disabled = false;
                 classifyResampledBtn.disabled = false;
+                classifyReconstructedBtn.disabled = false;
             }
             pauseBtn.disabled = true;
             messageBox.textContent = "Playback paused/stopped.";
@@ -821,6 +896,7 @@
             // Clear data
             originalBuffer = null;
             resampledBuffer = null;
+            reconstructedBuffer = null;
             uploadedFile = null;
             isPlaying = false;
             currentSourceNode = null;
@@ -828,6 +904,7 @@
             recordingStartTime = null;
             originalClassification = null;
             resampledClassification = null;
+            reconstructedClassification = null;
             
             // Reset recording UI
             recordBtn.disabled = false;
@@ -841,10 +918,12 @@
             controls.classList.add('opacity-50', 'pointer-events-none');
             playOriginalBtn.disabled = true;
             playSampledBtn.disabled = true;
+            playReconstructedBtn.disabled = true;
             pauseBtn.disabled = true;
             resetBtn.disabled = true;
             classifyOriginalBtn.disabled = true;
             classifyResampledBtn.disabled = true;
+            classifyReconstructedBtn.disabled = true;
             
             fileNameDisplay.classList.add('hidden');
             filePrompt.classList.remove('hidden');
@@ -860,13 +939,16 @@
             // Hide all results
             originalResults.classList.add('hidden');
             resampledResults.classList.add('hidden');
+            reconstructedResults.classList.add('hidden');
             aliasingAnalysis.classList.add('hidden');
             
             // Remove gender accent classes on full reset
             originalResults.classList.remove('results-male', 'results-female');
             resampledResults.classList.remove('results-male', 'results-female');
+            reconstructedResults.classList.remove('results-male', 'results-female');
             originalAccentBar.classList.remove('gender-accent-bar-male', 'gender-accent-bar-female');
             resampledAccentBar.classList.remove('gender-accent-bar-male', 'gender-accent-bar-female');
+            reconstructedAccentBar.classList.remove('gender-accent-bar-male', 'gender-accent-bar-female');
 
             messageBox.textContent = "Application reset. Ready for new file.";
         }
@@ -887,9 +969,11 @@
                     currentSourceNode = null;
                     playOriginalBtn.disabled = false;
                     playSampledBtn.disabled = false;
+                    playReconstructedBtn.disabled = false;
                     pauseBtn.disabled = true;
                     classifyOriginalBtn.disabled = false;
                     classifyResampledBtn.disabled = false;
+                    classifyReconstructedBtn.disabled = false;
                     messageBox.textContent = "Playback finished.";
                 }
             };
@@ -898,8 +982,10 @@
             isPlaying = true;
             playOriginalBtn.disabled = true;
             playSampledBtn.disabled = true;
+            playReconstructedBtn.disabled = true;
             classifyOriginalBtn.disabled = true; // Disable classification during playback
             classifyResampledBtn.disabled = true;
+            classifyReconstructedBtn.disabled = true;
             pauseBtn.disabled = false;
             messageBox.textContent = "Playing audio...";
         }
@@ -1153,12 +1239,32 @@
                 playAudio(resampledBuffer);
             }
         });
+
+        playReconstructedBtn.addEventListener('click', () => {
+            if (reconstructedBuffer) {
+                playAudio(reconstructedBuffer);
+            } else {
+                messageBox.textContent = "No reconstructed audio available! Enable anti-aliasing filter and adjust sample rate.";
+            }
+        });
         
         // Control buttons
         pauseBtn.addEventListener('click', stopAudio);
         resetBtn.addEventListener('click', resetApp);
         classifyOriginalBtn.addEventListener('click', classifyOriginal);
         classifyResampledBtn.addEventListener('click', classifyResampled);
+        classifyReconstructedBtn.addEventListener('click', classifyReconstructed);
+
+        // Anti-aliasing toggle handler
+        antiAliasingToggle.addEventListener('change', () => {
+            if (originalBuffer) {
+                const targetRate = parseInt(frequencySlider.value);
+                resampleAudio(targetRate);
+                messageBox.textContent = antiAliasingToggle.checked ? 
+                    "Anti-aliasing filter enabled. Signal will be low-pass filtered before downsampling." : 
+                    "Anti-aliasing filter disabled. Direct downsampling (aliasing may occur).";
+            }
+        });
 
         // Initial setup on load
         document.addEventListener('DOMContentLoaded', initAudioContext);
