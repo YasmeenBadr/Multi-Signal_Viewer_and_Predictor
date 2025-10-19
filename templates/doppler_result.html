@@ -2,116 +2,418 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Doppler Generation Result</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     body {
-      background:#000;
-      color:#e0e0e0;
-      text-align:center;
-      font-family:"Inter", sans-serif;
+      background: linear-gradient(135deg, #000 0%, #1a1a2e 100%);
+      color: #e0e0e0;
+      text-align: center;
+      font-family: "Segoe UI", sans-serif;
+      padding-bottom: 50px;
+      min-height: 100vh;
     }
-    h1 { color:#00eaff; font-weight:bold; }
-    h2 { color:#00eaff; margin-top: 30px; }
-    .doppler-btn { background-color: #00eaff; border: none; color: black; font-weight: bold; }
-    .doppler-btn:hover { background-color: #00c0cc; color: white; }
-    .back-btn { background-color: white; border: none; color: black; font-weight: bold; }
-    .back-btn:hover { background-color: #e0e0e0; color: black; }
-    canvas { background: #111; margin-top: 20px; border-radius: 8px; }
-    p, li { font-size: 1.1rem; }
+    h1 { 
+      color: #00eaff; 
+      font-weight: bold; 
+      margin: 30px 0;
+      text-shadow: 0 0 20px rgba(0, 234, 255, 0.5);
+    }
+    h2 { 
+      color: #00eaff; 
+      margin-top: 40px;
+      font-size: 1.5rem;
+    }
+    .doppler-btn { 
+      background: linear-gradient(135deg, #00eaff 0%, #00c0cc 100%);
+      border: none; 
+      color: black; 
+      font-weight: bold;
+      padding: 12px 30px;
+      border-radius: 8px;
+      transition: all 0.3s;
+      box-shadow: 0 4px 15px rgba(0, 234, 255, 0.3);
+    }
+    .doppler-btn:hover { 
+      background: linear-gradient(135deg, #00c0cc 0%, #00a0b0 100%);
+      color: white;
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(0, 234, 255, 0.5);
+    }
+    .back-btn { 
+      background: white; 
+      border: none; 
+      color: black; 
+      font-weight: bold;
+      padding: 12px 30px;
+      border-radius: 8px;
+      transition: all 0.3s;
+    }
+    .back-btn:hover { 
+      background: #e0e0e0; 
+      transform: translateY(-2px);
+    }
+    .chart-container {
+      position: relative;
+      height: 450px;
+      margin: 30px auto;
+      background: rgba(17, 17, 17, 0.8);
+      border-radius: 15px;
+      padding: 25px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+      border: 1px solid rgba(0, 234, 255, 0.2);
+      max-width: 900px;
+    }
     #sampling_status { 
       font-weight: bold; 
-      font-size: 1.2rem; 
-      margin-top: 10px; 
+      font-size: 1.4rem; 
+      margin: 20px auto;
+      padding: 15px 25px;
+      border-radius: 10px;
+      max-width: 600px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
     }
-    .status-good { color: #00ff00; }
-    .status-warning { color: #ffea00; }
-    .status-danger { color: #ff0000; }
+    .status-good { 
+      color: #00ff00; 
+      background: rgba(0, 255, 0, 0.15);
+      border: 2px solid rgba(0, 255, 0, 0.3);
+    }
+    .status-warning { 
+      color: #ffea00; 
+      background: rgba(255, 234, 0, 0.15);
+      border: 2px solid rgba(255, 234, 0, 0.3);
+    }
+    .status-danger { 
+      color: #ff3333; 
+      background: rgba(255, 51, 51, 0.15);
+      border: 2px solid rgba(255, 51, 51, 0.3);
+    }
+    .params-box {
+      background: rgba(26, 26, 46, 0.6);
+      border-radius: 15px;
+      padding: 25px;
+      margin: 25px auto;
+      max-width: 700px;
+      border: 2px solid rgba(0, 234, 255, 0.2);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    }
+    .params-box ul {
+      list-style: none;
+      padding: 0;
+      margin: 15px 0 0 0;
+    }
+    .params-box li {
+      padding: 12px 0;
+      border-bottom: 1px solid rgba(0, 234, 255, 0.1);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .params-box li:last-child {
+      border-bottom: none;
+    }
+    .param-label {
+      color: #aaa;
+    }
+    .param-value {
+      color: #00eaff;
+      font-weight: bold;
+    }
+    audio {
+      margin: 20px 0;
+      width: 100%;
+      max-width: 600px;
+      border-radius: 10px;
+    }
+    .frequency-info {
+      display: flex;
+      justify-content: space-around;
+      max-width: 500px;
+      margin: 20px auto;
+      gap: 20px;
+    }
+    .freq-card {
+      background: rgba(0, 234, 255, 0.1);
+      padding: 15px;
+      border-radius: 10px;
+      border: 1px solid rgba(0, 234, 255, 0.3);
+      flex: 1;
+    }
+    .freq-card h4 {
+      color: #00eaff;
+      font-size: 0.9rem;
+      margin-bottom: 5px;
+    }
+    .freq-card p {
+      color: white;
+      font-size: 1.3rem;
+      font-weight: bold;
+      margin: 0;
+    }
+    .error-message {
+      background: rgba(255, 0, 0, 0.2);
+      color: #ff6666;
+      padding: 20px;
+      border-radius: 10px;
+      border: 2px solid rgba(255, 0, 0, 0.5);
+      margin: 20px;
+    }
+    .doppler-explanation {
+      background: rgba(0, 234, 255, 0.1);
+      border-left: 4px solid #00eaff;
+      padding: 15px;
+      margin: 20px auto;
+      max-width: 700px;
+      border-radius: 8px;
+      text-align: left;
+    }
   </style>
 </head>
 <body>
   <div class="container mt-5">
-    <h1>Doppler Generation Result</h1>
+    <h1>🔊 Doppler Effect Simulation Result</h1>
    
     <!-- Parameters -->
-    <div id="result-details" class="mb-4">
-        <p><strong>Parameters used:</strong></p>
-        <ul style="list-style:none;">
-            <li>Velocity: {{ v }} m/s</li>
-            <li>Horn Frequency: {{ f0 }} Hz</li>
-            <li>Sampling Frequency: {{ fs_user }} Hz</li>
-            <li>Max Signal Frequency: {{ max_freq }} Hz</li>
-            <li>Nyquist Rate Required: {{ nyquist_freq }} Hz</li>
+    <div class="params-box">
+        <p><strong>📊 Simulation Parameters</strong></p>
+        <ul>
+            <li>
+              <span class="param-label">🚗 Vehicle Velocity:</span>
+              <span class="param-value">{{ v }} m/s</span>
+            </li>
+            <li>
+              <span class="param-label">📢 Base Horn Frequency:</span>
+              <span class="param-value">{{ f0 }} Hz</span>
+            </li>
+            <li>
+              <span class="param-label">📈 Max Frequency (with harmonics):</span>
+              <span class="param-value">{{ max_freq }} Hz</span>
+            </li>
+            <li>
+              <span class="param-label">⚡ Nyquist Rate:</span>
+              <span class="param-value">{{ nyquist_freq }} Hz</span>
+            </li>
+            <li>
+              <span class="param-label">⏱️ Duration:</span>
+              <span class="param-value">{{ duration }} seconds</span>
+            </li>
         </ul>
     </div>
     
+    
     <!-- Sampling Status -->
-    <p id="sampling_status" class="{% if 'Aliasing' in sampling_status or 'Undersampled' in sampling_status %}status-danger{% elif 'Near' in sampling_status or 'Marginal' in sampling_status %}status-warning{% else %}status-good{% endif %}">
-      Sampling Condition: {{ sampling_status }}
+    <p id="sampling_status" class="status-{{ status_class }}">
+      {{ sampling_status }}
     </p>
+    
+    <!-- Doppler Explanation -->
+    <div class="doppler-explanation">
+      <strong>🎯 What you should hear:</strong><br>
+      The car starts from a distance, approaches you (higher pitch), passes by, and then recedes into the distance (lower pitch).
+      This creates the classic "wee-oo" Doppler effect sound over {{ duration }} seconds.
+    </div>
     
     <!-- Audio Player -->
     <div id="audio-player-container" class="mb-4">
-        <h2>Generated Sound</h2>
-        <audio controls>
+        <h2>🎵 Generated Doppler Sound</h2>
+        <audio controls id="audioPlayer">
             <source src="{{ url_for('doppler.serve_audio', file_id=audio_file_id) }}" type="audio/wav">
             Your browser does not support the audio element.
         </audio>
         <br>
         <a href="{{ url_for('doppler.serve_audio', file_id=audio_file_id) }}"
            download="doppler_v{{ v }}_f{{ f0 }}_fs{{ fs_user }}.wav"
-           class="btn doppler-btn mt-3">Download WAV File</a>
+           class="btn doppler-btn mt-3">⬇️ Download WAV File</a>
     </div>
     
     <!-- Signal Plot -->
     <div>
-        <h2>Time-Domain Signal</h2>
-        <canvas id="signalPlot" width="800" height="350"></canvas>
+        <h2>📉 Time-Domain Signal Waveform</h2>
+        <p style="color: #aaa; font-size: 0.95rem;">Showing complete {{ duration }} second signal </p>
+        <div class="chart-container">
+          <canvas id="signalPlot"></canvas>
+        </div>
     </div>
     
     <!-- Return Button -->
-    <a href="{{ url_for('doppler.index') }}" class="btn back-btn mt-5 mb-5">⬅ Return to Generator</a>
+    <a href="{{ url_for('doppler.index') }}" class="btn back-btn mt-5">⬅️ Return to Generator</a>
   </div>
   
-  <!-- Chart.js -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script>
-    const xData = JSON.parse('{{ x_plot_json | tojson | safe }}');
-    const yData = JSON.parse('{{ y_plot_json | tojson | safe }}');
-    const ctx = document.getElementById('signalPlot').getContext('2d');
-    new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: xData,
-            datasets: [{
-                label: 'Generated Doppler Signal',
-                data: yData,
-                borderColor: 'rgba(0, 234, 255, 1)',
-                borderWidth: 1,
-                pointRadius: 0,
-                fill: false
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            animation: false,
-            scales: {
-                x: {
-                    title: { display: true, text: 'Time (s)', color: '#e0e0e0' },
-                    ticks: { color: '#e0e0e0', callback: value => Number(value).toFixed(2) },
-                    grid: { color: '#333' }
-                },
-                y: {
-                    title: { display: true, text: 'Amplitude', color: '#e0e0e0' },
-                    ticks: { color: '#e0e0e0', callback: value => Number(value).toFixed(2) },
-                    grid: { color: '#333' }
-                }
-            },
-            plugins: {
-                legend: { labels: { color: '#e0e0e0' } }
-            }
-        }
+    console.log('Script started');
+    
+    // Parse data from Flask with error handling
+    let xData, yData;
+    try {
+      const xDataRaw = '{{ x_plot_json | safe }}';
+      const yDataRaw = '{{ y_plot_json | safe }}';
+      
+      console.log('Raw X data length:', xDataRaw.length);
+      console.log('Raw Y data length:', yDataRaw.length);
+      
+      xData = JSON.parse(xDataRaw);
+      yData = JSON.parse(yDataRaw);
+      
+      console.log('Parsed X data:', xData.length, 'points');
+      console.log('Parsed Y data:', yData.length, 'points');
+      console.log('First few X values:', xData.slice(0, 5));
+      console.log('First few Y values:', yData.slice(0, 5));
+      
+      if (!Array.isArray(xData) || !Array.isArray(yData)) {
+        throw new Error('Data is not in array format');
+      }
+      
+      if (xData.length === 0 || yData.length === 0) {
+        throw new Error('Data arrays are empty');
+      }
+      
+      if (xData.length !== yData.length) {
+        throw new Error('X and Y data lengths do not match');
+      }
+      
+      // Create the chart with better configuration for 6-second signal
+      const ctx = document.getElementById('signalPlot');
+      if (!ctx) {
+        throw new Error('Canvas element not found');
+      }
+      
+      console.log('Creating chart...');
+      const chart = new Chart(ctx.getContext('2d'), {
+          type: 'line',
+          data: {
+              labels: xData,
+              datasets: [{
+                  label: 'Amplitude',
+                  data: yData,
+                  borderColor: 'rgba(0, 234, 255, 1)',
+                  backgroundColor: 'rgba(0, 234, 255, 0.1)',
+                  borderWidth: 1.5,
+                  pointRadius: 0,
+                  fill: true,
+                  tension: 0, // No smoothing to see actual aliasing
+                  borderJoinStyle: 'round'
+              }]
+          },
+          options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              animation: {
+                  duration: 0
+              },
+              interaction: {
+                  intersect: false,
+                  mode: 'index'
+              },
+              plugins: {
+                  legend: { 
+                      display: true,
+                      labels: { 
+                          color: '#e0e0e0',
+                          font: { size: 13 }
+                      } 
+                  },
+                  tooltip: {
+                      enabled: true,
+                      backgroundColor: 'rgba(0, 0, 0, 0.9)',
+                      titleColor: '#00eaff',
+                      bodyColor: '#e0e0e0',
+                      borderColor: '#00eaff',
+                      borderWidth: 1,
+                      callbacks: {
+                          label: function(context) {
+                              return 'Amplitude: ' + context.parsed.y.toFixed(4);
+                          },
+                          title: function(context) {
+                              return 'Time: ' + context[0].parsed.x.toFixed(2) + ' s';
+                          }
+                      }
+                  }
+              },
+              scales: {
+                  x: {
+                      type: 'linear',
+                      title: { 
+                          display: true, 
+                          text: 'Time (seconds)', 
+                          color: '#00eaff',
+                          font: { size: 14, weight: 'bold' }
+                      },
+                      ticks: { 
+                          color: '#e0e0e0',
+                          maxTicksLimit: 12, // More ticks for 6 seconds
+                          callback: function(value) {
+                              return value.toFixed(1) + 's';
+                          }
+                      },
+                      grid: { 
+                          color: 'rgba(0, 234, 255, 0.1)',
+                          lineWidth: 1
+                      },
+                      min: 0,
+                      max: 6 // Fixed to 6 seconds
+                  },
+                  y: {
+                      title: { 
+                          display: true, 
+                          text: 'Amplitude', 
+                          color: '#00eaff',
+                          font: { size: 14, weight: 'bold' }
+                      },
+                      ticks: { 
+                          color: '#e0e0e0',
+                          callback: function(value) {
+                              return value.toFixed(2);
+                          }
+                      },
+                      grid: { 
+                          color: 'rgba(0, 234, 255, 0.1)',
+                          lineWidth: 1
+                      },
+                      min: -1,
+                      max: 1
+                  }
+              }
+          }
+      });
+      
+      console.log('Chart created successfully!');
+      
+    } catch (error) {
+      console.error('Error loading chart:', error);
+      console.error('Error stack:', error.stack);
+      
+      const chartContainer = document.querySelector('.chart-container');
+      if (chartContainer) {
+        chartContainer.innerHTML = 
+          '<div class="error-message">' +
+          '<strong>❌ Error loading chart</strong><br>' +
+          error.message + '<br><br>' +
+          'Check browser console (F12) for details.' +
+          '</div>';
+      }
+    }
+    
+    // Audio player setup
+    window.addEventListener('load', function() {
+      const audio = document.getElementById('audioPlayer');
+      if (audio) {
+        audio.volume = 0.7;
+        console.log('Audio player ready');
+        
+        // Add event listener for playback issues
+        audio.addEventListener('error', function(e) {
+          console.error('Audio playback error:', e);
+          const container = document.getElementById('audio-player-container');
+          container.innerHTML += 
+            '<div class="error-message mt-3">' +
+            '<strong>⚠️ Audio Playback Issue</strong><br>' +
+            'The audio file may be corrupted or the format is not supported. ' +
+            'Try downloading the file instead.' +
+            '</div>';
+        });
+      }
     });
   </script>
 </body>
