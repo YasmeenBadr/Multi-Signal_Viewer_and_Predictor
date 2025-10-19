@@ -116,11 +116,11 @@ def generate():
 
     # ======= Determine sampling status =======
     if fs_user >= nyquist_freq:
-        sampling_status = "✓ Properly Sampled (No Aliasing)"
+        sampling_status = "[OK] Properly Sampled (No Aliasing)"
     elif fs_user >= nyquist_freq * 0.8:
-        sampling_status = "⚠️ Near Nyquist (Marginal)"
+        sampling_status = "[WARNING] Near Nyquist (Marginal)"
     else:
-        sampling_status = "❌ Undersampled (Aliasing Present)"
+        sampling_status = "[ERROR] Undersampled (Aliasing Present)"
 
     # ======= Prepare for visualization (downsample if too many points) =======
     max_plot_points = 5000

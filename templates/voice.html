@@ -1,485 +1,559 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Voice Gender Classification with Aliasing Demo</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Voice Processing Suite</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body {
-            font-family: 'Inter', sans-serif;
-            background-color: #121212;
+            /* Applied Inter font family */
+            font-family: 'Inter', sans-serif; 
+            /* Subtle, dark radial gradient background for a "digital" feel */
+            background: radial-gradient(circle at top, #121212 0%, #0a0a0a 100%);
             color: white;
+            overflow-x: hidden;
         }
-
         .main-color {
-            color: #00eaff;
+            color: #00eaff; /* Neon Cyan */
         }
-
-        .drag-area {
-            border: 2px dashed #00eaff;
-            background-color: #1f1f1f;
-            transition: all 0.3s;
+        .glass-card {
+            /* Defines the "Glassmorphism" effect */
+            backdrop-filter: blur(12px);
+            background: rgba(31, 31, 31, 0.7);
+            /* Subtle neon border */
+            border: 1px solid rgba(0, 234, 255, 0.2);
+            box-shadow: 0 0 20px rgba(0, 234, 255, 0.05);
+            transition: all 0.4s ease;
         }
-
-        .drag-area.drag-over {
-            background-color: #2a2a2a;
-            border-color: #0088aa;
-        }
-
-        .btn-control {
-            transition: all 0.2s;
-        }
-
-        .btn-control:hover:not(:disabled) {
+        .glass-card:hover {
+            border-color: rgba(0, 234, 255, 0.5);
+            box-shadow: 0 0 25px rgba(0, 234, 255, 0.15);
             transform: translateY(-2px);
         }
-
-        .gender-badge {
-            display: inline-block;
-            padding: 0.5rem 1rem;
+        .drag-area {
+            /* Neon dashed border for the active/upload area */
+            border: 2px dashed #00eaff;
+            background-color: rgba(15, 15, 15, 0.8);
+            transition: 0.4s ease;
+            backdrop-filter: blur(6px);
+        }
+        .drag-area.drag-over {
+            /* Active state for drag-over */
+            background-color: rgba(0, 234, 255, 0.1);
+            border-color: #00eaff;
+            box-shadow: 0 0 12px rgba(0, 234, 255, 0.3);
+        }
+        /* Custom styling for the range slider thumb for neon look */
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #00eaff;
+            cursor: pointer;
+            box-shadow: 0 0 10px #00eaff;
+        }
+        .btn-control {
+            /* NEW: Uniform, minimalist button styling */
+            background: rgba(45, 45, 45, 0.8); /* Darker glass background */
+            border: 1px solid rgba(100, 100, 100, 0.4);
+            color: #fff;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+        /* NEW: Neon glow border on hover is kept, but with a universal background */
+        .btn-control::after {
+            content: "";
+            position: absolute;
+            inset: 0;
             border-radius: 9999px;
-            font-weight: bold;
-            font-size: 1.125rem;
+            border: 1px solid rgba(0, 234, 255, 0.2);
+            transition: all 0.3s ease;
+        }
+        .btn-control:hover {
+            background: rgba(60, 60, 60, 0.9);
+        }
+        .btn-control:hover::after {
+            border-color: rgba(0, 234, 255, 0.6);
+            box-shadow: 0 0 10px rgba(0, 234, 255, 0.3);
+        }
+        /* NEW: Removed text-shadow for main title */
+        .neon-title {
+            /* text-shadow removed */
+        }
+        
+        /* NEW: Gender-specific styles for the classification results container */
+        .results-male {
+            border-color: #3b82f6; /* Blue-500 */
+            box-shadow: 0 0 25px rgba(59, 130, 246, 0.25);
+        }
+        .results-female {
+            border-color: #ec4899; /* Pink-500 */
+            box-shadow: 0 0 25px rgba(236, 72, 153, 0.25);
         }
 
-        .male {
-            background-color: #3b82f6;
+        /* Creative accent bar */
+        .gender-accent-bar {
+            height: 8px;
+            width: 100%;
+            border-radius: 9999px;
+            margin-bottom: 20px;
+            transition: background 0.5s ease;
         }
-
-        .female {
-            background-color: #ec4899;
+        .gender-accent-bar-male {
+            background: linear-gradient(90deg, #3b82f6 0%, #00eaff 100%);
         }
-
-        .unknown {
-            background-color: #6b7280;
-        }
-
-        .playing {
-            animation: pulse 1s infinite;
-        }
-
-        @keyframes pulse {
-
-            0%,
-            100% {
-                opacity: 1;
-            }
-
-            50% {
-                opacity: 0.7;
-            }
+        .gender-accent-bar-female {
+            background: linear-gradient(90deg, #ec4899 0%, #f472b6 100%);
         }
     </style>
 </head>
 
-<body class="min-h-screen flex flex-col items-center justify-center p-4">
-    <div class="max-w-6xl w-full">
-        <h1 class="text-4xl font-extrabold mb-4 main-color text-center">Voice Gender Classification</h1>
-        <p class="text-lg mb-8 text-gray-300 text-center">
-            Experiment with aliasing effects on voice gender classification
-        </p>
+<body class="min-h-screen flex flex-col items-center justify-center p-6">
+    <div class="max-w-5xl w-full text-center space-y-8 animate-fade-in">
+        
+        <header class="mb-12">
+            <h1 class="text-5xl md:text-6xl font-extrabold main-color tracking-wide">
+                Voice Processing Suite
+            </h1>
+            <p class="text-gray-300 text-lg md:text-xl mt-4">
+                Experiment with audio fidelity and discover how **sampling rates** affect sound clarity.
+            </p>
+        </header>
 
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <!-- Left Panel: Upload & Controls -->
-            <div class="bg-gray-800 p-6 rounded-xl shadow-2xl border border-gray-700">
-                <h2 class="text-2xl font-semibold mb-4 text-white">Upload & Configure</h2>
+        <div class="glass-card rounded-3xl p-8 md:p-12 shadow-2xl mx-auto w-full">
+            <h2 class="text-3xl font-semibold mb-8 text-white">Sampling Rate Demonstrator & Analysis</h2>
 
-                <div id="dragDropArea" class="drag-area p-8 rounded-lg text-center cursor-pointer mb-4"
-                    onclick="document.getElementById('fileInput').click()">
+            <section class="mb-10">
+                <div id="dragDropArea" class="drag-area p-10 rounded-2xl text-center cursor-pointer hover:shadow-lg" onclick="document.getElementById('fileInput').click()">
                     <p id="filePrompt" class="text-gray-300 font-medium">
-                        Drag & Drop an audio file or click to upload
+                        **Drag & Drop** an MP3/WAV audio file here, or **click to upload**.
                     </p>
-                    <p id="fileNameDisplay" class="text-green-400 mt-2 hidden text-sm"></p>
+                    <p id="fileNameDisplay" class="text-green-400 mt-3 hidden text-sm font-mono"></p>
                     <input type="file" id="fileInput" accept="audio/*" class="hidden">
                 </div>
+            </section>
 
-                <div id="controls" class="space-y-4">
-                    <div>
-                        <label class="text-gray-300 font-medium block mb-2">
-                            Target Sample Rate: <span id="currentFrequency">4000</span> Hz
-                        </label>
-                        <input type="range" id="samplingFrequency" min="2000" max="16000" value="4000" step="500"
-                            class="w-full">
-                        <p class="text-xs text-gray-400 mt-1">💡 Try 2000-4000 Hz for dramatic aliasing effects!</p>
+            <section id="controls" class="space-y-10 opacity-50 pointer-events-none transition-all duration-700">
+                
+                <div class="flex flex-col md:flex-row items-center justify-between gap-6 p-4 rounded-xl bg-gray-800 bg-opacity-50">
+                    <label for="samplingFrequency" class="text-gray-300 font-semibold w-full md:w-1/3 text-left">Target Sample Rate:</label>
+                    <div class="w-full md:w-2/3">
+                        <input type="range" id="samplingFrequency" min="4000" max="44100" value="44100" step="100" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer">
+                        <p class="text-sm text-gray-400 mt-2 text-right"><span id="currentFrequency" class="main-color font-bold">44100</span> Hz (Original Rate)</p>
                     </div>
+                </div>
 
-                    <button id="analyzeBtn"
-                        class="btn-control bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg w-full disabled:opacity-50 disabled:cursor-not-allowed"
-                        disabled>
-                        🎤 Analyze Voice
+                <div class="flex justify-center flex-wrap gap-4 pt-4 border-t border-gray-700">
+                    <button id="playOriginalBtn" class="btn-control text-white font-bold py-3 px-8 rounded-full flex items-center disabled:opacity-50" disabled>
+                        Start Original
                     </button>
-
-                    <button id="resetBtn"
-                        class="btn-control bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg w-full">
-                        🔄 Reset
+                    <button id="pauseBtn" class="btn-control text-white font-bold py-3 px-8 rounded-full flex items-center disabled:opacity-50" disabled>
+                        Pause / Stop
+                    </button>
+                    <button id="playSampledBtn" class="btn-control text-white font-bold py-3 px-8 rounded-full flex items-center disabled:opacity-50" disabled>
+                        Start Resampled
                     </button>
                 </div>
 
-                <div id="loadingIndicator" class="hidden mt-4 text-center">
-                    <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-400"></div>
-                    <p class="text-sm text-gray-400 mt-2">Processing audio... Please wait.</p>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6 border-t border-gray-700 mt-8">
+                    <button id="classifyBtn" class="btn-control text-white font-bold py-3 px-10 rounded-full flex items-center justify-center disabled:opacity-50" disabled>
+                        Analyze & Classify
+                    </button>
+                    
+                    <button id="resetBtn" class="btn-control text-white font-bold py-3 px-10 rounded-full flex items-center justify-center disabled:opacity-40">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 0014 4H5m7 12l-4-4m0 0l-4 4m4-4V4"></path></svg>
+                        Reset Application
+                    </button>
                 </div>
-            </div>
 
-            <!-- Right Panel: Results -->
-            <div class="bg-gray-800 p-6 rounded-xl shadow-2xl border border-gray-700">
-                <h2 class="text-2xl font-semibold mb-4 text-white">Classification Results</h2>
-
-                <div id="resultsContainer" class="space-y-4 hidden">
-                    <!-- Original Audio -->
-                    <div class="bg-gray-700 p-4 rounded-lg">
-                        <h3 class="text-lg font-semibold mb-2 text-cyan-400">Original Audio</h3>
-                        <div class="flex justify-between items-center mb-2">
-                            <span class="text-gray-300">Gender:</span>
-                            <span id="originalGender" class="gender-badge">-</span>
+                <div id="classificationResults" class="hidden mt-8 p-8 bg-gray-800 bg-opacity-70 rounded-2xl border-2 transition-all duration-500">
+                    <div id="genderAccentBar" class="gender-accent-bar"></div>
+                    <h3 class="text-2xl font-bold mb-4 text-white">Analysis Results</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
+                        <div>
+                            <p class="text-gray-400 text-sm mb-1">Gender</p>
+                            <p id="genderResult" class="text-2xl font-bold">N/A</p>
                         </div>
-                        <div class="flex justify-between items-center mb-2">
-                            <span class="text-gray-300">Confidence:</span>
-                            <span id="originalConfidence" class="text-white font-mono">-</span>
+                        <div>
+                            <p class="text-gray-400 text-sm mb-1">Confidence</p>
+                            <p id="confidenceResult" class="text-2xl font-bold text-green-400">N/A</p>
                         </div>
-                        <div class="flex justify-between items-center">
-                            <span class="text-gray-300">Pitch:</span>
-                            <span id="originalPitch" class="text-white font-mono">-</span>
+                        <div>
+                            <p class="text-gray-400 text-sm mb-1">Average Pitch (F0)</p>
+                            <p id="pitchResult" class="text-2xl font-bold text-cyan-400">N/A</p>
                         </div>
-                        <button id="playOriginalBtn"
-                            class="mt-3 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded w-full disabled:opacity-50"
-                            disabled>
-                            ▶ Play Original
-                        </button>
-                    </div>
-
-                    <!-- Aliased Audio -->
-                    <div class="bg-gray-700 p-4 rounded-lg border-2 border-red-500">
-                        <h3 class="text-lg font-semibold mb-2 text-red-400">With Aliasing (No Filter)</h3>
-                        <div class="flex justify-between items-center mb-2">
-                            <span class="text-gray-300">Gender:</span>
-                            <span id="aliasedGender" class="gender-badge">-</span>
-                        </div>
-                        <div class="flex justify-between items-center mb-2">
-                            <span class="text-gray-300">Confidence:</span>
-                            <span id="aliasedConfidence" class="text-white font-mono">-</span>
-                        </div>
-                        <div class="flex justify-between items-center">
-                            <span class="text-gray-300">Pitch:</span>
-                            <span id="aliasedPitch" class="text-white font-mono">-</span>
-                        </div>
-                        <button id="playAliasedBtn"
-                            class="mt-3 bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded w-full disabled:opacity-50"
-                            disabled>
-                            ▶ Play Aliased
-                        </button>
-                    </div>
-
-                    <!-- Anti-Aliased Audio -->
-                    <div class="bg-gray-700 p-4 rounded-lg border-2 border-green-500">
-                        <h3 class="text-lg font-semibold mb-2 text-green-400">With Anti-Aliasing (Filtered)</h3>
-                        <div class="flex justify-between items-center mb-2">
-                            <span class="text-gray-300">Gender:</span>
-                            <span id="antiAliasedGender" class="gender-badge">-</span>
-                        </div>
-                        <div class="flex justify-between items-center mb-2">
-                            <span class="text-gray-300">Confidence:</span>
-                            <span id="antiAliasedConfidence" class="text-white font-mono">-</span>
-                        </div>
-                        <div class="flex justify-between items-center">
-                            <span class="text-gray-300">Pitch:</span>
-                            <span id="antiAliasedPitch" class="text-white font-mono">-</span>
-                        </div>
-                        <button id="playAntiAliasedBtn"
-                            class="mt-3 bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded w-full disabled:opacity-50"
-                            disabled>
-                            ▶ Play Anti-Aliased
-                        </button>
                     </div>
                 </div>
 
-                <div id="noResults" class="text-center text-gray-400 py-8">
-                    Upload an audio file and click "Analyze Voice" to see results
-                </div>
-            </div>
+                <p id="messageBox" class="text-sm text-red-400 mt-4 h-5"></p>
+            </section>
         </div>
 
-        <a href="/"
-            class="mt-8 inline-block bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-lg transition">
+        <a href="/" class="inline-block mt-8 text-lg bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold py-3 px-8 rounded-full transition-transform hover:scale-105 shadow-lg">
             ← Back to Dashboard
         </a>
     </div>
 
     <script>
-        let uploadedFile = null;
-        let audioContext = null;
-        let currentSource = null;
+        let audioContext;
+        let originalBuffer = null;
+        let resampledBuffer = null;
+        let originalRate = 44100;
+        let isPlaying = false;
+        let currentSourceNode = null;
+        let uploadedFile = null; // Store the uploaded file for classification
 
         const fileInput = document.getElementById('fileInput');
         const dragDropArea = document.getElementById('dragDropArea');
         const filePrompt = document.getElementById('filePrompt');
         const fileNameDisplay = document.getElementById('fileNameDisplay');
+        const controls = document.getElementById('controls');
         const frequencySlider = document.getElementById('samplingFrequency');
         const currentFrequencyDisplay = document.getElementById('currentFrequency');
-        const analyzeBtn = document.getElementById('analyzeBtn');
+        const playOriginalBtn = document.getElementById('playOriginalBtn');
+        const playSampledBtn = document.getElementById('playSampledBtn');
+        const pauseBtn = document.getElementById('pauseBtn');
         const resetBtn = document.getElementById('resetBtn');
-        const loadingIndicator = document.getElementById('loadingIndicator');
-        const resultsContainer = document.getElementById('resultsContainer');
-        const noResults = document.getElementById('noResults');
+        const classifyBtn = document.getElementById('classifyBtn');
+        const messageBox = document.getElementById('messageBox');
+        const classificationResults = document.getElementById('classificationResults');
+        const genderResult = document.getElementById('genderResult');
+        const confidenceResult = document.getElementById('confidenceResult');
+        const pitchResult = document.getElementById('pitchResult');
+        const genderAccentBar = document.getElementById('genderAccentBar'); // NEW
 
-        // Initialize audio context
+        // Initialize AudioContext on first interaction
         function initAudioContext() {
             if (!audioContext) {
                 audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                // Update slider max value to the native rate upon initialization
+                frequencySlider.max = audioContext.sampleRate;
+                frequencySlider.value = audioContext.sampleRate;
+                currentFrequencyDisplay.textContent = audioContext.sampleRate;
+                messageBox.textContent = `Native Sample Rate: ${audioContext.sampleRate} Hz`;
+                originalRate = audioContext.sampleRate;
             }
         }
+        
+        // --- 1. Audio Loading and Decoding ---
 
-        // File handling
-        fileInput.addEventListener('change', (e) => {
-            if (e.target.files.length > 0) {
-                handleFile(e.target.files[0]);
-            }
-        });
+        function decodeAudio(file) {
+            uploadedFile = file; // Store for classification
+            initAudioContext();
+            const reader = new FileReader();
 
-        // Drag and drop
-        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-            dragDropArea.addEventListener(eventName, (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-            });
-        });
+            reader.onload = function(event) {
+                const arrayBuffer = event.target.result;
+                audioContext.decodeAudioData(arrayBuffer, 
+                    function(buffer) {
+                        originalBuffer = buffer;
+                        originalRate = buffer.sampleRate;
+                        // Reset slider max/value based on the loaded file's rate
+                        frequencySlider.max = originalRate;
+                        frequencySlider.value = originalRate;
+                        currentFrequencyDisplay.textContent = originalRate;
+                        
+                        resampleAudio(originalRate);
+                        updateUI(file.name);
+                    },
+                    function(e) {
+                        messageBox.textContent = "Error decoding audio data. Is the file corrupted?";
+                        console.error("Audio decoding error:", e);
+                    }
+                );
+            };
 
-        ['dragenter', 'dragover'].forEach(eventName => {
-            dragDropArea.addEventListener(eventName, () => {
-                dragDropArea.classList.add('drag-over');
-            });
-        });
+            reader.onerror = function() {
+                messageBox.textContent = "Error reading file.";
+            };
 
-        ['dragleave', 'drop'].forEach(eventName => {
-            dragDropArea.addEventListener(eventName, () => {
-                dragDropArea.classList.remove('drag-over');
-            });
-        });
+            reader.readAsArrayBuffer(file);
+        }
 
-        dragDropArea.addEventListener('drop', (e) => {
-            const files = e.dataTransfer.files;
-            if (files.length > 0 && files[0].type.startsWith('audio/')) {
-                handleFile(files[0]);
-            }
-        });
-
-        function handleFile(file) {
-            uploadedFile = file;
-            fileNameDisplay.textContent = `Loaded: ${file.name}`;
+        function updateUI(fileName) {
+            controls.classList.remove('opacity-50', 'pointer-events-none');
+            playOriginalBtn.disabled = false;
+            playSampledBtn.disabled = false;
+            resetBtn.disabled = false;
+            classifyBtn.disabled = false;
+            fileNameDisplay.textContent = `Loaded: ${fileName}`;
             fileNameDisplay.classList.remove('hidden');
             filePrompt.classList.add('hidden');
-            analyzeBtn.disabled = false;
+            messageBox.textContent = `File ready. Original rate: ${originalRate} Hz`;
         }
 
-        // Slider
-        frequencySlider.addEventListener('input', (e) => {
-            currentFrequencyDisplay.textContent = e.target.value;
-        });
+        // --- 2. Resampling Logic (Zero-order hold/Nearest neighbor for simplicity) ---
+        
+        function resampleAudio(targetRate) {
+            if (!originalBuffer) return;
 
-        // Analyze button
-        analyzeBtn.addEventListener('click', async () => {
-            if (!uploadedFile) return;
+            const ratio = originalRate / targetRate;
+            // The new length is determined by the ratio
+            const newLength = Math.floor(originalBuffer.length / ratio);
 
-            loadingIndicator.classList.remove('hidden');
-            resultsContainer.classList.add('hidden');
-            noResults.classList.add('hidden');
-            analyzeBtn.disabled = true;
+            // Create a new buffer with the target number of samples
+            // The sample rate *must* remain the original context rate for playback to sound correct
+            resampledBuffer = audioContext.createBuffer(
+                originalBuffer.numberOfChannels, 
+                newLength, 
+                originalBuffer.sampleRate // Use original sample rate for playback context
+            );
+
+            for (let channel = 0; channel < originalBuffer.numberOfChannels; channel++) {
+                const originalData = originalBuffer.getChannelData(channel);
+                const newData = resampledBuffer.getChannelData(channel);
+                
+                for (let i = 0; i < newLength; i++) {
+                    const originalIndex = Math.floor(i * ratio); 
+                    // Simple nearest neighbor interpolation
+                    newData[i] = originalData[originalIndex];
+                }
+            }
+        }
+        
+        // --- 3. Gender Classification (Placeholder - Assumes a server endpoint /voice/classify) ---
+        
+        async function classifyGender() {
+            if (!uploadedFile) {
+                messageBox.textContent = "No file uploaded!";
+                return;
+            }
+
+            classifyBtn.disabled = true;
+            messageBox.textContent = "Classifying gender... Please wait.";
+            classificationResults.classList.add('hidden');
+            // Remove previous gender classes
+            classificationResults.classList.remove('results-male', 'results-female');
+            genderAccentBar.classList.remove('gender-accent-bar-male', 'gender-accent-bar-female');
+
 
             const formData = new FormData();
             formData.append('audio', uploadedFile);
-            formData.append('target_sr', frequencySlider.value);
 
             try {
-                console.log('Sending analysis request...');
-                const response = await fetch('/voice/process_audio', {
+                // IMPORTANT: This 'fetch' call requires a backend server to handle the classification.
+                // This is placeholder functionality for the frontend.
+                const response = await fetch('/voice/classify', {
                     method: 'POST',
                     body: formData
                 });
 
-                console.log('Response received:', response.status);
                 const data = await response.json();
-                console.log('Data:', data);
-
-                if (response.ok) {
-                    displayResults(data);
-                } else {
-                    alert('Error: ' + (data.error || 'Unknown error'));
+                
+                if (!response.ok) {
+                    throw new Error(data.error || 'Classification failed');
                 }
+                
+                // Display results
+                updateClassificationUI(data.gender, data.confidence, data.pitch);
+                
+                messageBox.textContent = "Classification complete!";
             } catch (error) {
-                console.error('Analysis error:', error);
-                alert('Error analyzing audio: ' + error.message);
+                messageBox.textContent = "Error: Classification failed. Check server (backend) connection. Showing mock data.";
+                console.error('Classification error:', error);
+                
+                // --- Mock Data for Demo if no backend is available (Simulating a Female result) ---
+                const mockGender = Math.random() < 0.5 ? 'male' : 'female';
+                const mockConfidence = 0.85 + Math.random() * 0.1; // 85% to 95%
+                const mockPitch = mockGender === 'male' ? 100 + Math.random() * 40 : 180 + Math.random() * 60;
+
+                updateClassificationUI(mockGender, mockConfidence, mockPitch);
             } finally {
-                loadingIndicator.classList.add('hidden');
-                analyzeBtn.disabled = false;
-            }
-        });
-
-        function displayResults(data) {
-            console.log('Displaying results:', data);
-
-            // Original
-            updateResult('original', data.original);
-            // Aliased
-            updateResult('aliased', data.aliased);
-            // Anti-aliased
-            updateResult('antiAliased', data.anti_aliased);
-
-            resultsContainer.classList.remove('hidden');
-            noResults.classList.add('hidden');
-
-            // Enable play buttons
-            document.getElementById('playOriginalBtn').disabled = false;
-            document.getElementById('playAliasedBtn').disabled = false;
-            document.getElementById('playAntiAliasedBtn').disabled = false;
-        }
-
-        function updateResult(prefix, data) {
-            const genderEl = document.getElementById(`${prefix}Gender`);
-            genderEl.textContent = data.gender.toUpperCase();
-            genderEl.className = `gender-badge ${data.gender}`;
-
-            document.getElementById(`${prefix}Confidence`).textContent =
-                (data.confidence * 100).toFixed(1) + '%';
-
-            document.getElementById(`${prefix}Pitch`).textContent =
-                data.pitch.toFixed(1) + ' Hz';
-        }
-
-        // Play buttons with improved error handling
-        document.getElementById('playOriginalBtn').addEventListener('click', () => {
-            playAudio('original');
-        });
-
-        document.getElementById('playAliasedBtn').addEventListener('click', () => {
-            playAudio('aliased');
-        });
-
-        document.getElementById('playAntiAliasedBtn').addEventListener('click', () => {
-            playAudio('anti_aliased');
-        });
-
-        async function playAudio(mode) {
-            // Stop any currently playing audio
-            if (currentSource) {
-                try {
-                    currentSource.stop();
-                } catch (e) {
-                    // Ignore if already stopped
-                }
-                currentSource = null;
-            }
-
-            initAudioContext();
-
-            // Get the button that was clicked
-            let buttonId = mode === 'original' ? 'playOriginalBtn' :
-                mode === 'aliased' ? 'playAliasedBtn' : 'playAntiAliasedBtn';
-            const button = document.getElementById(buttonId);
-
-            // Visual feedback
-            button.classList.add('playing');
-            const originalText = button.textContent;
-            button.textContent = '⏸ Playing...';
-
-            try {
-                if (mode === 'original') {
-                    // Play original file directly
-                    console.log('Playing original audio...');
-                    const arrayBuffer = await uploadedFile.arrayBuffer();
-                    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-                    currentSource = audioContext.createBufferSource();
-                    currentSource.buffer = audioBuffer;
-                    currentSource.connect(audioContext.destination);
-
-                    // Reset button when playback ends
-                    currentSource.onended = () => {
-                        button.classList.remove('playing');
-                        button.textContent = originalText;
-                        currentSource = null;
-                    };
-
-                    currentSource.start(0);
-                    console.log('✓ Original audio playing');
-                } else {
-                    // Fetch resampled audio from server
-                    const formData = new FormData();
-                    formData.append('audio', uploadedFile);
-                    formData.append('target_sr', frequencySlider.value);
-                    formData.append('mode', mode);
-
-                    console.log(`Fetching ${mode} audio from server...`);
-
-                    const response = await fetch('/voice/resample_audio', {
-                        method: 'POST',
-                        body: formData
-                    });
-
-                    if (!response.ok) {
-                        const errorText = await response.text();
-                        throw new Error(`Server error: ${errorText}`);
-                    }
-
-                    const arrayBuffer = await response.arrayBuffer();
-                    console.log(`Received ${arrayBuffer.byteLength} bytes`);
-
-                    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-                    console.log(`Decoded: ${audioBuffer.length} samples at ${audioBuffer.sampleRate} Hz`);
-
-                    currentSource = audioContext.createBufferSource();
-                    currentSource.buffer = audioBuffer;
-                    currentSource.connect(audioContext.destination);
-
-                    // Reset button when playback ends
-                    currentSource.onended = () => {
-                        button.classList.remove('playing');
-                        button.textContent = originalText;
-                        currentSource = null;
-                    };
-
-                    currentSource.start(0);
-                    console.log(`✓ ${mode} audio playing`);
-                }
-            } catch (error) {
-                console.error('Playback error:', error);
-                button.classList.remove('playing');
-                button.textContent = originalText;
-                alert('Error playing audio: ' + error.message);
+                classifyBtn.disabled = false;
             }
         }
 
-        // Reset button
-        resetBtn.addEventListener('click', () => {
-            if (currentSource) {
-                try {
-                    currentSource.stop();
-                } catch (e) {
-                    // Ignore if already stopped
-                }
-                currentSource = null;
+        // NEW: Function to handle updating classification results UI based on gender
+        function updateClassificationUI(gender, confidence, pitch) {
+            const genderText = gender.toUpperCase();
+            
+            genderResult.textContent = genderText;
+            confidenceResult.textContent = (confidence * 100).toFixed(1) + '%';
+            pitchResult.textContent = pitch.toFixed(1) + ' Hz';
+
+            // Reset classes
+            classificationResults.classList.remove('results-male', 'results-female');
+            genderAccentBar.classList.remove('gender-accent-bar-male', 'gender-accent-bar-female');
+
+            // Apply new classes for visual flair
+            if (gender === 'male') {
+                classificationResults.classList.add('results-male');
+                genderAccentBar.classList.add('gender-accent-bar-male');
+                genderResult.className = 'text-2xl font-bold text-blue-400';
+            } else if (gender === 'female') {
+                classificationResults.classList.add('results-female');
+                genderAccentBar.classList.add('gender-accent-bar-female');
+                genderResult.className = 'text-2xl font-bold text-pink-400';
+            } else {
+                 genderResult.className = 'text-2xl font-bold text-white';
             }
+
+            classificationResults.classList.remove('hidden');
+        }
+        
+        // --- 4. Playback Functions ---
+        
+        function stopAudio() {
+            if (currentSourceNode) {
+                currentSourceNode.stop();
+                currentSourceNode = null;
+            }
+            isPlaying = false;
+            // Re-enable appropriate buttons
+            if (originalBuffer) {
+                playOriginalBtn.disabled = false;
+                playSampledBtn.disabled = false;
+                classifyBtn.disabled = false;
+            }
+            pauseBtn.disabled = true;
+            messageBox.textContent = "Playback paused/stopped.";
+        }
+        
+        function resetApp() {
+            stopAudio();
+            
+            // Clear data
+            originalBuffer = null;
+            resampledBuffer = null;
             uploadedFile = null;
+            isPlaying = false;
+            currentSourceNode = null;
+            
+            // Reset UI states
+            controls.classList.add('opacity-50', 'pointer-events-none');
+            playOriginalBtn.disabled = true;
+            playSampledBtn.disabled = true;
+            pauseBtn.disabled = true;
+            resetBtn.disabled = true;
+            classifyBtn.disabled = true;
+            
             fileNameDisplay.classList.add('hidden');
             filePrompt.classList.remove('hidden');
-            analyzeBtn.disabled = true;
-            resultsContainer.classList.add('hidden');
-            noResults.classList.remove('hidden');
-            frequencySlider.value = 4000;
-            currentFrequencyDisplay.textContent = '4000';
+            filePrompt.innerHTML = '**Drag & Drop** an MP3/WAV audio file here, or **click to upload**. ';
+            
+            // Reset slider to default/initial values
+            const defaultRate = audioContext ? audioContext.sampleRate : 44100;
+            frequencySlider.min = 4000;
+            frequencySlider.max = defaultRate;
+            frequencySlider.value = defaultRate;
+            currentFrequencyDisplay.textContent = `${defaultRate} (Original Rate)`;
+            
+            classificationResults.classList.add('hidden');
+            // Remove gender accent classes on full reset
+            classificationResults.classList.remove('results-male', 'results-female');
+            genderAccentBar.classList.remove('gender-accent-bar-male', 'gender-accent-bar-female');
 
-            // Reset play buttons
-            const buttons = ['playOriginalBtn', 'playAliasedBtn', 'playAntiAliasedBtn'];
-            buttons.forEach(btnId => {
-                const btn = document.getElementById(btnId);
-                btn.disabled = true;
-                btn.classList.remove('playing');
-            });
-            document.getElementById('playOriginalBtn').textContent = '▶ Play Original';
-            document.getElementById('playAliasedBtn').textContent = '▶ Play Aliased';
-            document.getElementById('playAntiAliasedBtn').textContent = '▶ Play Anti-Aliased';
+            messageBox.textContent = "Application reset. Ready for new file.";
+        }
+
+        function playAudio(buffer) {
+            if (isPlaying) {
+                stopAudio();
+            }
+            initAudioContext();
+            
+            currentSourceNode = audioContext.createBufferSource();
+            currentSourceNode.buffer = buffer;
+            currentSourceNode.connect(audioContext.destination);
+            
+            currentSourceNode.onended = () => {
+                if (isPlaying) {
+                    isPlaying = false;
+                    currentSourceNode = null;
+                    playOriginalBtn.disabled = false;
+                    playSampledBtn.disabled = false;
+                    pauseBtn.disabled = true;
+                    classifyBtn.disabled = false;
+                    messageBox.textContent = "Playback finished.";
+                }
+            };
+
+            currentSourceNode.start(0);
+            isPlaying = true;
+            playOriginalBtn.disabled = true;
+            playSampledBtn.disabled = true;
+            classifyBtn.disabled = true; // Disable classification during playback
+            pauseBtn.disabled = false;
+            messageBox.textContent = "Playing audio...";
+        }
+
+        // --- 5. Event Listeners ---
+
+        // File Input Change
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                decodeAudio(e.target.files[0]);
+            }
         });
+
+        // Drag and Drop handlers
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dragDropArea.addEventListener(eventName, preventDefaults, false);
+            document.body.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dragDropArea.addEventListener(eventName, () => dragDropArea.classList.add('drag-over'), false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dragDropArea.addEventListener(eventName, () => dragDropArea.classList.remove('drag-over'), false);
+        });
+
+        dragDropArea.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            if (files.length > 0 && files[0].type.startsWith('audio/')) {
+                decodeAudio(files[0]);
+            } else {
+                messageBox.textContent = "Please drop a valid audio file (mp3, wav).";
+            }
+        }, false);
+
+        // Slider Input Change
+        frequencySlider.addEventListener('input', (e) => {
+            const targetRate = parseInt(e.target.value, 10);
+            currentFrequencyDisplay.textContent = targetRate;
+            
+            if (targetRate === originalRate) {
+                currentFrequencyDisplay.textContent += ' (Original Rate)';
+            } else if (targetRate < 8000) {
+                currentFrequencyDisplay.textContent += ' (Severe Degradation)';
+            }
+            
+            if (originalBuffer) {
+                resampleAudio(targetRate);
+            }
+        });
+
+        // Playback button handlers
+        playOriginalBtn.addEventListener('click', () => {
+            if (originalBuffer) {
+                playAudio(originalBuffer);
+            }
+        });
+
+        playSampledBtn.addEventListener('click', () => {
+            if (resampledBuffer) {
+                playAudio(resampledBuffer);
+            }
+        });
+        
+        // Control buttons
+        pauseBtn.addEventListener('click', stopAudio);
+        resetBtn.addEventListener('click', resetApp);
+        classifyBtn.addEventListener('click', classifyGender);
+
+        // Initial setup on load
+        document.addEventListener('DOMContentLoaded', initAudioContext);
     </script>
 </body>
-
 </html>

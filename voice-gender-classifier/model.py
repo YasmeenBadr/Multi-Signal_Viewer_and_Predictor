@@ -10,6 +10,8 @@ import torch.nn.functional as F
 
 import torchaudio
 from torchaudio.transforms import Resample
+import librosa
+import numpy as np
 
 
 from huggingface_hub import PyTorchModelHubMixin
@@ -157,14 +159,68 @@ class ECAPA_gender(nn.Module, PyTorchModelHubMixin):
         return x
 
     def load_audio(self, path: str) -> torch.Tensor:
-        audio, sr = torchaudio.load(path)
-        if sr != 16000:
-            resampler = Resample(orig_freq=sr, new_freq=16000)
-            audio = resampler(audio)
-        return audio.mean(dim=0, keepdim=True)  # Convert to mono if stereo
+        # Use scipy.io.wavfile to avoid soundfile compatibility issues
+        try:
+            from scipy.io import wavfile
+            # Load audio file
+            sample_rate, audio = wavfile.read(path)
+            
+            # Convert to float32 and normalize
+            if audio.dtype == np.int16:
+                audio = audio.astype(np.float32) / 32768.0
+            elif audio.dtype == np.int32:
+                audio = audio.astype(np.float32) / 2147483648.0
+            elif audio.dtype == np.uint8:
+                audio = (audio.astype(np.float32) - 128) / 128.0
+            else:
+                audio = audio.astype(np.float32)
+            
+            # Convert stereo to mono if needed
+            if len(audio.shape) > 1:
+                audio = np.mean(audio, axis=1)
+            
+            # Resample to 16000 Hz if needed
+            if sample_rate != 16000:
+                # Use librosa for resampling only (not for loading)
+                audio = librosa.resample(audio, orig_sr=sample_rate, target_sr=16000)
+            
+            # Convert to torch tensor
+            audio_tensor = torch.from_numpy(audio).float()
+            return audio_tensor.unsqueeze(0)  # Add batch dimension
+            
+        except Exception as e:
+            # Fallback: try pydub for MP3/other formats
+            try:
+                from pydub import AudioSegment
+                import tempfile
+                import os
+                
+                # Load audio with pydub
+                audio_segment = AudioSegment.from_file(path)
+                
+                # Convert to mono and set sample rate to 16000
+                audio_segment = audio_segment.set_channels(1).set_frame_rate(16000)
+                
+                # Convert to numpy array
+                samples = np.array(audio_segment.get_array_of_samples(), dtype=np.float32)
+                
+                # Normalize based on sample width
+                if audio_segment.sample_width == 2:  # 16-bit
+                    samples = samples / 32768.0
+                elif audio_segment.sample_width == 4:  # 32-bit
+                    samples = samples / 2147483648.0
+                else:
+                    samples = samples / (2 ** (8 * audio_segment.sample_width - 1))
+                
+                # Convert to torch tensor
+                audio_tensor = torch.from_numpy(samples).float()
+                return audio_tensor.unsqueeze(0)
+                    
+            except Exception as e2:
+                raise Exception(f"Failed to load audio file. Tried scipy.wavfile and pydub. Please ensure the file is a valid audio file. Original error: {str(e)}, Fallback error: {str(e2)}")
     
-    def predict(self, audio : torch.Tensor, device: torch.device) -> torch.Tensor:
-        audio = self.load_audio(audio)
+    def predict(self, audio_path: str, device: torch.device) -> str:
+        audio = self.load_audio(audio_path)
         audio = audio.to(device)
         self.eval()
 

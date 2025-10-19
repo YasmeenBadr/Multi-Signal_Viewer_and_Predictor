@@ -1,0 +1,9 @@
+torch
+torchaudio
+librosa
+numpy
+scipy
+huggingface_hub
+safetensors
+soundfile
+pydub

@@ -107,7 +107,7 @@ if os.path.exists(SIMPLE_MODEL_PATH):
     except Exception as e:
         logger.warning("Failed to load 1D model: %s", e)
 else:
-    logger.info("simple_ecg_model.pt not found — using untrained 1D model (for demo).")
+    logger.info("simple_ecg_model.pt not found - using untrained 1D model (for demo).")
 model.eval()
 
 # -------------------------
@@ -293,7 +293,7 @@ def train_model2d_on_record(signals, chan_names, record_base, max_windows=200, w
         # save model weights
         try:
             torch.save(model2d.state_dict(), MODEL2D_PATH)
-            logger.info("Saved 2D model to %s", MODEL2D_PATH)
+            #logger.info("Saved 2D model to %s", MODEL2D_PATH)
         except Exception as e:
             logger.warning("Failed to save 2D model: %s", e)
 
@@ -335,7 +335,7 @@ def setup_simulated_record():
     """
     Prepare a simulated 12-lead ECG (sine + spikes) for UI/demo when no WFDB record loaded.
     """
-    logger.info("No WFDB record found — using simulated ECG (12 leads).")
+    logger.info("No WFDB record found - using simulated ECG (12 leads).")
     fs = 360
     duration_s = 60
     t = np.linspace(0, duration_s, int(duration_s * fs), endpoint=False)
