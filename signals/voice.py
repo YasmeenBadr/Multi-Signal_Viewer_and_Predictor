@@ -45,7 +45,7 @@ def load_model():
             model = ECAPA_gender.from_pretrained("JaesungHuh/voice-gender-classifier")
             model.to(device)
             model.eval()
-            print(f"✓ Voice gender classifier loaded on {device}")
+            print(f"[OK] Voice gender classifier loaded on {device}")
         except Exception as e:
             print(f"Error loading model: {e}")
             raise

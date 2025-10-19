@@ -192,6 +192,21 @@
                     </div>
                 </div>
 
+                <!-- Anti-Aliasing Filter Toggle -->
+                <div class="flex items-center justify-between p-4 rounded-xl bg-gradient-to-r from-purple-900 to-indigo-900 bg-opacity-50 border border-purple-500">
+                    <div class="flex items-center gap-3">
+                        <svg class="w-6 h-6 text-purple-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd"></path></svg>
+                        <div>
+                            <label for="antiAliasingToggle" class="text-white font-semibold cursor-pointer">Anti-Aliasing Filter</label>
+                            <p class="text-xs text-gray-300">Apply low-pass filter before downsampling</p>
+                        </div>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="antiAliasingToggle" class="sr-only peer" checked>
+                        <div class="w-14 h-7 bg-gray-700 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-purple-600"></div>
+                    </label>
+                </div>
+
                 <div class="flex justify-center flex-wrap gap-4 pt-4 border-t border-gray-700">
                     <button id="playOriginalBtn" class="btn-control text-white font-bold py-3 px-8 rounded-full flex items-center disabled:opacity-50" disabled>
                         Start Original
@@ -202,34 +217,138 @@
                     <button id="playSampledBtn" class="btn-control text-white font-bold py-3 px-8 rounded-full flex items-center disabled:opacity-50" disabled>
                         Start Resampled
                     </button>
+                    <button id="playReconstructedBtn" class="btn-control text-white font-bold py-3 px-8 rounded-full flex items-center disabled:opacity-50" disabled>
+                        <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd"></path></svg>
+                        Play Reconstructed
+                    </button>
                 </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6 border-t border-gray-700 mt-8">
-                    <button id="classifyBtn" class="btn-control text-white font-bold py-3 px-10 rounded-full flex items-center justify-center disabled:opacity-50" disabled>
-                        Analyze & Classify
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 pt-6 border-t border-gray-700 mt-8">
+                    <button id="classifyOriginalBtn" class="btn-control text-white font-bold py-3 px-6 rounded-full flex items-center justify-center disabled:opacity-50" disabled>
+                        <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"></path><path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"></path></svg>
+                        Original
                     </button>
                     
-                    <button id="resetBtn" class="btn-control text-white font-bold py-3 px-10 rounded-full flex items-center justify-center disabled:opacity-40">
+                    <button id="classifyResampledBtn" class="btn-control text-white font-bold py-3 px-6 rounded-full flex items-center justify-center disabled:opacity-50" disabled>
+                        <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm5 6a1 1 0 10-2 0v3.586l-1.293-1.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V8z" clip-rule="evenodd"></path></svg>
+                        Resampled
+                    </button>
+                    
+                    <button id="classifyReconstructedBtn" class="btn-control text-white font-bold py-3 px-6 rounded-full flex items-center justify-center disabled:opacity-50" disabled>
+                        <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd"></path></svg>
+                        Reconstructed
+                    </button>
+                    
+                    <button id="resetBtn" class="btn-control text-white font-bold py-3 px-6 rounded-full flex items-center justify-center disabled:opacity-40">
                         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 0014 4H5m7 12l-4-4m0 0l-4 4m4-4V4"></path></svg>
-                        Reset Application
+                        Reset
                     </button>
                 </div>
 
-                <div id="classificationResults" class="hidden mt-8 p-8 bg-gray-800 bg-opacity-70 rounded-2xl border-2 transition-all duration-500">
-                    <div id="genderAccentBar" class="gender-accent-bar"></div>
-                    <h3 class="text-2xl font-bold mb-4 text-white">Analysis Results</h3>
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
+                <!-- Original Audio Classification Results -->
+                <div id="originalResults" class="hidden mt-8 p-6 bg-gray-800 bg-opacity-70 rounded-2xl border-2 transition-all duration-500">
+                    <div id="originalAccentBar" class="gender-accent-bar"></div>
+                    <h3 class="text-xl font-bold mb-4 text-white flex items-center gap-2">
+                        <svg class="w-5 h-5 text-green-400" fill="currentColor" viewBox="0 0 20 20"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"></path><path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"></path></svg>
+                        Original Audio Classification
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
                         <div>
                             <p class="text-gray-400 text-sm mb-1">Gender</p>
-                            <p id="genderResult" class="text-2xl font-bold">N/A</p>
+                            <p id="originalGender" class="text-2xl font-bold">N/A</p>
                         </div>
                         <div>
                             <p class="text-gray-400 text-sm mb-1">Confidence</p>
-                            <p id="confidenceResult" class="text-2xl font-bold text-green-400">N/A</p>
+                            <p id="originalConfidence" class="text-2xl font-bold text-green-400">N/A</p>
                         </div>
                         <div>
-                            <p class="text-gray-400 text-sm mb-1">Average Pitch (F0)</p>
-                            <p id="pitchResult" class="text-2xl font-bold text-cyan-400">N/A</p>
+                            <p class="text-gray-400 text-sm mb-1">Avg Pitch (F0)</p>
+                            <p id="originalPitch" class="text-2xl font-bold text-cyan-400">N/A</p>
+                        </div>
+                    </div>
+                    <div class="mt-3 text-sm text-gray-400">
+                        Sample Rate: <span id="originalSampleRate" class="text-cyan-400 font-mono">N/A</span> Hz
+                    </div>
+                </div>
+
+                <!-- Resampled Audio Classification Results -->
+                <div id="resampledResults" class="hidden mt-6 p-6 bg-gray-800 bg-opacity-70 rounded-2xl border-2 transition-all duration-500">
+                    <div id="resampledAccentBar" class="gender-accent-bar"></div>
+                    <h3 class="text-xl font-bold mb-4 text-white flex items-center gap-2">
+                        <svg class="w-5 h-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm5 6a1 1 0 10-2 0v3.586l-1.293-1.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V8z" clip-rule="evenodd"></path></svg>
+                        Resampled Audio Classification
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+                        <div>
+                            <p class="text-gray-400 text-sm mb-1">Gender</p>
+                            <p id="resampledGender" class="text-2xl font-bold">N/A</p>
+                        </div>
+                        <div>
+                            <p class="text-gray-400 text-sm mb-1">Confidence</p>
+                            <p id="resampledConfidence" class="text-2xl font-bold text-green-400">N/A</p>
+                        </div>
+                        <div>
+                            <p class="text-gray-400 text-sm mb-1">Avg Pitch (F0)</p>
+                            <p id="resampledPitch" class="text-2xl font-bold text-cyan-400">N/A</p>
+                        </div>
+                    </div>
+                    <div class="mt-3 text-sm text-gray-400">
+                        Sample Rate: <span id="resampledSampleRate" class="text-yellow-400 font-mono">N/A</span> Hz
+                    </div>
+                </div>
+
+                <!-- Reconstructed Audio Classification Results -->
+                <div id="reconstructedResults" class="hidden mt-6 p-6 bg-gradient-to-r from-purple-900 to-indigo-900 bg-opacity-70 rounded-2xl border-2 border-purple-500 transition-all duration-500">
+                    <div id="reconstructedAccentBar" class="gender-accent-bar"></div>
+                    <h3 class="text-xl font-bold mb-4 text-white flex items-center gap-2">
+                        <svg class="w-5 h-5 text-purple-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd"></path></svg>
+                        Reconstructed Audio Classification (Anti-Aliased)
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+                        <div>
+                            <p class="text-gray-400 text-sm mb-1">Gender</p>
+                            <p id="reconstructedGender" class="text-2xl font-bold">N/A</p>
+                        </div>
+                        <div>
+                            <p class="text-gray-400 text-sm mb-1">Confidence</p>
+                            <p id="reconstructedConfidence" class="text-2xl font-bold text-green-400">N/A</p>
+                        </div>
+                        <div>
+                            <p class="text-gray-400 text-sm mb-1">Avg Pitch (F0)</p>
+                            <p id="reconstructedPitch" class="text-2xl font-bold text-cyan-400">N/A</p>
+                        </div>
+                    </div>
+                    <div class="mt-3 text-sm text-gray-400">
+                        Sample Rate: <span id="reconstructedSampleRate" class="text-purple-400 font-mono">N/A</span> Hz (Upsampled from <span id="reconstructedOriginalRate" class="text-purple-400 font-mono">N/A</span> Hz)
+                    </div>
+                </div>
+
+                <!-- Aliasing Analysis -->
+                <div id="aliasingAnalysis" class="hidden mt-6 p-6 bg-gradient-to-r from-purple-900 to-indigo-900 bg-opacity-50 rounded-2xl border-2 border-purple-500">
+                    <h3 class="text-xl font-bold mb-4 text-white flex items-center gap-2">
+                        <svg class="w-5 h-5 text-purple-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path></svg>
+                        Aliasing & Under-sampling Analysis
+                    </h3>
+                    <div class="space-y-3 text-sm">
+                        <div class="flex justify-between items-center p-3 bg-black bg-opacity-30 rounded-lg">
+                            <span class="text-gray-300">Classification Match:</span>
+                            <span id="classificationMatch" class="font-bold text-lg">N/A</span>
+                        </div>
+                        <div class="flex justify-between items-center p-3 bg-black bg-opacity-30 rounded-lg">
+                            <span class="text-gray-300">Confidence Change:</span>
+                            <span id="confidenceChange" class="font-bold text-lg">N/A</span>
+                        </div>
+                        <div class="flex justify-between items-center p-3 bg-black bg-opacity-30 rounded-lg">
+                            <span class="text-gray-300">Pitch Change:</span>
+                            <span id="pitchChange" class="font-bold text-lg">N/A</span>
+                        </div>
+                        <div class="flex justify-between items-center p-3 bg-black bg-opacity-30 rounded-lg">
+                            <span class="text-gray-300">Nyquist Frequency:</span>
+                            <span id="nyquistFreq" class="font-bold text-lg text-cyan-400">N/A</span>
+                        </div>
+                        <div class="p-3 bg-black bg-opacity-30 rounded-lg">
+                            <p class="text-gray-300 mb-1">Aliasing Effect:</p>
+                            <p id="aliasingEffect" class="font-semibold text-white">N/A</p>
                         </div>
                     </div>
                 </div>
@@ -247,6 +366,7 @@
         let audioContext;
         let originalBuffer = null;
         let resampledBuffer = null;
+        let reconstructedBuffer = null;
         let originalRate = 44100;
         let isPlaying = false;
         let currentSourceNode = null;
@@ -268,19 +388,57 @@
         const currentFrequencyDisplay = document.getElementById('currentFrequency');
         const playOriginalBtn = document.getElementById('playOriginalBtn');
         const playSampledBtn = document.getElementById('playSampledBtn');
+        const playReconstructedBtn = document.getElementById('playReconstructedBtn');
         const pauseBtn = document.getElementById('pauseBtn');
         const resetBtn = document.getElementById('resetBtn');
-        const classifyBtn = document.getElementById('classifyBtn');
+        const classifyOriginalBtn = document.getElementById('classifyOriginalBtn');
+        const classifyResampledBtn = document.getElementById('classifyResampledBtn');
+        const classifyReconstructedBtn = document.getElementById('classifyReconstructedBtn');
+        const antiAliasingToggle = document.getElementById('antiAliasingToggle');
         const messageBox = document.getElementById('messageBox');
-        const classificationResults = document.getElementById('classificationResults');
-        const genderResult = document.getElementById('genderResult');
-        const confidenceResult = document.getElementById('confidenceResult');
-        const pitchResult = document.getElementById('pitchResult');
-        const genderAccentBar = document.getElementById('genderAccentBar'); // NEW
+        
+        // Original results elements
+        const originalResults = document.getElementById('originalResults');
+        const originalGender = document.getElementById('originalGender');
+        const originalConfidence = document.getElementById('originalConfidence');
+        const originalPitch = document.getElementById('originalPitch');
+        const originalSampleRate = document.getElementById('originalSampleRate');
+        const originalAccentBar = document.getElementById('originalAccentBar');
+        
+        // Resampled results elements
+        const resampledResults = document.getElementById('resampledResults');
+        const resampledGender = document.getElementById('resampledGender');
+        const resampledConfidence = document.getElementById('resampledConfidence');
+        const resampledPitch = document.getElementById('resampledPitch');
+        const resampledSampleRate = document.getElementById('resampledSampleRate');
+        const resampledAccentBar = document.getElementById('resampledAccentBar');
+        
+        // Reconstructed results elements
+        const reconstructedResults = document.getElementById('reconstructedResults');
+        const reconstructedGender = document.getElementById('reconstructedGender');
+        const reconstructedConfidence = document.getElementById('reconstructedConfidence');
+        const reconstructedPitch = document.getElementById('reconstructedPitch');
+        const reconstructedSampleRate = document.getElementById('reconstructedSampleRate');
+        const reconstructedOriginalRate = document.getElementById('reconstructedOriginalRate');
+        const reconstructedAccentBar = document.getElementById('reconstructedAccentBar');
+        
+        // Aliasing analysis elements
+        const aliasingAnalysis = document.getElementById('aliasingAnalysis');
+        const classificationMatch = document.getElementById('classificationMatch');
+        const confidenceChange = document.getElementById('confidenceChange');
+        const pitchChange = document.getElementById('pitchChange');
+        const nyquistFreq = document.getElementById('nyquistFreq');
+        const aliasingEffect = document.getElementById('aliasingEffect');
+        
         const recordBtn = document.getElementById('recordBtn');
         const stopRecordBtn = document.getElementById('stopRecordBtn');
         const recordingStatus = document.getElementById('recordingStatus');
         const recordingTimer = document.getElementById('recordingTimer');
+        
+        // Store classification results for comparison
+        let originalClassification = null;
+        let resampledClassification = null;
+        let reconstructedClassification = null;
 
         // Initialize AudioContext on first interaction
         function initAudioContext() {
@@ -334,65 +492,122 @@
             controls.classList.remove('opacity-50', 'pointer-events-none');
             playOriginalBtn.disabled = false;
             playSampledBtn.disabled = false;
+            playReconstructedBtn.disabled = false;
             resetBtn.disabled = false;
-            classifyBtn.disabled = false;
+            classifyOriginalBtn.disabled = false;
+            classifyResampledBtn.disabled = false;
+            classifyReconstructedBtn.disabled = false;
             fileNameDisplay.textContent = `Loaded: ${fileName}`;
             fileNameDisplay.classList.remove('hidden');
             filePrompt.classList.add('hidden');
             messageBox.textContent = `File ready. Original rate: ${originalRate} Hz`;
         }
 
-        // --- 2. Resampling Logic (Zero-order hold/Nearest neighbor for simplicity) ---
+        // --- 2. Resampling Logic with Anti-Aliasing Filter ---
         
         function resampleAudio(targetRate) {
             if (!originalBuffer) return;
 
+            const useAntiAliasing = antiAliasingToggle.checked;
             const ratio = originalRate / targetRate;
-            // The new length is determined by the ratio
             const newLength = Math.floor(originalBuffer.length / ratio);
 
-            // Create a new buffer with the target number of samples
-            // The sample rate *must* remain the original context rate for playback to sound correct
+            // Create resampled buffer
             resampledBuffer = audioContext.createBuffer(
                 originalBuffer.numberOfChannels, 
                 newLength, 
-                originalBuffer.sampleRate // Use original sample rate for playback context
+                originalBuffer.sampleRate
             );
 
             for (let channel = 0; channel < originalBuffer.numberOfChannels; channel++) {
-                const originalData = originalBuffer.getChannelData(channel);
+                let originalData = originalBuffer.getChannelData(channel);
+                
+                // Apply low-pass filter if anti-aliasing is enabled
+                if (useAntiAliasing) {
+                    originalData = applyLowPassFilter(originalData, originalRate, targetRate / 2);
+                }
+                
                 const newData = resampledBuffer.getChannelData(channel);
                 
+                // Downsample with nearest neighbor
                 for (let i = 0; i < newLength; i++) {
-                    const originalIndex = Math.floor(i * ratio); 
-                    // Simple nearest neighbor interpolation
+                    const originalIndex = Math.floor(i * ratio);
                     newData[i] = originalData[originalIndex];
+                }
+            }
+
+            // Create reconstructed buffer (upsample back to original rate)
+            if (useAntiAliasing) {
+                reconstructSignal(targetRate);
+            }
+        }
+
+        // Low-pass filter using simple moving average (anti-aliasing filter)
+        function applyLowPassFilter(data, sampleRate, cutoffFreq) {
+            const filtered = new Float32Array(data.length);
+            const filterOrder = Math.floor(sampleRate / cutoffFreq);
+            
+            for (let i = 0; i < data.length; i++) {
+                let sum = 0;
+                let count = 0;
+                
+                for (let j = Math.max(0, i - filterOrder); j <= Math.min(data.length - 1, i + filterOrder); j++) {
+                    sum += data[j];
+                    count++;
+                }
+                
+                filtered[i] = sum / count;
+            }
+            
+            return filtered;
+        }
+
+        // Reconstruct signal using linear interpolation (upsampling)
+        function reconstructSignal(downsampledRate) {
+            if (!resampledBuffer) return;
+
+            const ratio = originalRate / downsampledRate;
+            const reconstructedLength = originalBuffer.length;
+
+            reconstructedBuffer = audioContext.createBuffer(
+                resampledBuffer.numberOfChannels,
+                reconstructedLength,
+                originalBuffer.sampleRate
+            );
+
+            for (let channel = 0; channel < resampledBuffer.numberOfChannels; channel++) {
+                const downsampledData = resampledBuffer.getChannelData(channel);
+                const reconstructedData = reconstructedBuffer.getChannelData(channel);
+
+                // Linear interpolation for upsampling
+                for (let i = 0; i < reconstructedLength; i++) {
+                    const downsampledIndex = i / ratio;
+                    const lowerIndex = Math.floor(downsampledIndex);
+                    const upperIndex = Math.min(lowerIndex + 1, downsampledData.length - 1);
+                    const fraction = downsampledIndex - lowerIndex;
+
+                    // Linear interpolation
+                    reconstructedData[i] = downsampledData[lowerIndex] * (1 - fraction) + 
+                                          downsampledData[upperIndex] * fraction;
                 }
             }
         }
         
-        // --- 3. Gender Classification (Placeholder - Assumes a server endpoint /voice/classify) ---
+        // --- 3. Gender Classification Functions ---
         
-        async function classifyGender() {
+        async function classifyOriginal() {
             if (!uploadedFile) {
                 messageBox.textContent = "No file uploaded!";
                 return;
             }
 
-            classifyBtn.disabled = true;
-            messageBox.textContent = "Classifying gender... Please wait.";
-            classificationResults.classList.add('hidden');
-            // Remove previous gender classes
-            classificationResults.classList.remove('results-male', 'results-female');
-            genderAccentBar.classList.remove('gender-accent-bar-male', 'gender-accent-bar-female');
-
+            classifyOriginalBtn.disabled = true;
+            messageBox.textContent = "Classifying original audio... Please wait.";
 
             const formData = new FormData();
             formData.append('audio', uploadedFile);
 
             try {
-                // IMPORTANT: This 'fetch' call requires a backend server to handle the classification.
-                // This is placeholder functionality for the frontend.
                 const response = await fetch('/voice/classify', {
                     method: 'POST',
                     body: formData
@@ -404,51 +619,168 @@
                     throw new Error(data.error || 'Classification failed');
                 }
                 
-                // Display results
-                updateClassificationUI(data.gender, data.confidence, data.pitch);
+                // Store and display results
+                originalClassification = {
+                    gender: data.gender,
+                    confidence: data.confidence,
+                    pitch: data.pitch,
+                    sampleRate: originalRate
+                };
                 
-                messageBox.textContent = "Classification complete!";
+                displayOriginalResults(originalClassification);
+                messageBox.textContent = "Original audio classified successfully!";
+                
+                // Show analysis if both classifications are done
+                if (resampledClassification) {
+                    displayAliasingAnalysis();
+                }
             } catch (error) {
-                messageBox.textContent = "Error: Classification failed. Check server (backend) connection. Showing mock data.";
+                messageBox.textContent = "Error: " + error.message;
                 console.error('Classification error:', error);
-                
-                // --- Mock Data for Demo if no backend is available (Simulating a Female result) ---
-                const mockGender = Math.random() < 0.5 ? 'male' : 'female';
-                const mockConfidence = 0.85 + Math.random() * 0.1; // 85% to 95%
-                const mockPitch = mockGender === 'male' ? 100 + Math.random() * 40 : 180 + Math.random() * 60;
-
-                updateClassificationUI(mockGender, mockConfidence, mockPitch);
             } finally {
-                classifyBtn.disabled = false;
+                classifyOriginalBtn.disabled = false;
             }
         }
 
-        // NEW: Function to handle updating classification results UI based on gender
-        function updateClassificationUI(gender, confidence, pitch) {
-            const genderText = gender.toUpperCase();
-            
-            genderResult.textContent = genderText;
-            confidenceResult.textContent = (confidence * 100).toFixed(1) + '%';
-            pitchResult.textContent = pitch.toFixed(1) + ' Hz';
-
-            // Reset classes
-            classificationResults.classList.remove('results-male', 'results-female');
-            genderAccentBar.classList.remove('gender-accent-bar-male', 'gender-accent-bar-female');
-
-            // Apply new classes for visual flair
-            if (gender === 'male') {
-                classificationResults.classList.add('results-male');
-                genderAccentBar.classList.add('gender-accent-bar-male');
-                genderResult.className = 'text-2xl font-bold text-blue-400';
-            } else if (gender === 'female') {
-                classificationResults.classList.add('results-female');
-                genderAccentBar.classList.add('gender-accent-bar-female');
-                genderResult.className = 'text-2xl font-bold text-pink-400';
-            } else {
-                 genderResult.className = 'text-2xl font-bold text-white';
+        async function classifyResampled() {
+            if (!resampledBuffer) {
+                messageBox.textContent = "No resampled audio available!";
+                return;
             }
 
-            classificationResults.classList.remove('hidden');
+            classifyResampledBtn.disabled = true;
+            messageBox.textContent = "Classifying resampled audio... Please wait.";
+
+            try {
+                // Convert resampled buffer to WAV file
+                const wavBlob = audioBufferToWav(resampledBuffer);
+                const wavFile = new File([wavBlob], 'resampled_audio.wav', { type: 'audio/wav' });
+                
+                const formData = new FormData();
+                formData.append('audio', wavFile);
+
+                const response = await fetch('/voice/classify', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.error || 'Classification failed');
+                }
+                
+                // Store and display results
+                const targetRate = parseInt(frequencySlider.value);
+                resampledClassification = {
+                    gender: data.gender,
+                    confidence: data.confidence,
+                    pitch: data.pitch,
+                    sampleRate: targetRate
+                };
+                
+                displayResampledResults(resampledClassification);
+                messageBox.textContent = "Resampled audio classified successfully!";
+                
+                // Show analysis if both classifications are done
+                if (originalClassification) {
+                    displayAliasingAnalysis();
+                }
+            } catch (error) {
+                messageBox.textContent = "Error: " + error.message;
+                console.error('Classification error:', error);
+            } finally {
+                classifyResampledBtn.disabled = false;
+            }
+        }
+
+        function displayOriginalResults(data) {
+            originalGender.textContent = data.gender.toUpperCase();
+            originalConfidence.textContent = (data.confidence * 100).toFixed(1) + '%';
+            originalPitch.textContent = data.pitch.toFixed(1) + ' Hz';
+            originalSampleRate.textContent = data.sampleRate;
+
+            // Reset and apply gender-specific styling
+            originalResults.classList.remove('results-male', 'results-female');
+            originalAccentBar.classList.remove('gender-accent-bar-male', 'gender-accent-bar-female');
+
+            if (data.gender === 'male') {
+                originalResults.classList.add('results-male');
+                originalAccentBar.classList.add('gender-accent-bar-male');
+                originalGender.className = 'text-2xl font-bold text-blue-400';
+            } else {
+                originalResults.classList.add('results-female');
+                originalAccentBar.classList.add('gender-accent-bar-female');
+                originalGender.className = 'text-2xl font-bold text-pink-400';
+            }
+
+            originalResults.classList.remove('hidden');
+        }
+
+        function displayResampledResults(data) {
+            resampledGender.textContent = data.gender.toUpperCase();
+            resampledConfidence.textContent = (data.confidence * 100).toFixed(1) + '%';
+            resampledPitch.textContent = data.pitch.toFixed(1) + ' Hz';
+            resampledSampleRate.textContent = data.sampleRate;
+
+            // Reset and apply gender-specific styling
+            resampledResults.classList.remove('results-male', 'results-female');
+            resampledAccentBar.classList.remove('gender-accent-bar-male', 'gender-accent-bar-female');
+
+            if (data.gender === 'male') {
+                resampledResults.classList.add('results-male');
+                resampledAccentBar.classList.add('gender-accent-bar-male');
+                resampledGender.className = 'text-2xl font-bold text-blue-400';
+            } else {
+                resampledResults.classList.add('results-female');
+                resampledAccentBar.classList.add('gender-accent-bar-female');
+                resampledGender.className = 'text-2xl font-bold text-pink-400';
+            }
+
+            resampledResults.classList.remove('hidden');
+        }
+
+        function displayAliasingAnalysis() {
+            const match = originalClassification.gender === resampledClassification.gender;
+            const confChange = ((resampledClassification.confidence - originalClassification.confidence) * 100).toFixed(1);
+            const pitchDiff = (resampledClassification.pitch - originalClassification.pitch).toFixed(1);
+            const nyquist = (resampledClassification.sampleRate / 2).toFixed(0);
+
+            // Classification match
+            classificationMatch.textContent = match ? '✓ MATCH' : '✗ MISMATCH';
+            classificationMatch.className = match ? 'font-bold text-lg text-green-400' : 'font-bold text-lg text-red-400';
+
+            // Confidence change
+            confidenceChange.textContent = (confChange >= 0 ? '+' : '') + confChange + '%';
+            confidenceChange.className = Math.abs(confChange) < 5 ? 'font-bold text-lg text-green-400' : 'font-bold text-lg text-yellow-400';
+
+            // Pitch change
+            pitchChange.textContent = (pitchDiff >= 0 ? '+' : '') + pitchDiff + ' Hz';
+            pitchChange.className = 'font-bold text-lg text-cyan-400';
+
+            // Nyquist frequency
+            nyquistFreq.textContent = nyquist + ' Hz';
+
+            // Aliasing effect description
+            let effect = '';
+            const sampleRate = resampledClassification.sampleRate;
+            
+            if (sampleRate < 8000) {
+                effect = '⚠️ SEVERE ALIASING: Sample rate is critically low. Significant loss of voice characteristics. High-frequency components are severely distorted.';
+            } else if (sampleRate < 12000) {
+                effect = '⚠️ MODERATE ALIASING: Sample rate below recommended minimum for voice. Noticeable degradation in audio quality and potential classification errors.';
+            } else if (sampleRate < 16000) {
+                effect = '⚠️ MILD ALIASING: Sample rate is acceptable but may cause minor artifacts. Some high-frequency voice characteristics may be lost.';
+            } else {
+                effect = '✓ MINIMAL ALIASING: Sample rate is sufficient for voice classification. Audio quality preserved with minimal artifacts.';
+            }
+
+            if (!match) {
+                effect += ' ❌ Gender classification changed due to under-sampling effects!';
+            }
+
+            aliasingEffect.textContent = effect;
+            aliasingAnalysis.classList.remove('hidden');
         }
         
         // --- 4. Playback Functions ---
@@ -463,7 +795,8 @@
             if (originalBuffer) {
                 playOriginalBtn.disabled = false;
                 playSampledBtn.disabled = false;
-                classifyBtn.disabled = false;
+                classifyOriginalBtn.disabled = false;
+                classifyResampledBtn.disabled = false;
             }
             pauseBtn.disabled = true;
             messageBox.textContent = "Playback paused/stopped.";
@@ -493,6 +826,8 @@
             currentSourceNode = null;
             audioChunks = [];
             recordingStartTime = null;
+            originalClassification = null;
+            resampledClassification = null;
             
             // Reset recording UI
             recordBtn.disabled = false;
@@ -508,7 +843,8 @@
             playSampledBtn.disabled = true;
             pauseBtn.disabled = true;
             resetBtn.disabled = true;
-            classifyBtn.disabled = true;
+            classifyOriginalBtn.disabled = true;
+            classifyResampledBtn.disabled = true;
             
             fileNameDisplay.classList.add('hidden');
             filePrompt.classList.remove('hidden');
@@ -521,10 +857,16 @@
             frequencySlider.value = defaultRate;
             currentFrequencyDisplay.textContent = `${defaultRate} (Original Rate)`;
             
-            classificationResults.classList.add('hidden');
+            // Hide all results
+            originalResults.classList.add('hidden');
+            resampledResults.classList.add('hidden');
+            aliasingAnalysis.classList.add('hidden');
+            
             // Remove gender accent classes on full reset
-            classificationResults.classList.remove('results-male', 'results-female');
-            genderAccentBar.classList.remove('gender-accent-bar-male', 'gender-accent-bar-female');
+            originalResults.classList.remove('results-male', 'results-female');
+            resampledResults.classList.remove('results-male', 'results-female');
+            originalAccentBar.classList.remove('gender-accent-bar-male', 'gender-accent-bar-female');
+            resampledAccentBar.classList.remove('gender-accent-bar-male', 'gender-accent-bar-female');
 
             messageBox.textContent = "Application reset. Ready for new file.";
         }
@@ -546,7 +888,8 @@
                     playOriginalBtn.disabled = false;
                     playSampledBtn.disabled = false;
                     pauseBtn.disabled = true;
-                    classifyBtn.disabled = false;
+                    classifyOriginalBtn.disabled = false;
+                    classifyResampledBtn.disabled = false;
                     messageBox.textContent = "Playback finished.";
                 }
             };
@@ -555,7 +898,8 @@
             isPlaying = true;
             playOriginalBtn.disabled = true;
             playSampledBtn.disabled = true;
-            classifyBtn.disabled = true; // Disable classification during playback
+            classifyOriginalBtn.disabled = true; // Disable classification during playback
+            classifyResampledBtn.disabled = true;
             pauseBtn.disabled = false;
             messageBox.textContent = "Playing audio...";
         }
@@ -813,7 +1157,8 @@
         // Control buttons
         pauseBtn.addEventListener('click', stopAudio);
         resetBtn.addEventListener('click', resetApp);
-        classifyBtn.addEventListener('click', classifyGender);
+        classifyOriginalBtn.addEventListener('click', classifyOriginal);
+        classifyResampledBtn.addEventListener('click', classifyResampled);
 
         // Initial setup on load
         document.addEventListener('DOMContentLoaded', initAudioContext);
