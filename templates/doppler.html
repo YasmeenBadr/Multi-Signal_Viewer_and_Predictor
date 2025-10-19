@@ -188,34 +188,36 @@
                 <input type="hidden" name="distance" value="10">
                 <input type="hidden" name="duration" value="6">
 
-                <!-- CRITICAL: Sampling Frequency Slider for Aliasing Demo -->
+                <!-- Sampling Frequency Slider -->
                 <div class="mt-4">
                     <label class="form-label">
                         Sampling Frequency (Hz)
-                        <span id="samplingStatus" class="status-badge status-danger">❌ downsampled</span>
+                        <span id="samplingStatus" class="status-badge status-danger">❌ Undersampled</span>
                     </label>
                     <input type="range" class="form-range" id="samplingSlider" name="sampling_freq" 
                            min="500" max="12000" step="100" value="1500">
                     
                     <div class="d-flex justify-content-between mt-2">
                         <small>500 Hz</small>
-                        <strong id="samplingValue" style="color: var(--primary-color);">2000 Hz</strong>
+                        <strong id="samplingValue" style="color: var(--primary-color);">1500 Hz</strong>
                         <small>12000 Hz</small>
                     </div>
 
                     <div class="sampling-info" id="samplingInfo">
-                        <strong>Aliasing Demonstration:</strong><br>
+                        <strong>🎯 Aliasing Demonstration:</strong><br>
                         <span id="nyquistInfo">Set sampling rate below Nyquist to hear aliasing effects</span>
+                    </div>
+                    
+                    <div class="mt-2">
+                        <small class="text-warning">
+                            <strong>Note:</strong> Audio will be resampled to at least 8000Hz for browser compatibility, 
+                            but aliasing effects will be preserved in the sound.
+                        </small>
                     </div>
                 </div>
 
-                <div class="mt-2">
-                    <small class="text-warning">
-                       <strong>Note:</strong> Audio will be resampled to at least 8000Hz for browser compatibility, 
-                       but aliasing effects will be preserved in the sound.
-                    </small>
-                </div>
                 <button type="submit" class="btn btn-custom w-100 mt-3">🔊 Generate Simulation</button>
+            </form>
         </div>
 
         <div class="text-center mt-5 mb-5">
@@ -266,7 +268,7 @@
                 samplingStatus.textContent = '⚠️ Near Nyquist';
                 samplingStatus.className = 'status-badge status-warning';
             } else {
-                samplingStatus.textContent = '❌ downsampled';
+                samplingStatus.textContent = '❌ Undersampled';
                 samplingStatus.className = 'status-badge status-danger';
             }
             
