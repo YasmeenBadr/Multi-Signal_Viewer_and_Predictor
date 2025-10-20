@@ -200,6 +200,9 @@ def detect():
 # ============================================================
 # ROUTE: Upload and Estimate Speed
 # ==================== UPLOAD AND ESTIMATE SPEED ====================
+# ... (keep all your code the same until upload_audio function)
+# ... (keep all your code the same until upload_audio function)
+
 @bp.route("/upload", methods=["POST"])
 def upload_audio():
     try:
@@ -239,7 +242,7 @@ def upload_audio():
                 estimated_speed = float(np.mean(f[car_key][:])) if car_key in f else 50.0
         except Exception as e:
             print(f"Model loading failed: {e}")
-            estimated_speed = 50.0  # Fallback
+            estimated_speed = 50.0
 
         estimated_speed = round(estimated_speed, 2)
 
@@ -248,7 +251,6 @@ def upload_audio():
             if len(y) == 0:
                 return 440.0
                 
-            # Use middle segment for stability
             start_idx = len(y) // 4
             end_idx = 3 * len(y) // 4
             segment = y[start_idx:end_idx]
@@ -256,13 +258,11 @@ def upload_audio():
             if len(segment) == 0:
                 return 440.0
                 
-            # Apply window and FFT
             window = windows.hann(len(segment))
             spectrum = np.fft.rfft(segment * window)
             freqs = np.fft.rfftfreq(len(segment), 1 / sr)
             mags = np.abs(spectrum)
             
-            # Find peak frequency between 50-2000 Hz
             valid_indices = (freqs > 50) & (freqs < 2000)
             if not np.any(valid_indices):
                 return 440.0
@@ -285,35 +285,27 @@ def upload_audio():
         N = len(y)
         duration = N / sr
         
-        # Create time array in seconds
-        t_plot = np.linspace(0, duration, N)
-        
-        # Downsample for plotting (max 1000 points)
         max_plot_points = 1000
         if N > max_plot_points:
             indices = np.linspace(0, N-1, max_plot_points, dtype=int)
             y_plot = y[indices]
-            t_plot = t_plot[indices]
         else:
             y_plot = y
 
         print(f"=== UPLOAD SUCCESS ===")
         print(f"Audio: {N} samples, {duration:.2f}s, {sr} Hz")
-        print(f"Plot: {len(t_plot)} time points, {len(y_plot)} amplitude points")
+        print(f"Plot: {len(y_plot)} amplitude points")
         print(f"Detection: speed={estimated_speed} km/h, freq={f_original} Hz")
+        print(f"Y data sample: {y_plot[:5]}")
 
-        # FIXED: Ensure data is properly formatted for JSON
-        y_plot_json = json.dumps([float(val) for val in y_plot])
-        x_plot_json = json.dumps([float(val) for val in t_plot])
-
+        # ✅ FIX 1: Don't double-encode JSON - convert to list directly
         return render_template(
             "doppler_detect_result.html",
             audio_file_id=file_id,
             estimated_speed=estimated_speed,
             f_original=f_original,
-            perceived_freq=round(f_original * 1.2, 2),
-            y_plot_json=y_plot_json,
-            x_plot_json=x_plot_json,
+            y_plot_list=y_plot.tolist(),  # ✅ Pass as Python list
+            sr=sr
         )
 
     except Exception as e:
@@ -322,6 +314,98 @@ def upload_audio():
         traceback.print_exc()
         return f"Error processing file: {str(e)}", 500
 
+
+# ✅ FIX 3: Actually resample the ORIGINAL uploaded audio
+@bp.route("/resample_uploaded_audio", methods=["POST"])
+def resample_uploaded_audio():
+    try:
+        print("=== RESAMPLE_UPLOADED_AUDIO CALLED ===")
+        
+        data = request.get_json()
+        print(f"Received data: {data}")
+        
+        target_fs = int(data["target_fs"])
+        audio_file_id = data["audio_file_id"]
+
+        print(f"Resampling original file {audio_file_id} to {target_fs} Hz")
+
+        # Read the ORIGINAL uploaded file
+        original_filepath = os.path.join(TEMP_DIR, f"{audio_file_id}.wav")
+        
+        if not os.path.exists(original_filepath):
+            raise Exception("Original file not found")
+        
+        sr_orig, data_orig = wav.read(original_filepath)
+        
+        # Convert to mono if stereo
+        if data_orig.ndim > 1:
+            y_orig = data_orig[:, 0].astype(np.float32)
+        else:
+            y_orig = data_orig.astype(np.float32)
+            
+        # Normalize to -1 to 1
+        if np.issubdtype(y_orig.dtype, np.integer):
+            y_orig = y_orig / float(np.iinfo(data_orig.dtype).max)
+        
+        y_orig = y_orig / (np.max(np.abs(y_orig)) + 1e-9)
+        
+        print(f"Original: {len(y_orig)} samples at {sr_orig} Hz")
+        
+        # ✅ RESAMPLE to target frequency
+        duration = len(y_orig) / sr_orig
+        num_samples_new = int(duration * target_fs)
+        
+        if target_fs != sr_orig:
+            y_resampled = resample(y_orig, num_samples_new)
+        else:
+            y_resampled = y_orig
+        
+        print(f"Resampled: {len(y_resampled)} samples at {target_fs} Hz")
+        
+        # ✅ FIX: For audio playback, upsample to at least 8000 Hz if needed
+        audio_fs = max(8000, target_fs)  # Browsers need minimum 8kHz
+        
+        if audio_fs != target_fs:
+            num_samples_audio = int(duration * audio_fs)
+            y_audio = resample(y_resampled, num_samples_audio)
+            print(f"Upsampled for playback: {audio_fs} Hz")
+        else:
+            y_audio = y_resampled
+        
+        # Save audio file at playable sampling rate
+        audio_data = np.clip(y_audio * 32767, -32767, 32767).astype(np.int16)
+        
+        resampled_file_id = str(uuid.uuid4())
+        resampled_filename = os.path.join(TEMP_DIR, f"{resampled_file_id}.wav")
+        write(resampled_filename, audio_fs, audio_data)
+        
+        print(f"✅ Saved audio: {resampled_filename} at {audio_fs} Hz (display: {target_fs} Hz)")
+
+        # Prepare plot data - use the TRUE resampled signal (not upsampled)
+        max_plot_points = 800
+        if len(y_resampled) > max_plot_points:
+            stride = len(y_resampled) // max_plot_points
+            y_plot = y_resampled[::stride][:max_plot_points]
+        else:
+            y_plot = y_resampled
+
+        print(f"✅ Returning {len(y_plot)} plot points")
+
+        return jsonify({
+            "success": True,
+            "resampled_file_id": resampled_file_id,
+            "y_plot": y_plot.tolist(),
+            "actual_fs_used": target_fs,  # The TRUE sampling rate
+            "audio_fs": audio_fs,  # The playback sampling rate
+            "original_length": len(y_orig),
+            "resampled_length": len(y_resampled)
+        })
+
+    except Exception as e:
+        print(f"❌ Error in resample_uploaded_audio: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"success": False, "error": str(e)})
 # ============================================================
 # ==================== GENERATE DOWNSAMPLED AUDIO ====================
 @bp.route("/generate_downsampled_audio", methods=["POST"])
