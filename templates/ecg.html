@@ -38,7 +38,7 @@
 
   .prediction-result {
     font-weight: 700;
-    color: #00f7ff;
+    color: #00eaff;
   }
 
   .disease-name {
@@ -50,26 +50,26 @@
   /* Buttons */
   .btn-primary {
     background: #000000;
-    border: 1px solid#00f7ff;
+    border: 1px solid#00eaff;
     font-weight: 600;
   }
   
   .btn-primary:hover {
     background: #323739;
-    border-color: #00e1ff;
+    border-color: #00eaff;
     color: #000;
   }
   .btn-primary {
     --bs-btn-color: #fff;
-    --bs-btn-bg: #00e1ff;
-    --bs-btn-border-color: #00e1ff;
+    --bs-btn-bg:#00eaff;
+    --bs-btn-border-color:#00eaff;
     --bs-btn-hover-color: #fff;
     --bs-btn-hover-bg: #00e1ff;
-    --bs-btn-hover-border-color: #00e1ff;
+    --bs-btn-hover-border-color: #00eaff;
     --bs-btn-focus-shadow-rgb: 49, 132, 253;
     --bs-btn-active-color: #fff;
     --bs-btn-active-bg: #303636;
-    --bs-btn-active-border-color: #00e1ff;
+    --bs-btn-active-border-color: #00eaff;
     --bs-btn-active-shadow: inset 0 3px 5px rgba(0, 0, 0, 0.125);
     --bs-btn-disabled-color: #fff;
     --bs-btn-disabled-bg: #202829;
@@ -78,18 +78,18 @@
 
   .btn-secondary {
     background: #333;
-    border: 1px solid #00f2ff;
-    color: #00ffe5;
+    border: 1px solid #00eaff;
+    color:#e0e0e0;
   }
   .btn-secondary:hover {
     background: #444;
-    border-color: #00eeff;
+    border-color: #00eaff;
     color: #00fbff;
   }
 
   /* Drop zone */
   #dropZone {
-    border: 2px dashed #00f7ff;
+    border: 2px dashed #00eaff;
     padding: 12px;
     border-radius: 8px;
     background: #0e0e0e;
@@ -97,7 +97,7 @@
     text-align: center;
   }
   #pickFiles {
-    color:#00f7ff;
+    color:#00eaff;
     text-decoration: underline;
     cursor: pointer;
   }
@@ -108,18 +108,18 @@
   /* Form inputs and selects */
   input.form-control, select.form-select {
     background: #222;
-    color: #00f7ff;
-    border: 1px solid #00f7ff;
+    color:#00eaff;
+    border: 1px solid #00eaff;
   }
 
   input.form-control:focus, select.form-select:focus {
-    border-color: #00f7ff;
-    box-shadow: 0 0 8px #00f7ff;
+    border-color: #00eaff;
+    box-shadow: 0 0 8px #00eaff;
   }
 
   /* Labels */
   label.form-label {
-    color:#00f7ff;
+    color:#e0e0e0;
     font-weight: 500;
   }
 
@@ -130,7 +130,7 @@
 
 .form-check-input:checked {
     background-color: #101112;
-    border-color: #00f7ff;
+    border-color: #e0e0e0;
 }
 
   .form-text {
@@ -139,7 +139,7 @@
 
   /* Heading */
   h1 {
-    color: #00f7ff;
+    color: #00eaff;
     text-align: center;
     font-weight: 800;
     margin-bottom: 24px;
@@ -195,7 +195,7 @@
         </div>
 
         <div class="mb-3">
-          <label id="freqLabel" class="form-label">Sampling Frequency (Hz) <span id="freqValue" style="margin-left:8px;color:#9cf;">-- Hz</span></label>
+          <label id="freqLabel" class="form-label">Sampling Frequency (Hz) <span id="freqValue" style="margin-left:8px;color:#9cf;">500 Hz</span></label>
           <input id="freqSlider" type="range" min="10" max="500" step="10" value="500" />
           <div style="display:flex; justify-content:space-between; align-items:center;">
             <div class="small-muted">Min:10</div>
@@ -216,7 +216,7 @@
           <div id="diseaseName" class="disease-name"></div>
           <div id="aliasingNote" style="margin-top:6px; color:#ffb74d; font-size:0.85rem;"></div>
         </div>
-        <button class="btn btn-primary w-100" style="color:#00eaff;" type="submit">Start Streaming</button>
+        <button class="btn btn-primary w-100" style="color:#e0e0e0;" type="submit">Start Streaming</button>
         <button id="stopBtn" class="btn btn-secondary w-100 mt-2" type="button">Stop</button>
       </form>
     </div>
@@ -282,9 +282,11 @@ async function initConfig(){
     const cfg = await fetch("/ecg/config").then(r=>r.json());
     nativeFs = cfg.fs_native || cfg.fs || nativeFs;
     displayFs = cfg.display_fs || displayFs;
-    requestedSampling = cfg.freq_default || nativeFs;
-    document.getElementById("freqSlider").max = Math.min(500, nativeFs);
-    document.getElementById("freqSlider").value = requestedSampling;
+    // Default UI to a safe cap of 500 Hz (or native if lower) so it doesn't show 1000 Hz by default
+    requestedSampling = Math.min(500, nativeFs);
+    const sliderEl = document.getElementById("freqSlider");
+    sliderEl.max = Math.min(500, nativeFs);
+    sliderEl.value = requestedSampling;
     document.getElementById("freqValue").innerText = requestedSampling + " Hz";
     allChannels = cfg.channels || (Array.from({length:12}, (_,i)=>"Lead "+(i+1)));
     const cdiv = document.getElementById("channelList");
@@ -481,6 +483,8 @@ async function fetchData(){
     const usedFs = result.used_sampling_freq || requestedSampling || nativeFs;
     const maxSamples=Math.round(widthSec*plotFs*4); // Keep 4x window width to reduce compression
 
+    // Keep the label in sync with backend-reported sampling
+    document.getElementById('freqValue').innerText = usedFs + ' Hz';
     selectedChannels.forEach((ch,idx)=>{
       const chunk=result.signals[String(ch)]||[];
       channelData[ch].push(...chunk);
