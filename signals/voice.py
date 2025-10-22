@@ -95,7 +95,18 @@ def classify_gender():
         # Perform gender classification
         try:
             with torch.no_grad():
-                gender = model.predict(filepath, device=device)
+                result = model.predict(filepath, device=device)
+                # Handle both old (string) and new (tuple) return formats
+                if isinstance(result, tuple):
+                    gender, model_confidence = result
+                else:
+                    # Fallback for old model version - get confidence manually
+                    gender = result
+                    # Load audio and get model output directly
+                    audio = model.load_audio(filepath).to(device)
+                    output = model.forward(audio)
+                    probabilities = torch.softmax(output, dim=1)
+                    model_confidence = probabilities.max(1)[0].item()
         except Exception as e:
             # Clean up the temporary file
             try:
@@ -128,12 +139,8 @@ def classify_gender():
             # Use default pitch values based on gender if librosa not available
             avg_pitch = 120 if gender == 'male' else 210
         
-        # Calculate confidence based on pitch ranges
-        # Typical male: 85-180 Hz, Female: 165-255 Hz
-        if gender == 'male':
-            confidence = 0.9 if avg_pitch < 165 else 0.6
-        else:
-            confidence = 0.9 if avg_pitch > 165 else 0.6
+        # Use the actual model confidence from softmax probabilities
+        confidence = model_confidence
         
         # Clean up the temporary file
         try:
