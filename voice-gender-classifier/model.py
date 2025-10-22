@@ -219,12 +219,18 @@ class ECAPA_gender(nn.Module, PyTorchModelHubMixin):
             except Exception as e2:
                 raise Exception(f"Failed to load audio file. Tried scipy.wavfile and pydub. Please ensure the file is a valid audio file. Original error: {str(e)}, Fallback error: {str(e2)}")
     
-    def predict(self, audio_path: str, device: torch.device) -> str:
+    def predict(self, audio_path: str, device: torch.device) -> tuple:
+        """
+        Predict gender with confidence score
+        Returns: (gender, confidence)
+        """
         audio = self.load_audio(audio_path)
         audio = audio.to(device)
         self.eval()
 
         with torch.no_grad():
             output = self.forward(audio)
-            _, pred = output.max(1)
-        return self.pred2gender[pred.item()]
+            probabilities = torch.softmax(output, dim=1)
+            confidence, pred = probabilities.max(1)
+        
+        return self.pred2gender[pred.item()], confidence.item()

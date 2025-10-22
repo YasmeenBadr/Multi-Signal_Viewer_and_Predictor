@@ -38,7 +38,7 @@
 
   .prediction-result {
     font-weight: 700;
-    color: #00f7ff;
+    color: #00eaff;
   }
 
   .disease-name {
@@ -50,26 +50,26 @@
   /* Buttons */
   .btn-primary {
     background: #000000;
-    border: 1px solid#00f7ff;
+    border: 1px solid#00eaff;
     font-weight: 600;
   }
   
   .btn-primary:hover {
     background: #323739;
-    border-color: #00e1ff;
+    border-color: #00eaff;
     color: #000;
   }
   .btn-primary {
     --bs-btn-color: #fff;
-    --bs-btn-bg: #00e1ff;
-    --bs-btn-border-color: #00e1ff;
+    --bs-btn-bg:#00eaff;
+    --bs-btn-border-color:#00eaff;
     --bs-btn-hover-color: #fff;
     --bs-btn-hover-bg: #00e1ff;
-    --bs-btn-hover-border-color: #00e1ff;
+    --bs-btn-hover-border-color: #00eaff;
     --bs-btn-focus-shadow-rgb: 49, 132, 253;
     --bs-btn-active-color: #fff;
     --bs-btn-active-bg: #303636;
-    --bs-btn-active-border-color: #00e1ff;
+    --bs-btn-active-border-color: #00eaff;
     --bs-btn-active-shadow: inset 0 3px 5px rgba(0, 0, 0, 0.125);
     --bs-btn-disabled-color: #fff;
     --bs-btn-disabled-bg: #202829;
@@ -78,18 +78,18 @@
 
   .btn-secondary {
     background: #333;
-    border: 1px solid #00f2ff;
-    color: #00ffe5;
+    border: 1px solid #00eaff;
+    color:#e0e0e0;
   }
   .btn-secondary:hover {
     background: #444;
-    border-color: #00eeff;
+    border-color: #00eaff;
     color: #00fbff;
   }
 
   /* Drop zone */
   #dropZone {
-    border: 2px dashed #00f7ff;
+    border: 2px dashed #00eaff;
     padding: 12px;
     border-radius: 8px;
     background: #0e0e0e;
@@ -97,7 +97,7 @@
     text-align: center;
   }
   #pickFiles {
-    color:#00f7ff;
+    color:#00eaff;
     text-decoration: underline;
     cursor: pointer;
   }
@@ -108,18 +108,18 @@
   /* Form inputs and selects */
   input.form-control, select.form-select {
     background: #222;
-    color: #00f7ff;
-    border: 1px solid #00f7ff;
+    color:#00eaff;
+    border: 1px solid #00eaff;
   }
 
   input.form-control:focus, select.form-select:focus {
-    border-color: #00f7ff;
-    box-shadow: 0 0 8px #00f7ff;
+    border-color: #00eaff;
+    box-shadow: 0 0 8px #00eaff;
   }
 
   /* Labels */
   label.form-label {
-    color:#00f7ff;
+    color:#e0e0e0;
     font-weight: 500;
   }
 
@@ -130,7 +130,7 @@
 
 .form-check-input:checked {
     background-color: #101112;
-    border-color: #00f7ff;
+    border-color: #e0e0e0;
 }
 
   .form-text {
@@ -139,11 +139,16 @@
 
   /* Heading */
   h1 {
-    color: #00f7ff;
+    color: #00eaff;
     text-align: center;
     font-weight: 800;
     margin-bottom: 24px;
   }
+
+  /* frequency slider */
+  #freqLabel { color: #00eaff; font-weight:600; margin-bottom:6px; }
+  #freqSlider { width:100%; accent-color:#00eaff; margin-bottom:6px; }
+  .small-muted { color:#9aa; font-size:0.9rem; }
 </style>
 </head>
 <body class="min-h-screen bg-primary-bg text-text-light p-4">
@@ -188,14 +193,30 @@
             <option value="Recurrence">Recurrence</option>
           </select>
         </div>
+
+        <div class="mb-3">
+          <label id="freqLabel" class="form-label">Sampling Frequency (Hz) <span id="freqValue" style="margin-left:8px;color:#9cf;">500 Hz</span></label>
+          <input id="freqSlider" type="range" min="10" max="500" step="10" value="500" />
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div class="small-muted">Min:10</div>
+            <div class="small-muted">Max: 500</div>
+          </div>
+          <div class="mt-2" style="display:flex; gap:8px;">
+            <button id="applyFreq" class="btn btn-primary" type="button">Apply Sampling</button>
+            <button id="resetFreq" class="btn btn-secondary" type="button">Reset Sampling</button>
+          </div>
+          <div class="form-text small-muted">Lower frequency simulates lower-sampling hardware — predictions & signal will change.</div>
+        </div>
+
         <div class="prediction-box mb-3">
           <h6>Prediction</h6>
           <div id="predictionResult" class="prediction-result">Waiting for data...</div>
           <div id="predictionDescription" style="margin-top:8px; color:#ccc; font-size:0.9rem;"></div>
-          <div id="recurrencePrediction" class="text-info" style="margin-top:8px; font-size:0.9rem;"></div>
+          <div id="recurrencePrediction" style="margin-top:6px; color:#90caf9; font-size:0.85rem;"></div>
           <div id="diseaseName" class="disease-name"></div>
+          <div id="aliasingNote" style="margin-top:6px; color:#ffb74d; font-size:0.85rem;"></div>
         </div>
-        <button class="btn btn-primary w-100" style="color:#00eaff;" type="submit">Start Streaming</button>
+        <button class="btn btn-primary w-100" style="color:#e0e0e0;" type="submit">Start Streaming</button>
         <button id="stopBtn" class="btn btn-secondary w-100 mt-2" type="button">Stop</button>
       </form>
     </div>
@@ -247,27 +268,34 @@
 <script>
 let streaming=false, intervalId=null;
 let updateSpeed=1, allChannels=[], selectedChannels=[], widthSec=5;
-let fs=360, displayFs=200;
+let nativeFs=500, displayFs=200;
 let channelData={}, globalStart=0;
 let colormap="Jet";
 let polarMode = "fixed";
-let currentDisplay = 'All';
+let currentDisplay = 'Time';
 let filesUploaded = false;
+let requestedSampling = null; // value applied via Apply Sampling
 
-// Initialize channel config
+// Init config
 async function initConfig(){
   try{
     const cfg = await fetch("/ecg/config").then(r=>r.json());
-    fs = cfg.fs || fs;
+    nativeFs = cfg.fs_native || cfg.fs || nativeFs;
     displayFs = cfg.display_fs || displayFs;
-    allChannels = cfg.channels || [];
+    // Default UI to a safe cap of 500 Hz (or native if lower) so it doesn't show 1000 Hz by default
+    requestedSampling = Math.min(500, nativeFs);
+    const sliderEl = document.getElementById("freqSlider");
+    sliderEl.max = Math.min(500, nativeFs);
+    sliderEl.value = requestedSampling;
+    document.getElementById("freqValue").innerText = requestedSampling + " Hz";
+    allChannels = cfg.channels || (Array.from({length:12}, (_,i)=>"Lead "+(i+1)));
     const cdiv = document.getElementById("channelList");
     cdiv.innerHTML="";
     allChannels.forEach((name,i)=>{
       const checked=i<2?"checked":"";
       cdiv.insertAdjacentHTML("beforeend",
         `<div class="form-check">
-          <input class="form-check-input" type="checkbox" name="channels" value="${i}" ${checked}>
+          <input class="form-check-input channel-checkbox" type="checkbox" name="channels" value="${i}" ${checked}>
           <label class="form-check-label">${name}</label>
         </div>`
       );
@@ -276,7 +304,7 @@ async function initConfig(){
 }
 initConfig();
 
-// Event listeners
+// UI wiring
 document.getElementById("colormapSelect").addEventListener("change",(ev)=>{ colormap=ev.target.value; });
 document.getElementById("polarModeSelect").addEventListener("change", (ev)=>{ polarMode = ev.target.value; });
 const xorThresholdInput = document.getElementById('xorThreshold');
@@ -344,7 +372,43 @@ function applyDisplaySelection(val){
 displaySelect.addEventListener('change', (e)=> applyDisplaySelection(e.target.value));
 applyDisplaySelection(displaySelect.value || 'Time');
 
-// Form submit
+// Frequency slider
+const freqSlider = document.getElementById('freqSlider');
+const freqValue = document.getElementById('freqValue');
+freqSlider.addEventListener('input', (e)=>{
+  freqValue.innerText = e.target.value + " Hz";
+});
+document.getElementById('applyFreq').addEventListener('click', async ()=>{
+  const val = parseFloat(freqSlider.value);
+  // call backend to set sampling (clears buffers so model will predict freshly)
+  const res = await fetch('/ecg/set_sampling', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({sampling_freq: val})
+  });
+  const j = await res.json();
+  if(j && j.success){
+    requestedSampling = j.current_sampling;
+    alert("Applied sampling: " + requestedSampling + " Hz.");
+    // If streaming, fetch new data without resetting buffers
+    if(streaming){ await fetchData(); }
+  } else {
+    alert("Failed to apply sampling: " + JSON.stringify(j));
+  }
+});
+document.getElementById('resetFreq').addEventListener('click', async ()=>{
+  const res = await fetch('/ecg/reset_sampling',{method:'POST'});
+  const j = await res.json();
+  if(j && j.success){
+    requestedSampling = j.current_sampling;
+    freqSlider.value = requestedSampling;
+    freqValue.innerText = requestedSampling + " Hz";
+    alert("Reset sampling to native: " + requestedSampling + " Hz");
+  } else {
+    alert("Failed to reset sampling: " + JSON.stringify(j));
+  }
+});
+
+// Form submit (start)
 document.getElementById("channelForm").addEventListener("submit", ev=>{
   ev.preventDefault();
   if(!filesUploaded){ alert("Please upload files first."); return; }
@@ -366,6 +430,7 @@ document.getElementById("stopBtn").addEventListener("click", ()=>{
   if(intervalId) clearInterval(intervalId);
 });
 
+// Update speed change
 document.getElementById("speedControl").addEventListener("change", ev=>{
   updateSpeed = parseFloat(ev.target.value)||1;
   if(streaming){
@@ -375,12 +440,12 @@ document.getElementById("speedControl").addEventListener("change", ev=>{
 });
 
 function initPlots(channels){
-  if(!filesUploaded) return; // do not init unless files uploaded
-  const timeTraces = channels.map(ch=>({x:[],y:[],mode:"lines",name:"",line:{width:1.5}, showlegend:false, hoverinfo:'none'}));
+  if(!filesUploaded) return;
+  const timeTraces = channels.map(ch=>({x:[],y:[],mode:"lines",name:"",line:{width:1.8}, showlegend:false, hoverinfo:'none'}));
   Plotly.newPlot("timePlot", timeTraces, {
     title:'Real-time ECG (time domain)',
     paper_bgcolor:"#000", plot_bgcolor:"#000", font:{color:"#e0e0e0"},
-    xaxis:{title:"Time (s)", range:[0,widthSec], gridcolor:"#333"},
+    xaxis:{title:"Time (s)", range:[0,widthSec], gridcolor:"#333", dtick:2},
     yaxis:{title:"Amplitude", gridcolor:"#333", autorange:true},
     showlegend:false
   });
@@ -394,8 +459,11 @@ function initPlots(channels){
   Plotly.newPlot("polarPlot", polarTraces, {title:'Polar Plot', paper_bgcolor:"#000", font:{color:"#e0e0e0"}, showlegend:false});
 
   if(channels.length===2){
-    Plotly.newPlot("recurrenceScatterPlot", [{ z:[], type:"heatmap", colorscale:colormap }],
-      {title:'Recurrence', paper_bgcolor:"#000", plot_bgcolor:"#000", font:{color:"#e0e0e0"}, showlegend:false});
+    Plotly.newPlot("recurrenceScatterPlot", [{ z:[], type:"heatmap", colorscale:colormap }], {title:'Recurrence', paper_bgcolor:"#000", plot_bgcolor:"#000", font:{color:"#e0e0e0"}, showlegend:false});
+  } else {
+    // keep plot but empty
+    Plotly.purge('recurrenceScatterPlot');
+    document.getElementById('recurrenceScatterPlot').innerHTML = '';
   }
 }
 
@@ -403,27 +471,35 @@ async function fetchData(){
   if(!streaming) return;
   try{
     const xorThresholdVal = xorThresholdInput ? parseFloat(xorThresholdInput.value)||0.05 : 0.05;
+    // when calling update, send channels + current requestedSampling (backend will clamp to native)
     const resp = await fetch("/ecg/update", {
       method:"POST",
       headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({channels:selectedChannels,width:widthSec, polar_mode:polarMode, xor_threshold:xorThresholdVal})
+      body:JSON.stringify({channels:selectedChannels, width:widthSec, polar_mode:polarMode, xor_threshold:xorThresholdVal, sampling_freq: requestedSampling})
     });
     if(!resp.ok) throw new Error("HTTP "+resp.status);
     const result = await resp.json();
-    const plotFs = displayFs, maxSamples=Math.round(widthSec*plotFs);
+    const plotFs = result.display_fs || displayFs;
+    const usedFs = result.used_sampling_freq || requestedSampling || nativeFs;
+    const maxSamples=Math.round(widthSec*plotFs*4); // Keep 4x window width to reduce compression
 
+    // Keep the label in sync with backend-reported sampling
+    document.getElementById('freqValue').innerText = usedFs + ' Hz';
     selectedChannels.forEach((ch,idx)=>{
       const chunk=result.signals[String(ch)]||[];
       channelData[ch].push(...chunk);
+      // Trim data more gradually to reduce compression
       if(channelData[ch].length>maxSamples){
-        const drop=channelData[ch].length-maxSamples;
+        const drop=Math.floor(channelData[ch].length*0.1); // Only drop 10% at a time
         channelData[ch]=channelData[ch].slice(drop);
         if(idx===0) globalStart+=drop/plotFs;
       }
       const xvals=channelData[ch].map((_,i)=>globalStart+i/plotFs);
       if(currentDisplay==='All'||currentDisplay==='Time') Plotly.restyle("timePlot",{x:[xvals],y:[channelData[ch]]},[idx]);
     });
-    Plotly.relayout("timePlot",{"xaxis.range":[globalStart,globalStart+widthSec]});
+    // Set a fixed time window that slides with the data
+    const currentTime = globalStart + (channelData[selectedChannels[0]]?.length || 0) / plotFs;
+    Plotly.relayout("timePlot",{"xaxis.range":[Math.max(0, currentTime-widthSec), currentTime], "xaxis.dtick":0.5});
 
     if(selectedChannels.length===1){
       const chXOR=selectedChannels[0];
@@ -449,69 +525,58 @@ async function fetchData(){
 
     if(selectedChannels.length===2){
       const colormapData=result.colormap||[];
-      if(currentDisplay==='All'||currentDisplay==='Recurrence') Plotly.restyle("recurrenceScatterPlot",{z:[colormapData], colorscale:colormap});
+      if(currentDisplay==='All'||currentDisplay==='Recurrence') {
+        try {
+          Plotly.restyle("recurrenceScatterPlot",{z:[colormapData], colorscale:colormap});
+        } catch(e){}
+      }
     }
 
-   // === Restored + clearer prediction logic ===
-if(filesUploaded){
-  const pred=result.prediction||{};
-  const rec=result.recurrence_prediction||{};
-  const predRes=document.getElementById("predictionResult");
-  const predDesc=document.getElementById("predictionDescription");
-  const recEl=document.getElementById("recurrencePrediction");
-  const diseaseEl=document.getElementById("diseaseName");
+    // prediction UI
+    if(filesUploaded){
+      const pred=result.prediction||{};
+      const rec=result.recurrence_prediction||{};
+      const alias=result.aliasing||{};
+      const predRes=document.getElementById("predictionResult");
+      const predDesc=document.getElementById("predictionDescription");
+      const recEl=document.getElementById("recurrencePrediction");
+      const diseaseEl=document.getElementById("diseaseName");
+      const aliasEl=document.getElementById("aliasingNote");
 
-  // --- Normal ECG prediction ---
-  let disp=(pred&&typeof pred==='object')?(pred.smoothed||pred.raw||pred):null;
-  if(!disp||!disp.label){
-    predRes.innerText="N/A";
-    predDesc.innerText="";
-    diseaseEl.innerText="";
-  }else{
-    predRes.innerText=disp.label||"N/A";
-    predDesc.innerText=disp.description||"";
-    diseaseEl.innerText=disp.disease_name||"";
-  }
+      let disp=(pred&&typeof pred==='object')?(pred.smoothed||pred.raw||pred):null;
+      if(!disp||!disp.label){
+        predRes.innerText="N/A";
+        predDesc.innerText="";
+        diseaseEl.innerText="";
+      }else{
+        predRes.innerText=disp.label||"N/A";
+        predDesc.innerText=disp.description||"";
+        diseaseEl.innerText=disp.disease_name||"";
+      }
 
-  // --- Recurrence prediction ---
-  if(rec&&rec.label){
-    const conf=rec.confidence!==undefined?` (Confidence: ${(rec.confidence*100).toFixed(1)}%)`:"";
-    recEl.innerText=`Recurrence Prediction: ${rec.label}${conf}`;
-  }else{
-    recEl.innerText="";
-  }
-}
-}catch(err){
+      if(rec&&rec.label){
+        const conf=rec.confidence!==undefined?` (Confidence: ${(rec.confidence*100).toFixed(1)}%)`:"";
+        recEl.innerText=`Recurrence Prediction: ${rec.label}${conf}`;
+      }else{
+        recEl.innerText="";
+      }
+
+      if(alias && alias.is_undersampled){
+        aliasEl.innerText = alias.note || "Potential aliasing detected at current sampling.";
+        aliasEl.style.color = "#ff6b6b";
+        aliasEl.style.fontWeight = "bold";
+      } else {
+        aliasEl.innerText = "";
+      }
+    }
+
+  }catch(err){
     console.error(err);
     streaming=false;
     if(intervalId) clearInterval(intervalId);
     alert("Connection lost or server error — check console.");
   }
 }
-    // === Restored prediction logic ===
-    if(filesUploaded){
-      const pred=result.prediction||{};
-      let disp=(pred&&typeof pred==='object')?(pred.smoothed||pred.raw||pred):null;
-      if(!disp||!disp.label){
-        document.getElementById("predictionResult").innerText="N/A";
-        document.getElementById("predictionDescription").innerText="";
-        document.getElementById("diseaseName").innerText="";
-      }else{
-        document.getElementById("predictionResult").innerText=disp.label||"N/A";
-        document.getElementById("predictionDescription").innerText=disp.description||"";
-        document.getElementById("diseaseName").innerText=disp.disease_name||"";
-      }
-      try{
-        const rec=result.recurrence_prediction;
-        if(rec&&rec.label){
-          const descEl=document.getElementById("predictionDescription");
-          const prev=descEl.innerText||"";
-          const recTxt=`Recurrence: ${rec.label} (conf=${(rec.confidence||0).toFixed(2)})`;
-          descEl.innerText=prev?prev+" | "+recTxt:recTxt;
-        }
-      }catch(e){}
-    }
-
 </script>
 </body>
 </html>

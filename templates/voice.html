@@ -510,15 +510,15 @@
 
             const useAntiAliasing = antiAliasingToggle.checked;
             const ratio = originalRate / targetRate;
-            const newLength = Math.floor(originalBuffer.length / ratio);
+            
+            // Calculate new length to maintain same duration
+            // Duration = samples / sampleRate, so samples = duration * sampleRate
+            const duration = originalBuffer.length / originalRate;
+            const downsampledLength = Math.floor(duration * targetRate);
 
-            // Create resampled buffer
-            resampledBuffer = audioContext.createBuffer(
-                originalBuffer.numberOfChannels, 
-                newLength, 
-                originalBuffer.sampleRate
-            );
-
+            // Create a temporary downsampled buffer
+            const tempDownsampled = [];
+            
             for (let channel = 0; channel < originalBuffer.numberOfChannels; channel++) {
                 let originalData = originalBuffer.getChannelData(channel);
                 
@@ -527,18 +527,37 @@
                     originalData = applyLowPassFilter(originalData, originalRate, targetRate / 2);
                 }
                 
-                const newData = resampledBuffer.getChannelData(channel);
-                
-                // Downsample with nearest neighbor
-                for (let i = 0; i < newLength; i++) {
+                // Downsample: pick every Nth sample
+                const channelDownsampled = new Float32Array(downsampledLength);
+                for (let i = 0; i < downsampledLength; i++) {
                     const originalIndex = Math.floor(i * ratio);
-                    newData[i] = originalData[originalIndex];
+                    channelDownsampled[i] = originalData[Math.min(originalIndex, originalData.length - 1)];
+                }
+                tempDownsampled.push(channelDownsampled);
+            }
+
+            // Now upsample back to original length to maintain playback duration
+            // This simulates what happens when you play low sample rate audio at normal speed
+            resampledBuffer = audioContext.createBuffer(
+                originalBuffer.numberOfChannels,
+                originalBuffer.length,
+                originalBuffer.sampleRate
+            );
+
+            for (let channel = 0; channel < originalBuffer.numberOfChannels; channel++) {
+                const downsampledData = tempDownsampled[channel];
+                const resampledData = resampledBuffer.getChannelData(channel);
+                
+                // Upsample using zero-order hold (repeat samples) to show aliasing
+                for (let i = 0; i < resampledData.length; i++) {
+                    const downsampledIndex = Math.floor(i / ratio);
+                    resampledData[i] = downsampledData[Math.min(downsampledIndex, downsampledData.length - 1)];
                 }
             }
 
-            // Create reconstructed buffer (upsample back to original rate)
+            // Create reconstructed buffer (with better interpolation)
             if (useAntiAliasing) {
-                reconstructSignal(targetRate);
+                reconstructSignal(targetRate, tempDownsampled);
             }
         }
 
@@ -563,23 +582,23 @@
         }
 
         // Reconstruct signal using linear interpolation (upsampling)
-        function reconstructSignal(downsampledRate) {
-            if (!resampledBuffer) return;
+        function reconstructSignal(downsampledRate, tempDownsampled) {
+            if (!tempDownsampled) return;
 
             const ratio = originalRate / downsampledRate;
             const reconstructedLength = originalBuffer.length;
 
             reconstructedBuffer = audioContext.createBuffer(
-                resampledBuffer.numberOfChannels,
+                originalBuffer.numberOfChannels,
                 reconstructedLength,
                 originalBuffer.sampleRate
             );
 
-            for (let channel = 0; channel < resampledBuffer.numberOfChannels; channel++) {
-                const downsampledData = resampledBuffer.getChannelData(channel);
+            for (let channel = 0; channel < originalBuffer.numberOfChannels; channel++) {
+                const downsampledData = tempDownsampled[channel];
                 const reconstructedData = reconstructedBuffer.getChannelData(channel);
 
-                // Linear interpolation for upsampling
+                // Linear interpolation for upsampling (proper reconstruction)
                 for (let i = 0; i < reconstructedLength; i++) {
                     const downsampledIndex = i / ratio;
                     const lowerIndex = Math.floor(downsampledIndex);
