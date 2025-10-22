@@ -106,12 +106,12 @@
                     
                     <div class="mb-6 border-2 border-dashed border-gray-600 rounded-lg p-4 text-center hover:border-accent transition duration-300" 
                         id="dropZone">
-                        <input type="file" id="edfFile" accept=".edf" class="hidden">
+                        <input type="file" id="edfFile" accept=".edf,.fif,.fif.gz" class="hidden">
                         <label for="edfFile" class="cursor-pointer">
                             <svg class="mx-auto h-8 w-8 text-accent mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 014 4.903V18a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
                             </svg>
-                            <p class="text-sm font-medium">Drag & drop or <span class="text-accent font-bold">click to upload</span> an **EDF** file</p>
+                            <p class="text-sm font-medium">Drag & drop or <span class="text-accent font-bold">click to upload</span> an **EDF or FIF** file</p>
                         </label>
                         <p id="fileNameDisplay" class="text-xs text-gray-400 mt-2">No file loaded.</p>
                     </div>
@@ -137,6 +137,20 @@
                         </label>
                         <input type="range" id="fsSlider" min="1" max="160" value="160" step="1" class="w-full">
                         <p class="text-[10px] text-gray-400 mt-1">Adjusts visualization sampling up to the file's FS.</p>
+                    </div>
+                    
+                    <!-- Downsampling Control for Aliasing Effect -->
+                    <div class="mb-4 border border-gray-600 rounded-lg p-3 bg-gray-800/50">
+                        <label for="downsampleSlider" class="block text-xs font-medium mb-1 text-gray-300">Downsampling Factor (Aliasing Effect)
+                            <span id="downsampleValue" class="ml-2 text-accent font-bold">1x</span>
+                        </label>
+                        <input type="range" id="downsampleSlider" min="1" max="32" value="1" step="1" class="w-full">
+                        <div class="flex justify-between text-[10px] text-gray-400 mt-1">
+                            <span>1x (Original)</span>
+                            <span>16x (Heavy Aliasing)</span>
+                            <span>32x (Severe Aliasing)</span>
+                        </div>
+                        <p class="text-[10px] text-gray-400 mt-2">⚠️ Higher values cause aliasing and affect prediction accuracy</p>
                     </div>
                     <div id="streamingButtons" class="mt-4 mb-6">
                         <div class="flex gap-2 mb-2">
@@ -224,7 +238,7 @@
                 </div>
                 <div id="plot" style="width:100%;height:100%;">
                     <div class="text-center p-10 text-xl text-gray-500">
-                        Please upload an EDF file to begin analysis.
+                        Please upload an EDF or FIF file to begin analysis.
                     </div>
                 </div>
             </div>
@@ -446,6 +460,33 @@
             updateFs(e.target.value);
         });
 
+        // Downsampling slider event listener
+        const downsampleSlider = document.getElementById('downsampleSlider');
+        const downsampleValue = document.getElementById('downsampleValue');
+        
+        downsampleSlider.addEventListener('input', (e) => {
+            const factor = parseInt(e.target.value);
+            downsampleValue.textContent = factor + 'x';
+            // Store the downsampling factor for use in predictions
+            window.downsampleFactor = factor;
+            
+            // Update visual feedback based on aliasing level
+            const container = downsampleSlider.closest('.border-gray-600');
+            if (factor === 1) {
+                container.className = container.className.replace(/border-\w+-\d+/, 'border-gray-600');
+                container.className = container.className.replace(/bg-\w+-\d+\/\d+/, 'bg-gray-800/50');
+            } else if (factor >= 16) {
+                container.className = container.className.replace(/border-\w+-\d+/, 'border-red-800');
+                container.className = container.className.replace(/bg-\w+-\d+\/\d+/, 'bg-red-900/30');
+            } else if (factor >= 8) {
+                container.className = container.className.replace(/border-\w+-\d+/, 'border-orange-800');
+                container.className = container.className.replace(/bg-\w+-\d+\/\d+/, 'bg-orange-900/30');
+            } else {
+                container.className = container.className.replace(/border-\w+-\d+/, 'border-yellow-800');
+                container.className = container.className.replace(/bg-\w+-\d+\/\d+/, 'bg-yellow-900/30');
+            }
+        });
+
         // --- Button State Management ---
         function updateButtonStates() {
             startContinueButton.disabled = false;
@@ -575,8 +616,8 @@
 
         // --- FILE UPLOAD HANDLERS ---
         function handleFileUpload(file) {
-            if (!file || file.name.split('.').pop().toLowerCase() !== 'edf') {
-                alert("Please select a valid EDF file.");
+            if (!file || !['edf', 'fif', 'gz'].includes(file.name.split('.').pop().toLowerCase())) {
+                alert("Please select a valid EDF or FIF file.");
                 return;
             }
             
@@ -1325,7 +1366,10 @@
                 const response = await fetch("/eeg/predict", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ channels: selectedChannels })
+                    body: JSON.stringify({ 
+                        channels: selectedChannels,
+                        downsample_factor: window.downsampleFactor || 1
+                    })
                 });
                 
                 if (!response.ok) {
@@ -1335,7 +1379,7 @@
                 const result = await response.json();
                 
                 if (result.success) {
-                    displayPredictionResults(result.predictions, result.channel_used);
+                    displayPredictionResults(result.predictions, result.channel_used, result.downsample_factor);
                 } else {
                     predictionResults.innerHTML = `<div class="text-center p-4 text-sm text-red-400">Error: ${result.message}</div>`;
                 }
@@ -1351,7 +1395,7 @@
             }
         }
         
-        function displayPredictionResults(predictions, channelUsed) {
+        function displayPredictionResults(predictions, channelUsed, downsampleFactor = 1) {
             const diseaseNames = {
                 'epilepsy': 'Epilepsy',
                 'alzheimer': 'Alzheimer\'s',
@@ -1368,6 +1412,26 @@
             
             let html = `<div class="space-y-3">`;
             html += `<div class="text-xs text-gray-400 mb-3">Channel: ${channelIndexToOriginalName[channelUsed] || channelUsed}</div>`;
+            
+            // Add downsampling information
+            if (downsampleFactor > 1) {
+                const aliasingWarning = downsampleFactor >= 16 ? '⚠️ Severe Aliasing' : 
+                                       downsampleFactor >= 8 ? '⚠️ Heavy Aliasing' : 
+                                       downsampleFactor >= 4 ? '⚠️ Moderate Aliasing' : '⚠️ Light Aliasing';
+                
+                let warningClass = 'text-gray-400 bg-gray-800/50 border-gray-600';
+                if (downsampleFactor >= 16) {
+                    warningClass = 'text-red-300 bg-red-900/30 border-red-800';
+                } else if (downsampleFactor >= 8) {
+                    warningClass = 'text-orange-300 bg-orange-900/30 border-orange-800';
+                } else if (downsampleFactor >= 4) {
+                    warningClass = 'text-yellow-300 bg-yellow-900/30 border-yellow-800';
+                }
+                
+                html += `<div class="text-xs ${warningClass} mb-3 p-2 rounded border">
+                    ${aliasingWarning} - Downsampling: ${downsampleFactor}x
+                </div>`;
+            }
             
             Object.entries(predictions).forEach(([disease, result]) => {
                 const confidence = (result.confidence * 100).toFixed(1);

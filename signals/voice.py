@@ -99,6 +99,7 @@ def classify_gender():
                 # Handle both old (string) and new (tuple) return formats
                 if isinstance(result, tuple):
                     gender, model_confidence = result
+                    print(f"[DEBUG] Using new model format: {gender} with confidence {model_confidence:.4f}")
                 else:
                     # Fallback for old model version - get confidence manually
                     gender = result
@@ -107,6 +108,7 @@ def classify_gender():
                     output = model.forward(audio)
                     probabilities = torch.softmax(output, dim=1)
                     model_confidence = probabilities.max(1)[0].item()
+                    print(f"[DEBUG] Using fallback method: {gender} with confidence {model_confidence:.4f}")
         except Exception as e:
             # Clean up the temporary file
             try:

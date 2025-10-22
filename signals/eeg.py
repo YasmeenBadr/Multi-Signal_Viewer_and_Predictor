@@ -145,21 +145,21 @@ class EpilepsyPredictor:
             self.model = None
     
     def predict(self, eeg_data: np.ndarray) -> Tuple[int, float, str]:
-        """Predict epilepsy from EEG data using actual model and epilepsy_prob pattern"""
+        """Predict epilepsy from EEG data using pattern analysis"""
         self._load_model()
         
         if self.model is None:
-            np.random.seed(42)
-            if np.random.random() < 0.6:  # 60% normal cases
-                predicted_class = 0
-                epilepsy_prob = np.random.uniform(0.1, 0.5)  # Low epilepsy probability
-                confidence = 1 - epilepsy_prob
-                class_name = "Normal"
-            else:  # 40% epilepsy cases
+            # Analyze EEG patterns for epilepsy detection
+            epilepsy_score = self._analyze_epilepsy_patterns(eeg_data)
+            
+            if epilepsy_score > 0.7:  # High epilepsy probability
                 predicted_class = 1
-                epilepsy_prob = np.random.uniform(0.5, 0.98)  # High epilepsy probability
-                confidence = epilepsy_prob
+                confidence = epilepsy_score
                 class_name = "Epilepsy"
+            else:  # Normal
+                predicted_class = 0
+                confidence = 1 - epilepsy_score
+                class_name = "Normal"
             return predicted_class, confidence, class_name
         
         try:
@@ -193,6 +193,51 @@ class EpilepsyPredictor:
             print(f"Error in epilepsy prediction: {e}")
             # Return realistic fallback based on actual label pattern
             return 0, 0.7, "Normal"
+    
+    def _analyze_epilepsy_patterns(self, eeg_data: np.ndarray) -> float:
+        """Analyze EEG patterns characteristic of epilepsy"""
+        try:
+            # Calculate statistical features
+            mean_amp = np.mean(np.abs(eeg_data))
+            std_amp = np.std(eeg_data)
+            max_amp = np.max(np.abs(eeg_data))
+            
+            # Detect spikes (sudden amplitude changes) - more sensitive
+            diff = np.diff(eeg_data)
+            spike_threshold = std_amp * 2  # Lower threshold for better detection
+            spikes = np.sum(np.abs(diff) > spike_threshold)
+            spike_ratio = spikes / len(diff) if len(diff) > 0 else 0
+            
+            # Detect sharp waves and spikes (epilepsy-specific)
+            sharp_waves = np.sum(np.abs(diff) > std_amp * 1.5)
+            sharp_wave_ratio = sharp_waves / len(diff) if len(diff) > 0 else 0
+            
+            # Detect high-frequency activity (seizure-like)
+            from scipy.signal import welch
+            freqs, psd = welch(eeg_data, fs=160, nperseg=min(256, len(eeg_data)//4))
+            seizure_freq_power = np.sum(psd[(freqs >= 20) & (freqs <= 40)])  # Broader range
+            total_power = np.sum(psd)
+            seizure_freq_ratio = seizure_freq_power / total_power if total_power > 0 else 0
+            
+            # Detect amplitude asymmetry (epilepsy characteristic)
+            amplitude_asymmetry = np.std(np.abs(eeg_data)) / (mean_amp + 1e-6)
+            
+            # Epilepsy score - much more conservative
+            epilepsy_score = min(1.0, (
+                spike_ratio * 1.5 +           # Lower weight on spikes
+                sharp_wave_ratio * 1.2 +      # Sharp waves
+                seizure_freq_ratio * 1.2 +    # Seizure frequencies
+                min(amplitude_asymmetry * 0.1, 0.2)  # Amplitude asymmetry
+            ))
+            
+            # Only boost score if multiple strong indicators are present
+            if spike_ratio > 0.05 and sharp_wave_ratio > 0.05:
+                epilepsy_score = min(1.0, epilepsy_score * 1.3)
+            
+            return epilepsy_score
+            
+        except Exception as e:
+            return 0.1  # Lower default score
 
 
 class AlzheimerPredictor:
@@ -266,15 +311,21 @@ class AlzheimerPredictor:
             self.model = None
     
     def predict(self, eeg_data: np.ndarray) -> Tuple[int, float, str]:
-        """Predict Alzheimer's from EEG data using actual model and alzheimer_prob pattern"""
+        """Predict Alzheimer's from EEG data using pattern analysis"""
         self._load_model()
         
         if self.model is None:
-            np.random.seed(43)
-            alzheimer_prob = np.random.uniform(0.1, 0.3)  # Matches the actual label pattern
-            predicted_class = 0  # Most cases are normal
-            confidence = 1 - alzheimer_prob  # Confidence is inverse of alzheimer_prob for normal cases
-            class_name = "Normal"
+            # Analyze EEG patterns for Alzheimer's detection
+            alzheimer_score = self._analyze_alzheimer_patterns(eeg_data)
+            
+            if alzheimer_score > 0.2:  # Very low Alzheimer's probability threshold
+                predicted_class = 1
+                confidence = alzheimer_score
+                class_name = "Alzheimer"
+            else:  # Normal
+                predicted_class = 0
+                confidence = alzheimer_score  # Use the actual score, not 1-score
+                class_name = "Normal"
             return predicted_class, confidence, class_name
         
         try:
@@ -308,6 +359,66 @@ class AlzheimerPredictor:
             print(f"Error in Alzheimer prediction: {e}")
             # Return realistic fallback based on actual label pattern
             return 0, 0.75, "Normal"
+    
+    def _analyze_alzheimer_patterns(self, eeg_data: np.ndarray) -> float:
+        """Analyze EEG patterns characteristic of Alzheimer's disease"""
+        try:
+            # Check for flat or corrupted data
+            if np.std(eeg_data) < 1e-6:
+                return 0.05  # Very low score for flat data
+            
+            # Calculate frequency band powers
+            from scipy.signal import welch
+            freqs, psd = welch(eeg_data, fs=160, nperseg=min(256, len(eeg_data)//4))
+            
+            # Define frequency bands
+            delta_power = np.sum(psd[(freqs >= 0.5) & (freqs <= 4)])
+            theta_power = np.sum(psd[(freqs >= 4) & (freqs <= 8)])
+            alpha_power = np.sum(psd[(freqs >= 8) & (freqs <= 13)])
+            beta_power = np.sum(psd[(freqs >= 13) & (freqs <= 30)])
+            
+            total_power = delta_power + theta_power + alpha_power + beta_power
+            
+            if total_power > 0:
+                # Alzheimer's: reduced alpha, increased theta
+                alpha_ratio = alpha_power / total_power
+                theta_ratio = theta_power / total_power
+                delta_ratio = delta_power / total_power
+                beta_ratio = beta_power / total_power
+                
+                # Calculate irregularity (entropy-like measure)
+                psd_norm = psd / np.sum(psd) if np.sum(psd) > 0 else psd
+                entropy = -np.sum(psd_norm * np.log(psd_norm + 1e-10))
+                
+                # Check for epilepsy-like patterns - if present, reduce Alzheimer score
+                diff = np.diff(eeg_data)
+                std_amp = np.std(eeg_data)
+                spikes = np.sum(np.abs(diff) > std_amp * 2)
+                spike_ratio = spikes / len(diff) if len(diff) > 0 else 0
+                
+                # Alzheimer's score - very sensitive for Alzheimer detection
+                alzheimer_score = min(1.0, (
+                    (1 - alpha_ratio) * 3.0 +  # Much higher weight on reduced alpha
+                    theta_ratio * 2.0 +       # Much higher theta weight
+                    delta_ratio * 1.0 +       # Higher delta weight
+                    (entropy / 8) * 0.5       # Much higher irregularity weight
+                ))
+                
+                # Reduce score if epilepsy-like patterns are present
+                if spike_ratio > 0.1:  # If spikes detected, likely epilepsy not Alzheimer
+                    alzheimer_score = alzheimer_score * 0.3
+                
+                # Boost score if cognitive decline patterns are present
+                if alpha_ratio < 0.3 and theta_ratio > 0.2:  # Cognitive decline indicators
+                    alzheimer_score = min(1.0, alzheimer_score * 1.5)
+                    
+            else:
+                alzheimer_score = 0.1
+                
+            return alzheimer_score
+            
+        except Exception as e:
+            return 0.1  # Lower default score
 
 
 class SleepDisorderPredictor:
@@ -368,18 +479,20 @@ class SleepDisorderPredictor:
             self.model = None
     
     def predict(self, eeg_data: np.ndarray) -> Tuple[int, float, str]:
-        """Predict sleep disorder from EEG data using actual model and label pattern"""
+        """Predict sleep disorder from EEG data using pattern analysis"""
         self._load_model()
         
         if self.model is None:
-            np.random.seed(44)
-            if np.random.random() < 0.8:  # 80% sleep disorder cases
+            # Analyze EEG patterns for sleep disorder detection
+            sleep_disorder_score = self._analyze_sleep_disorder_patterns(eeg_data)
+            
+            if sleep_disorder_score > 0.95:  # Extremely high sleep disorder probability
                 predicted_class = 1
-                confidence = np.random.uniform(0.6, 0.7)  # Moderate confidence for sleep disorder
+                confidence = sleep_disorder_score
                 class_name = "Sleep Disorder"
-            else:  # 20% normal cases
+            else:  # Normal
                 predicted_class = 0
-                confidence = np.random.uniform(0.6, 0.8)  # Moderate to high confidence for normal
+                confidence = 1 - sleep_disorder_score
                 class_name = "Normal"
             return predicted_class, confidence, class_name
         
@@ -410,6 +523,74 @@ class SleepDisorderPredictor:
             print(f"Error in sleep disorder prediction: {e}")
             # Return realistic fallback based on actual label pattern
             return 1, 0.65, "Sleep Disorder"
+    
+    def _analyze_sleep_disorder_patterns(self, eeg_data: np.ndarray) -> float:
+        """Analyze EEG patterns characteristic of sleep disorders"""
+        try:
+            # Check for flat or corrupted data
+            if np.std(eeg_data) < 1e-6:
+                return 0.05  # Very low score for flat data
+            
+            # Calculate frequency band powers
+            from scipy.signal import welch
+            freqs, psd = welch(eeg_data, fs=160, nperseg=min(256, len(eeg_data)//4))
+            
+            # Define frequency bands
+            delta_power = np.sum(psd[(freqs >= 0.5) & (freqs <= 4)])
+            theta_power = np.sum(psd[(freqs >= 4) & (freqs <= 8)])
+            alpha_power = np.sum(psd[(freqs >= 8) & (freqs <= 13)])
+            beta_power = np.sum(psd[(freqs >= 13) & (freqs <= 30)])
+            
+            total_power = delta_power + theta_power + alpha_power + beta_power
+            
+            if total_power > 0:
+                # Sleep disorders: abnormal sleep patterns, reduced sleep spindles
+                delta_ratio = delta_power / total_power
+                theta_ratio = theta_power / total_power
+                alpha_ratio = alpha_power / total_power
+                beta_ratio = beta_power / total_power
+                
+                # Detect sleep spindles (11-15 Hz) - reduced in sleep disorders
+                spindle_power = np.sum(psd[(freqs >= 11) & (freqs <= 15)])
+                spindle_ratio = spindle_power / total_power
+                
+                # Detect K-complexes (sleep disorder characteristic)
+                k_complex_power = np.sum(psd[(freqs >= 0.5) & (freqs <= 2)])
+                k_complex_ratio = k_complex_power / total_power
+                
+                # Calculate irregularity (but not as high as epilepsy)
+                psd_norm = psd / np.sum(psd) if np.sum(psd) > 0 else psd
+                entropy = -np.sum(psd_norm * np.log(psd_norm + 1e-10))
+                
+                # Check for epilepsy-like patterns (spikes) - if present, reduce sleep disorder score
+                diff = np.diff(eeg_data)
+                std_amp = np.std(eeg_data)
+                spikes = np.sum(np.abs(diff) > std_amp * 2)
+                spike_ratio = spikes / len(diff) if len(diff) > 0 else 0
+                
+                # Sleep disorder score - ultra conservative
+                sleep_disorder_score = min(1.0, (
+                    (1 - spindle_ratio) * 0.5 +  # Ultra low weight on reduced sleep spindles
+                    delta_ratio * 0.3 +          # Ultra low slow wave activity weight
+                    k_complex_ratio * 0.4 +      # Ultra low K-complexes weight
+                    (entropy / 25) * 0.05        # Ultra low irregularity weight
+                ))
+                
+                # Reduce score if epilepsy-like patterns are present
+                if spike_ratio > 0.01:  # If spikes detected, likely epilepsy not sleep disorder
+                    sleep_disorder_score = sleep_disorder_score * 0.1
+                
+                # Only boost score if extremely strong sleep disorder patterns are present
+                if spindle_ratio < 0.005 and delta_ratio > 0.8:  # Ultra strong sleep disorder indicators
+                    sleep_disorder_score = min(1.0, sleep_disorder_score * 1.1)
+                    
+            else:
+                sleep_disorder_score = 0.1
+                
+            return sleep_disorder_score
+            
+        except Exception as e:
+            return 0.1  # Lower default score
 
 
 class ParkinsonPredictor:
@@ -470,19 +651,21 @@ class ParkinsonPredictor:
             self.model = None
     
     def predict(self, eeg_data: np.ndarray) -> Tuple[int, float, str]:
-        """Predict Parkinson's from EEG data using actual model"""
+        """Predict Parkinson's from EEG data using pattern analysis"""
         self._load_model()
         
         if self.model is None:
-            np.random.seed(45)
-            if np.random.random() < 0.6:  # 60% healthy cases
-                predicted_class = 0
-                confidence = np.random.uniform(0.65, 0.75)  # Moderate confidence for healthy
-                class_name = "Healthy"
-            else:  # 40% Parkinson cases
+            # Analyze EEG patterns for Parkinson's detection
+            parkinson_score = self._analyze_parkinson_patterns(eeg_data)
+            
+            if parkinson_score > 0.95:  # Extremely high Parkinson's probability
                 predicted_class = 1
-                confidence = np.random.uniform(0.70, 0.80)  # Moderate confidence for Parkinson
+                confidence = parkinson_score
                 class_name = "Parkinson"
+            else:  # Healthy
+                predicted_class = 0
+                confidence = 1 - parkinson_score
+                class_name = "Healthy"
             return predicted_class, confidence, class_name
         
         try:
@@ -512,6 +695,69 @@ class ParkinsonPredictor:
             print(f"Error in Parkinson prediction: {e}")
             # Return realistic fallback
             return 0, 0.70, "Healthy"
+    
+    def _analyze_parkinson_patterns(self, eeg_data: np.ndarray) -> float:
+        """Analyze EEG patterns characteristic of Parkinson's disease"""
+        try:
+            # Calculate frequency band powers
+            from scipy.signal import welch
+            freqs, psd = welch(eeg_data, fs=160, nperseg=min(256, len(eeg_data)//4))
+            
+            # Define frequency bands
+            delta_power = np.sum(psd[(freqs >= 0.5) & (freqs <= 4)])
+            theta_power = np.sum(psd[(freqs >= 4) & (freqs <= 8)])
+            alpha_power = np.sum(psd[(freqs >= 8) & (freqs <= 13)])
+            beta_power = np.sum(psd[(freqs >= 13) & (freqs <= 30)])
+            
+            total_power = delta_power + theta_power + alpha_power + beta_power
+            
+            if total_power > 0:
+                # Parkinson's: reduced beta, increased theta, tremor-related activity
+                beta_ratio = beta_power / total_power
+                theta_ratio = theta_power / total_power
+                alpha_ratio = alpha_power / total_power
+                delta_ratio = delta_power / total_power
+                
+                # Detect tremor-related activity (4-6 Hz) - specific to Parkinson's
+                tremor_power = np.sum(psd[(freqs >= 4) & (freqs <= 6)])
+                tremor_ratio = tremor_power / total_power
+                
+                # Detect beta suppression (13-30 Hz) - characteristic of Parkinson's
+                beta_suppression = 1 - beta_ratio
+                
+                # Calculate irregularity
+                psd_norm = psd / np.sum(psd) if np.sum(psd) > 0 else psd
+                entropy = -np.sum(psd_norm * np.log(psd_norm + 1e-10))
+                
+                # Check for epilepsy-like patterns - if present, reduce Parkinson score
+                diff = np.diff(eeg_data)
+                std_amp = np.std(eeg_data)
+                spikes = np.sum(np.abs(diff) > std_amp * 2)
+                spike_ratio = spikes / len(diff) if len(diff) > 0 else 0
+                
+                # Parkinson's score - extremely conservative
+                parkinson_score = min(1.0, (
+                    beta_suppression * 0.5 +   # Much lower weight on beta suppression
+                    tremor_ratio * 0.3 +       # Much lower tremor weight
+                    theta_ratio * 0.2 +        # Much lower theta weight
+                    (entropy / 20) * 0.1       # Much lower irregularity weight
+                ))
+                
+                # Reduce score if epilepsy-like patterns are present
+                if spike_ratio > 0.01:  # If spikes detected, likely epilepsy not Parkinson
+                    parkinson_score = parkinson_score * 0.1
+                
+                # Only boost score if very strong motor-related patterns are present
+                if beta_ratio < 0.15 and tremor_ratio > 0.2:  # Very strong motor symptom indicators
+                    parkinson_score = min(1.0, parkinson_score * 1.4)
+                    
+            else:
+                parkinson_score = 0.1
+                
+            return parkinson_score
+            
+        except Exception as e:
+            return 0.1  # Lower default score
 
 
 # Initialize prediction models
@@ -522,41 +768,148 @@ parkinson_predictor = ParkinsonPredictor()
 
 
 def run_all_predictions(eeg_data: np.ndarray) -> Dict[str, Dict]:
-    """Run all prediction models on EEG data"""
+    """Run all prediction models on EEG data with ranking system"""
     results = {}
     
     try:
-        # Epilepsy prediction
+        # Get all predictions
         ep_class, ep_conf, ep_name = epilepsy_predictor.predict(eeg_data)
-        results['epilepsy'] = {
-            'predicted_class': ep_class,
-            'confidence': ep_conf,
-            'class_name': ep_name
-        }
-        
-        # Alzheimer prediction
         alz_class, alz_conf, alz_name = alzheimer_predictor.predict(eeg_data)
-        results['alzheimer'] = {
-            'predicted_class': alz_class,
-            'confidence': alz_conf,
-            'class_name': alz_name
-        }
-        
-        # Sleep disorder prediction
         sleep_class, sleep_conf, sleep_name = sleep_disorder_predictor.predict(eeg_data)
-        results['sleep_disorder'] = {
-            'predicted_class': sleep_class,
-            'confidence': sleep_conf,
-            'class_name': sleep_name
-        }
-        
-        # Parkinson prediction
         park_class, park_conf, park_name = parkinson_predictor.predict(eeg_data)
-        results['parkinson'] = {
-            'predicted_class': park_class,
-            'confidence': park_conf,
-            'class_name': park_name
-        }
+        
+        # Create prediction scores for ranking - only consider positive predictions
+        prediction_scores = {}
+        if ep_class == 1:
+            prediction_scores['epilepsy'] = ep_conf
+        if alz_class == 1:
+            prediction_scores['alzheimer'] = alz_conf
+        if sleep_class == 1:
+            prediction_scores['sleep_disorder'] = sleep_conf
+        if park_class == 1:
+            prediction_scores['parkinson'] = park_conf
+        
+        # Only show positive predictions if confidence is high enough
+        confidence_threshold = 0.6  # Moderate threshold for balanced detection
+        
+        # Find the highest scoring condition among positive predictions
+        if prediction_scores:
+            max_score = max(prediction_scores.values())
+            max_condition = max(prediction_scores, key=prediction_scores.get)
+        else:
+            max_score = 0
+            max_condition = None
+        
+        # Show only the highest scoring condition if it exceeds threshold
+        # This prevents multiple conditions from being detected simultaneously
+        if max_condition and max_score > confidence_threshold:
+            # Only show the highest scoring condition
+            if max_condition == 'epilepsy':
+                results['epilepsy'] = {
+                    'predicted_class': ep_class,
+                    'confidence': ep_conf,
+                    'class_name': ep_name
+                }
+                results['alzheimer'] = {
+                    'predicted_class': 0,
+                    'confidence': 1 - alz_conf,
+                    'class_name': 'Normal'
+                }
+                results['sleep_disorder'] = {
+                    'predicted_class': 0,
+                    'confidence': 1 - sleep_conf,
+                    'class_name': 'Normal'
+                }
+                results['parkinson'] = {
+                    'predicted_class': 0,
+                    'confidence': 1 - park_conf,
+                    'class_name': 'Healthy'
+                }
+            elif max_condition == 'alzheimer':
+                results['epilepsy'] = {
+                    'predicted_class': 0,
+                    'confidence': 1 - ep_conf,
+                    'class_name': 'Normal'
+                }
+                results['alzheimer'] = {
+                    'predicted_class': alz_class,
+                    'confidence': alz_conf,
+                    'class_name': alz_name
+                }
+                results['sleep_disorder'] = {
+                    'predicted_class': 0,
+                    'confidence': 1 - sleep_conf,
+                    'class_name': 'Normal'
+                }
+                results['parkinson'] = {
+                    'predicted_class': 0,
+                    'confidence': 1 - park_conf,
+                    'class_name': 'Healthy'
+                }
+            elif max_condition == 'sleep_disorder':
+                results['epilepsy'] = {
+                    'predicted_class': 0,
+                    'confidence': 1 - ep_conf,
+                    'class_name': 'Normal'
+                }
+                results['alzheimer'] = {
+                    'predicted_class': 0,
+                    'confidence': 1 - alz_conf,
+                    'class_name': 'Normal'
+                }
+                results['sleep_disorder'] = {
+                    'predicted_class': sleep_class,
+                    'confidence': sleep_conf,
+                    'class_name': sleep_name
+                }
+                results['parkinson'] = {
+                    'predicted_class': 0,
+                    'confidence': 1 - park_conf,
+                    'class_name': 'Healthy'
+                }
+            elif max_condition == 'parkinson':
+                results['epilepsy'] = {
+                    'predicted_class': 0,
+                    'confidence': 1 - ep_conf,
+                    'class_name': 'Normal'
+                }
+                results['alzheimer'] = {
+                    'predicted_class': 0,
+                    'confidence': 1 - alz_conf,
+                    'class_name': 'Normal'
+                }
+                results['sleep_disorder'] = {
+                    'predicted_class': 0,
+                    'confidence': 1 - sleep_conf,
+                    'class_name': 'Normal'
+                }
+                results['parkinson'] = {
+                    'predicted_class': park_class,
+                    'confidence': park_conf,
+                    'class_name': park_name
+                }
+        else:
+            # No condition detected above threshold
+            results['epilepsy'] = {
+                'predicted_class': 0,
+                'confidence': 1 - ep_conf,
+                'class_name': 'Normal'
+            }
+            results['alzheimer'] = {
+                'predicted_class': 0,
+                'confidence': 1 - alz_conf,
+                'class_name': 'Normal'
+            }
+            results['sleep_disorder'] = {
+                'predicted_class': 0,
+                'confidence': 1 - sleep_conf,
+                'class_name': 'Normal'
+            }
+            results['parkinson'] = {
+                'predicted_class': 0,
+                'confidence': 1 - park_conf,
+                'class_name': 'Healthy'
+            }
         
     except Exception as e:
         print(f"Error in prediction pipeline: {e}")
@@ -595,8 +948,13 @@ def upload_file():
         try:
             file.save(filepath)
             
-            # Load the EDF file with MNE
-            eeg_data.raw = mne.io.read_raw_edf(filepath, preload=True, verbose=False)
+            # Load the EEG file with MNE (support both EDF and FIF)
+            if filename.lower().endswith('.edf'):
+                eeg_data.raw = mne.io.read_raw_edf(filepath, preload=True, verbose=False)
+            elif filename.lower().endswith('.fif') or filename.lower().endswith('.fif.gz'):
+                eeg_data.raw = mne.io.read_raw_fif(filepath, preload=True, verbose=False)
+            else:
+                return jsonify({"success": False, "message": "Unsupported file format. Please use .edf or .fif files."}), 400
             eeg_data.fs = int(eeg_data.raw.info["sfreq"])
             eeg_data.n_times = eeg_data.raw.n_times
             eeg_data.ch_names = eeg_data.raw.ch_names
@@ -757,6 +1115,7 @@ def predict_diseases():
     try:
         data = request.get_json()
         channels = data.get("channels", [])
+        downsample_factor = data.get("downsample_factor", 1)
         
         if not channels:
             return jsonify({"success": False, "message": "No channels selected."}), 400
@@ -780,6 +1139,12 @@ def predict_diseases():
         # Use the first channel's data for prediction
         eeg_data_for_prediction = picked[0]  # Shape: (samples,)
         
+        # Apply downsampling (aliasing effect)
+        if downsample_factor > 1:
+            # Simple downsampling by taking every nth sample
+            eeg_data_for_prediction = eeg_data_for_prediction[::int(downsample_factor)]
+            print(f"Applied {downsample_factor}x downsampling. New length: {len(eeg_data_for_prediction)}")
+        
         # Run all predictions
         prediction_results = run_all_predictions(eeg_data_for_prediction)
         
@@ -787,7 +1152,8 @@ def predict_diseases():
             "success": True,
             "predictions": prediction_results,
             "channel_used": channels[0],
-            "data_length": len(eeg_data_for_prediction)
+            "data_length": len(eeg_data_for_prediction),
+            "downsample_factor": downsample_factor
         })
         
     except Exception as e:
