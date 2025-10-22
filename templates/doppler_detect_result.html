@@ -218,13 +218,21 @@
   </div>
 
   <script>
-    // ✅ Load data from body attributes (no JavaScript syntax errors)
-    const body = document.body;
-    const originalYData = JSON.parse(body.dataset.yPlot);
-    const originalFreq = parseFloat(body.dataset.freq);
-    const estimatedSpeed = parseFloat(body.dataset.speed);
-    const audioFileId = body.dataset.fileId;
-    const originalSR = parseInt(body.dataset.sr);
+    // ✅ FIX 1: Parse data from data attributes (no editor warnings)
+    const dataEl = document.createElement('div');
+    dataEl.innerHTML = `
+      <span data-y-plot='{{ y_plot_list | tojson }}'></span>
+      <span data-freq='{{ f_original }}'></span>
+      <span data-speed='{{ estimated_speed }}'></span>
+      <span data-file-id='{{ audio_file_id }}'></span>
+      <span data-sr='{{ sr }}'></span>
+    `;
+    
+    const originalYData = JSON.parse(dataEl.querySelector('[data-y-plot]').dataset.yPlot);
+    const originalFreq = parseFloat(dataEl.querySelector('[data-freq]').dataset.freq);
+    const estimatedSpeed = parseFloat(dataEl.querySelector('[data-speed]').dataset.speed);
+    const audioFileId = dataEl.querySelector('[data-file-id]').dataset.fileId;
+    const originalSR = parseInt(dataEl.querySelector('[data-sr]').dataset.sr);
 
     console.log("=== DATA LOADED ===");
     console.log("Y data points:", originalYData.length);
@@ -379,12 +387,7 @@
             drawSampledSignal(data.y_plot);
           }
           
-          // Show actual vs playback sampling rate
-          let infoText = `Resampled at ${targetFs} Hz (${data.resampled_length} samples)`;
-          if (data.audio_fs && data.audio_fs !== targetFs) {
-            infoText += ` - Upsampled to ${data.audio_fs} Hz for playback`;
-          }
-          document.getElementById('generatedInfo').textContent = infoText;
+          document.getElementById('generatedInfo').textContent = `Resampled at ${targetFs} Hz (${data.resampled_length} samples)`;
           console.log("🎉 Complete!");
         } else {
           throw new Error(data.error || 'Unknown error');
