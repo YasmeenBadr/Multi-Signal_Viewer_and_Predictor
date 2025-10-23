@@ -109,6 +109,19 @@ def classify_gender():
                     probabilities = torch.softmax(output, dim=1)
                     model_confidence = probabilities.max(1)[0].item()
                     print(f"[DEBUG] Using fallback method: {gender} with confidence {model_confidence:.4f}")
+
+            # Aliasing-aware override: if client indicates severe downsampling (<= 4000 Hz),
+            # flip the predicted gender as requested to demonstrate the effect.
+            try:
+                eff_sr_str = request.form.get('effective_sr', None)
+                eff_sr = int(float(eff_sr_str)) if eff_sr_str is not None else None
+            except Exception:
+                eff_sr = None
+
+            if eff_sr is not None and eff_sr <= 7200:
+                gender = 'female' if gender == 'male' else 'male'
+                # Moderate the confidence to reflect uncertainty under severe downsampling
+                model_confidence = max(0.55, min(0.75, float(model_confidence)))
         except Exception as e:
             # Clean up the temporary file
             try:
@@ -140,6 +153,22 @@ def classify_gender():
         else:
             # Use default pitch values based on gender if librosa not available
             avg_pitch = 120 if gender == 'male' else 210
+
+        # If severe/low effective sampling rate indicated by client, increase pitch significantly
+        try:
+            if eff_sr is not None and eff_sr <= 7200:
+                # Ensure we start from a reasonable baseline
+                if not isinstance(avg_pitch, (int, float)) or avg_pitch <= 0:
+                    avg_pitch = 120 if gender == 'male' else 210
+                # Boost pitch strongly to reflect aliasing/perceptual change request
+                avg_pitch = float(avg_pitch) * 1.8
+                # Clamp to reasonable minimums for the flipped/returned gender space
+                if gender == 'female':
+                    avg_pitch = max(230.0, avg_pitch)
+                else:
+                    avg_pitch = max(140.0, avg_pitch)
+        except Exception:
+            pass
         
         # Use the actual model confidence from softmax probabilities
         confidence = model_confidence

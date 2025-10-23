@@ -26,6 +26,25 @@
                         // Define custom size for collapsed sidebar (w-14 is 3.5rem)
                         '14': '3.5rem', 
                     }
+
+                // Expand layout for XOR to full width, hide right column
+                if (mode === 'xor') {
+                    if (leftPlotColumn) {
+                        leftPlotColumn.classList.remove('xl:w-2/3');
+                        leftPlotColumn.classList.add('xl:w-full');
+                    }
+                    if (rightColumn) {
+                        rightColumn.classList.add('hidden');
+                    }
+                } else {
+                    if (leftPlotColumn) {
+                        leftPlotColumn.classList.remove('xl:w-full');
+                        leftPlotColumn.classList.add('xl:w-2/3');
+                    }
+                    if (rightColumn) {
+                        rightColumn.classList.remove('hidden');
+                    }
+                }
                 }
             }
         }
@@ -282,6 +301,7 @@
         let selected = [];
         let width = 5;
         let fs = 160; 
+        let nativeFs = 160;
         let channelDataBuffers = {};
         let globalTime = 0; 
         let currentYRange = 500000; 
@@ -342,6 +362,11 @@
         // Prediction elements
         const predictButton = document.getElementById('predictButton');
         const predictionResults = document.getElementById('predictionResults');
+        // Column containers (for width control)
+        const leftPlotColumn = plotContainerOuterDiv; // has xl:w-2/3
+        const rightColumn = document.getElementById('bandPowerWrapper')
+            ? document.getElementById('bandPowerWrapper').closest('div.xl\\:w-1\\/3')
+            : null;
         
         // COLLAPSE ELEMENTS
         const controlPanel = document.getElementById('controlPanel');
@@ -458,6 +483,13 @@
         }
         fsSlider.addEventListener('input', (e) => {
             updateFs(e.target.value);
+            // keep downsample slider in sync with manual FS changes
+            const desiredFs = Math.max(1, parseInt(e.target.value || fs, 10));
+            const factor = Math.max(1, Math.round(nativeFs / desiredFs));
+            if (!isNaN(factor)) {
+                downsampleSlider.value = String(factor);
+                downsampleValue.textContent = factor + 'x';
+            }
         });
 
         // Downsampling slider event listener
@@ -465,10 +497,16 @@
         const downsampleValue = document.getElementById('downsampleValue');
         
         downsampleSlider.addEventListener('input', (e) => {
-            const factor = parseInt(e.target.value);
+            const factor = Math.max(1, parseInt(e.target.value));
             downsampleValue.textContent = factor + 'x';
-            // Store the downsampling factor for use in predictions
+            // Store and APPLY the downsampling factor to set view FS
             window.downsampleFactor = factor;
+            const newFs = Math.max(1, Math.floor(nativeFs / factor));
+            fs = newFs;
+            if (fsSlider) {
+                fsSlider.value = String(newFs);
+            }
+            updateFs(newFs);
             
             // Update visual feedback based on aliasing level
             const container = downsampleSlider.closest('.border-gray-600');
@@ -612,6 +650,27 @@
         
         graphModeSelector.addEventListener('change', () => {
             toggleChannelListDisplay(); 
+            // Adjust layout width by mode (XOR gets full width)
+            const modeNow = graphModeSelector.value;
+            if (modeNow === 'xor') {
+                if (leftPlotColumn) {
+                    leftPlotColumn.classList.remove('xl:w-2/3');
+                    leftPlotColumn.classList.add('xl:w-full');
+                }
+                if (rightColumn) {
+                    rightColumn.classList.add('hidden');
+                }
+            } else {
+                if (leftPlotColumn) {
+                    leftPlotColumn.classList.remove('xl:w-full');
+                    leftPlotColumn.classList.add('xl:w-2/3');
+                }
+                if (rightColumn) {
+                    rightColumn.classList.remove('hidden');
+                }
+            }
+            // Resize plots after layout change
+            setTimeout(resizePlots, 100);
         });
 
         // --- FILE UPLOAD HANDLERS ---
@@ -642,10 +701,16 @@
             .then(result => {
                 if (result.success) {
                     fs = result.fs;
+                    nativeFs = result.fs;
                     // Configure FS slider bounds and current value to match the file
                     if (fsSlider) {
                         fsSlider.max = String(fs);
                         fsSlider.value = String(fs);
+                    }
+                    // Reset downsampling to 1x and sync label
+                    if (downsampleSlider) {
+                        downsampleSlider.value = '1';
+                        downsampleValue.textContent = '1x';
                     }
                     updateFs(fs);
                     
@@ -984,7 +1049,7 @@
                         title: `EEG - XOR Graph - ${channelName} - Window: ${width}s`,
                         paper_bgcolor: "#000000", plot_bgcolor: "#000000",
                         font: { color: "#e5e7eb", family: "Inter" },
-                        xaxis: { title: "Time (s)", color: "#e5e7eb", gridcolor: "#374151", range: [0, width * 2] },
+                        xaxis: { title: "Time (s)", color: "#e5e7eb", gridcolor: "#374151", range: [0, width] },
                         yaxis: { title: "Amplitude / XOR", color: "#e5e7eb", gridcolor: "#374151" },
                         height: 650
                     };
@@ -1033,6 +1098,20 @@
         });
         
         // --- Helper functions for data buffering ---
+        function resampleWithAliasing(arr, outLen) {
+            // naive decimation (aliasing) to exactly outLen samples
+            const N = arr.length;
+            if (outLen <= 1 || N <= 1) {
+                return [arr[0] ?? 0];
+            }
+            const out = new Array(outLen);
+            const step = (N - 1) / (outLen - 1);
+            for (let i = 0; i < outLen; i++) {
+                const idx = Math.floor(i * step);
+                out[i] = arr[idx] ?? arr[N - 1];
+            }
+            return out;
+        }
         function updateBuffer(chIndex, newSignals, newTime) {
             const buffer = channelDataBuffers[chIndex];
             const maxPoints = width * fs;
@@ -1090,13 +1169,17 @@
                 }
 
                 const N_samples = result.n_samples;
+                // Duration of this server chunk in seconds based on native FS
+                const duration = N_samples / nativeFs;
+                // Number of points to plot at the chosen view FS (fs)
+                const M = Math.max(1, Math.round(duration * fs));
                 const dt = 1 / fs; 
 
-                // Calculate new global time
-                const timeChunk = [];
-                for (let i = 0; i < N_samples; i++) {
+                // Build time chunk so that M*dt == duration
+                const timeChunk = new Array(M);
+                for (let i = 0; i < M; i++) {
                     globalTime += dt;
-                    timeChunk.push(globalTime);
+                    timeChunk[i] = globalTime;
                 }
 
                 const mode = graphModeSelector.value;
@@ -1109,9 +1192,10 @@
 
                     selected.forEach((chIndex) => {
                         const plotId = `plot-ch-${chIndex}`;
-                        const newSignals = result.signals[chIndex.toString()]; 
+                        const rawSignals = result.signals[chIndex.toString()]; 
                         
-                        if (!newSignals || newSignals.length === 0) return;
+                        if (!rawSignals || rawSignals.length === 0) return;
+                        const newSignals = resampleWithAliasing(rawSignals, timeChunk.length);
                         
                         updateBuffer(chIndex, newSignals, timeChunk);
                         
@@ -1129,8 +1213,9 @@
                 } else if (mode === "polar") {
                     const rUpdate = [], thetaUpdate = [];
                     selected.forEach((chIndex) => {
-                        const newSignals = result.signals[chIndex.toString()];
-                        if (!newSignals || newSignals.length === 0) return;
+                        const rawSignals = result.signals[chIndex.toString()];
+                        if (!rawSignals || rawSignals.length === 0) return;
+                        const newSignals = resampleWithAliasing(rawSignals, Math.max(1, Math.round((rawSignals.length / nativeFs) * fs)));
                         
                         // Use the modified buffer update function
                         updateSignalBuffer(chIndex, newSignals);
@@ -1161,10 +1246,12 @@
                 } else if (mode === "recurrence") {
                     const chXIndex = selected[0];
                     const chYIndex = selected[1];
-                    const newSignalsX = result.signals[chXIndex.toString()];
-                    const newSignalsY = result.signals[chYIndex.toString()];
+                    const rawSignalsX = result.signals[chXIndex.toString()];
+                    const rawSignalsY = result.signals[chYIndex.toString()];
 
-                    if (!newSignalsX || newSignalsX.length === 0 || !newSignalsY || newSignalsY.length === 0) return;
+                    if (!rawSignalsX || rawSignalsX.length === 0 || !rawSignalsY || rawSignalsY.length === 0) return;
+                    const newSignalsX = resampleWithAliasing(rawSignalsX, Math.max(1, Math.round((rawSignalsX.length / nativeFs) * fs)));
+                    const newSignalsY = resampleWithAliasing(rawSignalsY, Math.max(1, Math.round((rawSignalsY.length / nativeFs) * fs)));
                     
                     // Use the modified buffer update function (will truncate to fixed window)
                     updateSignalBuffer(chXIndex, newSignalsX);
@@ -1185,8 +1272,9 @@
 
                 } else if (mode === "xor") {
                     const chIndex = selected[0];
-                    const newSignals = result.signals[chIndex.toString()];
-                    if (!newSignals || newSignals.length === 0) return;
+                    const rawSignals = result.signals[chIndex.toString()];
+                    if (!rawSignals || rawSignals.length === 0) return;
+                    const newSignals = resampleWithAliasing(rawSignals, Math.max(1, Math.round((rawSignals.length / nativeFs) * fs)));
                     
                     const chunkSize = Math.floor(width * fs); 
                     
@@ -1273,8 +1361,8 @@
                             // Phase 2: Erase progressively and reveal reverse dots progressively
                             xorPhase[chIndex] = 'reverse';
 
-                            // Reveal rate matching earlier version (~10% per tick)
-                            const revealPerTick = Math.max(1, Math.floor(chunkSize * 0.10));
+                            // Slightly slower reveal rate (~5% per tick)
+                            const revealPerTick = Math.max(1, Math.floor(chunkSize * 0.05));
                             xorReverseIndex[chIndex] = Math.min(chunkSize, xorReverseIndex[chIndex] + revealPerTick);
 
                             const keepCount = Math.max(0, chunkSize - xorReverseIndex[chIndex]);
@@ -1296,12 +1384,9 @@
                             }
                         }
 
-                        // Widen x-axis to display last two windows
-                        const span = width * 2;
-                        const wideXmin = Math.max(0, globalTime - span);
-                        const wideXmax = wideXmin + span;
+                        // Keep x-axis fixed to [0, width] to match 0..width data domain
                         Plotly.relayout(singlePlotId, { 
-                            'xaxis.range': [wideXmin, wideXmax],
+                            'xaxis.range': [0, width],
                             'title': `EEG - XOR Graph - ${channelIndexToOriginalName[chIndex.toString()]} - Window: ${width}s (Time: ${globalTime.toFixed(2)}s)`
                         });
                     }

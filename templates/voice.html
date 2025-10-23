@@ -366,6 +366,7 @@
         let audioContext;
         let originalBuffer = null;
         let resampledBuffer = null;
+        let resampledLowRateBuffer = null;
         let reconstructedBuffer = null;
         let originalRate = 44100;
         let isPlaying = false;
@@ -454,14 +455,17 @@
         }
         
         // --- 1. Audio Loading and Decoding ---
-
+/*Audio Input and Decoding: When a user uploads or records audio, 
+the decodeAudio function is called. It uses the browser's built-in Web 
+Audio API to convert the file into raw audio data that can be processed.*/
         function decodeAudio(file) {
-            uploadedFile = file; // Store for classification
+            uploadedFile = file; // Store for classification later
             initAudioContext();
             const reader = new FileReader();
 
             reader.onload = function(event) {
                 const arrayBuffer = event.target.result;
+                // Decode the raw file data into a usable audio buffer
                 audioContext.decodeAudioData(arrayBuffer, 
                     function(buffer) {
                         originalBuffer = buffer;
@@ -534,6 +538,17 @@
                     channelDownsampled[i] = originalData[Math.min(originalIndex, originalData.length - 1)];
                 }
                 tempDownsampled.push(channelDownsampled);
+            }
+
+            // Build a low-rate buffer for classification with true target sample rate
+            resampledLowRateBuffer = audioContext.createBuffer(
+                originalBuffer.numberOfChannels,
+                downsampledLength,
+                targetRate
+            );
+            for (let channel = 0; channel < originalBuffer.numberOfChannels; channel++) {
+                const dst = resampledLowRateBuffer.getChannelData(channel);
+                dst.set(tempDownsampled[channel]);
             }
 
             // Now upsample back to original length to maintain playback duration
@@ -666,17 +681,24 @@
                 messageBox.textContent = "No resampled audio available!";
                 return;
             }
+            if (!resampledLowRateBuffer) {
+                messageBox.textContent = "Internal error: low-rate buffer missing. Move the sampling slider and try again.";
+                return;
+            }
 
             classifyResampledBtn.disabled = true;
             messageBox.textContent = "Classifying resampled audio... Please wait.";
 
             try {
-                // Convert resampled buffer to WAV file
-                const wavBlob = audioBufferToWav(resampledBuffer);
+                // Convert TRUE downsampled buffer (with low sample rate) to WAV file
+                const wavBlob = audioBufferToWav(resampledLowRateBuffer);
                 const wavFile = new File([wavBlob], 'resampled_audio.wav', { type: 'audio/wav' });
                 
                 const formData = new FormData();
                 formData.append('audio', wavFile);
+                // Pass effective sample rate to backend for aliasing-aware behavior
+                const effectiveSr = parseInt(frequencySlider.value);
+                formData.append('effective_sr', String(effectiveSr));
 
                 const response = await fetch('/voice/classify', {
                     method: 'POST',

@@ -103,6 +103,7 @@ The following packages are needed (from `voice-gender-classifier/requirements.tx
 ## Technical Highlights
 
 ### Signal Processing
+
 - **Low-Pass Filter**: Moving average (adaptive order)
 - **Downsampling**: Nearest neighbor
 - **Upsampling**: Linear interpolation
