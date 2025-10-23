@@ -498,9 +498,9 @@ def index():
     return render_template("ecg.html")
 
 @ECG_BP.route("/config")
-def config():
+def config():  
     display_fs = _stream.get("display_fs") or DISPLAY_FS
-    return jsonify({
+    return jsonify({        #This ensures the UI knows available channels and native sampling rate.
         "fs": _stream["fs"],
         "fs_native": _stream.get("fs_native", _stream.get("fs", FREQ_DEFAULT)),
         "display_fs": display_fs,
@@ -509,7 +509,7 @@ def config():
         "freq_default": _stream.get("fs", FREQ_DEFAULT),
         "freq_min": FREQ_MIN,
         "hea_diagnosis": _stream.get("hea_diagnosis") # ADDED: return diagnosis
-    })
+    }) 
 
 @ECG_BP.route("/set_freq", methods=["POST"])
 def set_freq():
@@ -1049,19 +1049,21 @@ def update():
             "prediction_impact": ""
         }
         try:
-            # Check if current sampling is significantly below native (likely to cause aliasing)
             native_fs_check = _stream.get("fs_native", streaming_fs)
-            sampling_ratio = streaming_fs / native_fs_check if native_fs_check > 0 else 1.0
-            
-            if sampling_ratio < 0.5:  # More than 2x downsampling
+            # Severe aliasing only when absolute sampling freq is below 100 Hz
+            if float(streaming_fs) < 100.0:
                 aliasing_info["is_undersampled"] = True
                 aliasing_info["note"] = f"Severe aliasing: {streaming_fs}Hz vs native {native_fs_check}Hz"
                 aliasing_info["prediction_impact"] = "Predictions may be unreliable due to aliasing distortion"
-            elif sampling_ratio < 0.8:  # Moderate downsampling
-                aliasing_info["is_undersampled"] = True
-                aliasing_info["note"] = f"Moderate aliasing: {streaming_fs}Hz vs native {native_fs_check}Hz"
-                aliasing_info["prediction_impact"] = "Predictions may be affected by aliasing"
-            
+            else:
+                # Moderate aliasing message only if we are downsampling (but >= 100 Hz)
+                try:
+                    if native_fs_check > 0 and float(streaming_fs) < float(native_fs_check):
+                        aliasing_info["is_undersampled"] = True
+                        aliasing_info["note"] = f"Moderate aliasing: {streaming_fs}Hz vs native {native_fs_check}Hz"
+                        aliasing_info["prediction_impact"] = "Predictions may be affected by aliasing"
+                except Exception:
+                    pass
         except Exception:
             pass
 

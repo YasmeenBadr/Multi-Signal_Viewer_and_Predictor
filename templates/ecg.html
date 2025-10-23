@@ -282,7 +282,7 @@ async function initConfig(){
     const cfg = await fetch("/ecg/config").then(r=>r.json());
     nativeFs = cfg.fs_native || cfg.fs || nativeFs;
     displayFs = cfg.display_fs || displayFs;
-    // Default UI to a safe cap of 500 Hz (or native if lower) so it doesn't show 1000 Hz by default
+    // Default UI to a safe cap of 500 Hz (or native if lower) 
     requestedSampling = Math.min(500, nativeFs);
     const sliderEl = document.getElementById("freqSlider");
     sliderEl.max = Math.min(500, nativeFs);
@@ -322,7 +322,7 @@ dropZone.addEventListener('drop', (e)=>{
 });
 filePicker.addEventListener('change', (e)=> handleFiles(e.target.files));
 
-function handleFiles(fileList){
+function handleFiles(fileList){ // upload ECG files
   if(!fileList || fileList.length===0) return;
   const fd = new FormData();
   for(const f of fileList){ fd.append('files', f, f.name); }
@@ -408,7 +408,7 @@ document.getElementById('resetFreq').addEventListener('click', async ()=>{
   }
 });
 
-// Form submit (start)
+// Form submit (start)  
 document.getElementById("channelForm").addEventListener("submit", ev=>{
   ev.preventDefault();
   if(!filesUploaded){ alert("Please upload files first."); return; }
@@ -467,6 +467,8 @@ function initPlots(channels){
   }
 }
 
+//Sends current selected channels, window size, polar mode, XOR threshold, and sampling frequency to the backend.
+//Backend returns signal data + predictions + aliasing info
 async function fetchData(){
   if(!streaming) return;
   try{
