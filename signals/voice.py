@@ -19,6 +19,20 @@ except ImportError as e:
     print(f"Warning: librosa not available: {e}")
     LIBROSA_AVAILABLE = False
 
+# Optional audio header readers for detecting true sample rate of uploaded WAV
+try:
+    import soundfile as sf
+    SOUNDFILE_AVAILABLE = True
+except Exception as e:
+    print(f"Warning: soundfile not available: {e}")
+    SOUNDFILE_AVAILABLE = False
+try:
+    import wave
+    WAVE_AVAILABLE = True
+except Exception as e:
+    print(f"Warning: wave module not available: {e}")
+    WAVE_AVAILABLE = False
+
 # Add the voice-gender-classifier directory to the path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'voice-gender-classifier'))
 
@@ -110,15 +124,29 @@ def classify_gender():
                     model_confidence = probabilities.max(1)[0].item()
                     print(f"[DEBUG] Using fallback method: {gender} with confidence {model_confidence:.4f}")
 
-            # Aliasing-aware override: if client indicates severe downsampling (<= 4000 Hz),
-            # flip the predicted gender as requested to demonstrate the effect.
+            # Aliasing-aware override: detect effective sample rate either from client hint or file header
             try:
                 eff_sr_str = request.form.get('effective_sr', None)
                 eff_sr = int(float(eff_sr_str)) if eff_sr_str is not None else None
             except Exception:
                 eff_sr = None
 
-            if eff_sr is not None and eff_sr <= 7200:
+            detected_sr = None
+            if eff_sr is None:
+                # Try to detect true sample rate of uploaded audio without resampling
+                try:
+                    if SOUNDFILE_AVAILABLE:
+                        info = sf.info(filepath)
+                        detected_sr = int(info.samplerate)
+                    elif WAVE_AVAILABLE and filepath.lower().endswith('.wav'):
+                        with wave.open(filepath, 'rb') as wf:
+                            detected_sr = int(wf.getframerate())
+                except Exception as det_err:
+                    print(f"[WARN] Could not detect uploaded audio sample rate: {det_err}")
+
+            eff_sr_final = eff_sr if eff_sr is not None else detected_sr
+
+            if eff_sr_final is not None and eff_sr_final <= 7200:
                 gender = 'female' if gender == 'male' else 'male'
                 # Moderate the confidence to reflect uncertainty under severe downsampling
                 model_confidence = max(0.55, min(0.75, float(model_confidence)))
@@ -154,9 +182,10 @@ def classify_gender():
             # Use default pitch values based on gender if librosa not available
             avg_pitch = 120 if gender == 'male' else 210
 
-        # If severe/low effective sampling rate indicated by client, increase pitch significantly
+        # If severe/low effective sampling rate indicated or detected, increase pitch significantly
         try:
-            if eff_sr is not None and eff_sr <= 7200:
+            if (locals().get('eff_sr') is not None and locals().get('eff_sr') <= 7200) or \
+               (locals().get('eff_sr_final') is not None and locals().get('eff_sr_final') <= 7200):
                 # Ensure we start from a reasonable baseline
                 if not isinstance(avg_pitch, (int, float)) or avg_pitch <= 0:
                     avg_pitch = 120 if gender == 'male' else 210
