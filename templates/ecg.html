@@ -480,7 +480,8 @@ async function fetchData(){
     if(!resp.ok) throw new Error("HTTP "+resp.status);
     const result = await resp.json();
     const plotFs = result.display_fs || displayFs;
-    const usedFs = result.used_sampling_freq || requestedSampling || nativeFs;
+    const usedFsRaw = (result && result.used_sampling_freq!=null) ? result.used_sampling_freq : (requestedSampling!=null ? requestedSampling : nativeFs);
+    const usedFs = Math.min(500, usedFsRaw);
     const maxSamples=Math.round(widthSec*plotFs*4); // Keep 4x window width to reduce compression
 
     // Keep the label in sync with backend-reported sampling

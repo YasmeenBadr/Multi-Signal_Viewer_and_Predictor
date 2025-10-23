@@ -520,6 +520,13 @@ def set_freq():
         raw_native_fs = _stream.get("fs_native", _stream.get("fs", FREQ_DEFAULT)) # Get true native FS
         MAX_FREQ_LIMIT = 500 
         new_fs = max(FREQ_MIN, min(new_fs, raw_native_fs, MAX_FREQ_LIMIT))
+        # No-op if requested sampling equals current fs (avoid unnecessary resampling and state changes)
+        try:
+            cur_fs = float(_stream.get("fs", FREQ_DEFAULT))
+            if abs(float(new_fs) - cur_fs) < 1e-6:
+                return jsonify({"success": True, "message": f"Frequency unchanged ({int(cur_fs)} Hz)", "current_sampling": int(cur_fs)})
+        except Exception:
+            pass
         
         raw = _stream.get("signals_raw")
         if raw is None:
@@ -557,11 +564,18 @@ def set_sampling():
         raw_native_fs = _stream.get("fs_native", _stream.get("fs", FREQ_DEFAULT))
         MAX_FREQ_LIMIT = 500
         new_fs = max(FREQ_MIN, min(new_fs, raw_native_fs, MAX_FREQ_LIMIT))
+        # No-op if requested sampling equals current fs (avoid unnecessary resampling and state changes)
+        try:
+            cur_fs = float(_stream.get("fs", FREQ_DEFAULT))
+            if abs(float(new_fs) - cur_fs) < 1e-6:
+                return jsonify({"success": True, "message": f"Frequency unchanged ({int(cur_fs)} Hz)", "current_sampling": int(cur_fs)})
+        except Exception:
+            pass
 
         raw = _stream.get("signals_raw")
         if raw is None:
             return jsonify({"success": False, "error": "No raw signals to resample."}), 400
-
+        
         down = resample_with_aliasing(raw, raw_native_fs, new_fs)
         if down.ndim == 1:
             down = down[:, None]
@@ -1092,29 +1106,6 @@ def update():
                 prediction_out["description"] = DISEASE_DESCRIPTIONS.get("Abnormal", prediction_out.get("description", ""))
                 prediction_out["disease_name"] = _stream.get("hea_diagnosis", "")
                 prediction_out["confidence"] = max(p_abn, 0.9)
-        except Exception:
-            pass
-
-        # -------------------------
-        # Decision thresholding ONLY at/near native to reduce false Abnormal
-        # -------------------------
-        try:
-            native_fs_check = _stream.get("fs_native", streaming_fs)
-            sampling_ratio = streaming_fs / native_fs_check if native_fs_check > 0 else 1.0
-            native_equiv = False
-            try:
-                native_equiv = (sampling_ratio >= 0.98) or (abs(float(streaming_fs) - float(native_fs_check)) <= 1.0)
-            except Exception:
-                native_equiv = (sampling_ratio >= 0.98)
-            if native_equiv and isinstance(prediction_out, dict) and isinstance(prediction_out.get("probabilities"), list):
-                probs = prediction_out["probabilities"]
-                if len(probs) >= 2:
-                    p_abn = float(probs[1])
-                    if p_abn < 0.6 and prediction_out.get("label") != "Abnormal":
-                        prediction_out["label"] = "Normal"
-                        prediction_out["confidence"] = float(probs[0])
-                        prediction_out["description"] = DISEASE_DESCRIPTIONS.get("Normal", "")
-                        prediction_out["disease_name"] = ""
         except Exception:
             pass
 
