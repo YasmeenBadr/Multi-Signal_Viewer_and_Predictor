@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Real-Time ECG Viewer</title>
   <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
-  <script src="{{ url_for('static', filename='js/signal_common.js') }}"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"/>
 <style>
   /* General body and sidebar */
@@ -202,6 +201,10 @@
             <div class="small-muted">Min:10</div>
             <div class="small-muted">Max: 500</div>
           </div>
+          <div class="mt-2" style="display:flex; gap:8px;">
+            <button id="applyFreq" class="btn btn-primary" type="button">Apply Sampling</button>
+            <button id="resetFreq" class="btn btn-secondary" type="button">Reset Sampling</button>
+          </div>
           <div class="form-text small-muted">Lower frequency simulates lower-sampling hardware — predictions & signal will change.</div>
         </div>
 
@@ -266,17 +269,12 @@
 let streaming=false, intervalId=null;
 let updateSpeed=1, allChannels=[], selectedChannels=[], widthSec=5;
 let nativeFs=500, displayFs=200;
-// Legacy buffers (kept for compatibility), but we will use channelBuffers for smoother plotting
 let channelData={}, globalStart=0;
-// EEG-style buffers/time
-let channelBuffers = {}; // { ch: {data:[], time:[]} }
-let ecgGlobalTime = 0;
 let colormap="Jet";
 let polarMode = "fixed";
 let currentDisplay = 'Time';
 let filesUploaded = false;
 let requestedSampling = null; // value applied via Apply Sampling
-// no stacked time plot ids needed for single-plot view
 
 // Init config
 async function initConfig(){
@@ -286,8 +284,10 @@ async function initConfig(){
     displayFs = cfg.display_fs || displayFs;
     // Default UI to a safe cap of 500 Hz (or native if lower) 
     requestedSampling = Math.min(500, nativeFs);
-    samplingCtrl.setNativeFs(nativeFs);
-    samplingCtrl.setFs(requestedSampling, false);
+    const sliderEl = document.getElementById("freqSlider");
+    sliderEl.max = Math.min(500, nativeFs);
+    sliderEl.value = requestedSampling;
+    document.getElementById("freqValue").innerText = requestedSampling + " Hz";
     allChannels = cfg.channels || (Array.from({length:12}, (_,i)=>"Lead "+(i+1)));
     const cdiv = document.getElementById("channelList");
     cdiv.innerHTML="";
@@ -372,17 +372,40 @@ function applyDisplaySelection(val){
 displaySelect.addEventListener('change', (e)=> applyDisplaySelection(e.target.value));
 applyDisplaySelection(displaySelect.value || 'Time');
 
-// Frequency slider (shared controller)
+// Frequency slider
 const freqSlider = document.getElementById('freqSlider');
 const freqValue = document.getElementById('freqValue');
-const samplingCtrl = createSamplingController({
-  sliderEl: freqSlider,
-  valueEl: freqValue,
-  applyBtn: document.getElementById('applyFreq'),
-  resetBtn: document.getElementById('resetFreq'),
-  maxFsCap: 500,
-  backend: { applyUrl: '/ecg/set_sampling', resetUrl: '/ecg/reset_sampling', fieldName: 'sampling_freq' },
-  onFsChange: (fs)=>{ requestedSampling = fs; }
+freqSlider.addEventListener('input', (e)=>{
+  freqValue.innerText = e.target.value + " Hz";
+});
+document.getElementById('applyFreq').addEventListener('click', async ()=>{
+  const val = parseFloat(freqSlider.value);
+  // call backend to set sampling (clears buffers so model will predict freshly)
+  const res = await fetch('/ecg/set_sampling', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({sampling_freq: val})
+  });
+  const j = await res.json();
+  if(j && j.success){
+    requestedSampling = j.current_sampling;
+    alert("Applied sampling: " + requestedSampling + " Hz.");
+    // If streaming, fetch new data without resetting buffers
+    if(streaming){ await fetchData(); }
+  } else {
+    alert("Failed to apply sampling: " + JSON.stringify(j));
+  }
+});
+document.getElementById('resetFreq').addEventListener('click', async ()=>{
+  const res = await fetch('/ecg/reset_sampling',{method:'POST'});
+  const j = await res.json();
+  if(j && j.success){
+    requestedSampling = j.current_sampling;
+    freqSlider.value = requestedSampling;
+    freqValue.innerText = requestedSampling + " Hz";
+    alert("Reset sampling to native: " + requestedSampling + " Hz");
+  } else {
+    alert("Failed to reset sampling: " + JSON.stringify(j));
+  }
 });
 
 // Form submit (start)  
@@ -394,9 +417,8 @@ document.getElementById("channelForm").addEventListener("submit", ev=>{
   updateSpeed = parseFloat(document.getElementById("speedControl").value)||1;
   if(selectedChannels.length===0){ alert("Select channel(s)"); return; }
 
-  channelData={}; globalStart=0; channelBuffers={}; ecgGlobalTime=0;
+  channelData={}; globalStart=0;
   selectedChannels.forEach(ch=>channelData[ch]=[]);
-  selectedChannels.forEach(ch=>channelBuffers[ch]={data:[], time:[]});
   initPlots(selectedChannels);
   streaming=true;
   if(intervalId) clearInterval(intervalId);
@@ -429,15 +451,15 @@ function initPlots(channels){
   });
 
   if(channels.length===1){
-    plotNew("xorPlot", [{x:[],y:[],mode:"lines",showlegend:false,hoverinfo:'none'}],
+    Plotly.newPlot("xorPlot", [{x:[],y:[],mode:"lines",showlegend:false,hoverinfo:'none'}],
       {title:'XOR Graph', paper_bgcolor:"#000", plot_bgcolor:"#000", font:{color:"#e0e0e0"}, showlegend:false});
   }
 
   const polarTraces = channels.map(ch=>({r:[],theta:[],mode:"lines",type:"scatterpolar",name:"",showlegend:false,hoverinfo:'none'}));
-  plotNew("polarPlot", polarTraces, {title:'Polar Plot', paper_bgcolor:"#000", font:{color:"#e0e0e0"}, showlegend:false});
+  Plotly.newPlot("polarPlot", polarTraces, {title:'Polar Plot', paper_bgcolor:"#000", font:{color:"#e0e0e0"}, showlegend:false});
 
   if(channels.length===2){
-    plotNew("recurrenceScatterPlot", [{ z:[], type:"heatmap", colorscale:colormap }], {title:'Recurrence', paper_bgcolor:"#000", plot_bgcolor:"#000", font:{color:"#e0e0e0"}, showlegend:false});
+    Plotly.newPlot("recurrenceScatterPlot", [{ z:[], type:"heatmap", colorscale:colormap }], {title:'Recurrence', paper_bgcolor:"#000", plot_bgcolor:"#000", font:{color:"#e0e0e0"}, showlegend:false});
   } else {
     // keep plot but empty
     Plotly.purge('recurrenceScatterPlot');
@@ -459,9 +481,9 @@ async function fetchData(){
     });
     if(!resp.ok) throw new Error("HTTP "+resp.status);
     const result = await resp.json();
+    const plotFs = result.display_fs || displayFs;
     const usedFsRaw = (result && result.used_sampling_freq!=null) ? result.used_sampling_freq : (requestedSampling!=null ? requestedSampling : nativeFs);
     const usedFs = Math.min(500, usedFsRaw);
-    const plotFs = usedFs; // Match EEG behavior: use actual streaming FS for plotting time base
     const maxSamples=Math.round(widthSec*plotFs*4); // Keep 4x window width to reduce compression
 
     // Keep the label in sync with backend-reported sampling
@@ -480,20 +502,19 @@ async function fetchData(){
     });
     // Set a fixed time window that slides with the data
     const currentTime = globalStart + (channelData[selectedChannels[0]]?.length || 0) / plotFs;
-    const [startR, endR] = [Math.max(0, currentTime-widthSec), currentTime];
-    Plotly.relayout("timePlot",{"xaxis.range":[startR, endR], "xaxis.dtick":0.5});
+    Plotly.relayout("timePlot",{"xaxis.range":[Math.max(0, currentTime-widthSec), currentTime], "xaxis.dtick":0.5});
 
     if(selectedChannels.length===1){
       const chXOR=selectedChannels[0];
       const xorChunk=result.xor[String(chXOR)]||[];
       const xvalsXOR=xorChunk.map((_,i)=>globalStart+i/plotFs);
       if(currentDisplay==='All'||currentDisplay==='XOR'){
-        plotRestyle("xorPlot",{x:[xvalsXOR],y:[xorChunk]},[0]);
+        Plotly.restyle("xorPlot",{x:[xvalsXOR],y:[xorChunk]},[0]);
         if(xvalsXOR.length>0){
           const xMin=xvalsXOR[0], xMax=xvalsXOR[xvalsXOR.length-1];
           let yMin=0,yMax=0;
           if(xorChunk.length>0){ yMin=Math.min(...xorChunk)-0.01; yMax=Math.max(...xorChunk)+0.01; }
-          plotRelayout("xorPlot", {"xaxis.range":[xMin,xMax], "yaxis.range":[yMin,yMax]});
+          Plotly.relayout("xorPlot", {"xaxis.range":[xMin,xMax], "yaxis.range":[yMin,yMax]});
         }
       }
     }
@@ -503,12 +524,14 @@ async function fetchData(){
       const polar=result.polar[String(ch)]||{r:[],theta:[]};
       rArr.push(polar.r); thetaArr.push(polar.theta);
     });
-    if(currentDisplay==='All'||currentDisplay==='Polar') plotRestyle("polarPlot",{r:rArr,theta:thetaArr});
+    if(currentDisplay==='All'||currentDisplay==='Polar') Plotly.restyle("polarPlot",{r:rArr,theta:thetaArr});
 
     if(selectedChannels.length===2){
       const colormapData=result.colormap||[];
       if(currentDisplay==='All'||currentDisplay==='Recurrence') {
-        try { plotRestyle("recurrenceScatterPlot",{z:[colormapData], colorscale:colormap}); } catch(e){}
+        try {
+          Plotly.restyle("recurrenceScatterPlot",{z:[colormapData], colorscale:colormap});
+        } catch(e){}
       }
     }
 
