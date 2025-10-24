@@ -459,9 +459,6 @@ def set_freq():
         _stream["fs"] = int(new_fs) # The *current* FS
         _stream["pos"] = 0
         _stream["alias_phase"] = {}
-        # Clear prediction buffers/history so predictions reflect new aliased stream only
-        _stream["pred_buffers"] = {}
-        _stream["pred_history"] = []
         
         # Preserve all buffers/state to avoid clearing history when sampling changes
         # Only reset position, keep prediction buffers, history, and other state intact
@@ -504,9 +501,6 @@ def set_sampling():
         _stream["fs"] = int(new_fs)
         _stream["pos"] = 0
         _stream["alias_phase"] = {}
-        # Clear prediction buffers/history so predictions reflect new aliased stream only
-        _stream["pred_buffers"] = {}
-        _stream["pred_history"] = []
         # Preserve buffers/state to avoid clearing history when sampling changes
         # Track sampling change timestamp and whether reduced
         _stream["last_sampling_change_ts"] = time.time()
@@ -531,9 +525,6 @@ def reset_sampling():
         _stream["fs"] = int(native_fs)
         _stream["pos"] = 0
         _stream["alias_phase"] = {}
-        # Clear prediction buffers/history on reset as well
-        _stream["pred_buffers"] = {}
-        _stream["pred_history"] = []
         # Preserve all buffers/state to avoid clearing history when resetting sampling
         # Only reset position, keep prediction buffers, history, and other state intact
         _stream["last_sampling_change_ts"] = time.time()
