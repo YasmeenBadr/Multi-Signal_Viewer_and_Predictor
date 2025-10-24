@@ -6,6 +6,7 @@
     <title>EEG Real-Time Viewer</title>
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="{{ url_for('static', filename='js/signal_common.js') }}"></script>
     <script>
         // Configure Tailwind
         tailwind.config = {
@@ -39,7 +40,7 @@
                 } else {
                     if (leftPlotColumn) {
                         leftPlotColumn.classList.remove('xl:w-full');
-                        leftPlotColumn.classList.add('xl:w-2/3');
+``                        leftPlotColumn.classList.add('xl:w-2/3');
                     }
                     if (rightColumn) {
                         rightColumn.classList.remove('hidden');
@@ -158,19 +159,7 @@
                         <p class="text-[10px] text-gray-400 mt-1">Adjusts visualization sampling up to the file's FS.</p>
                     </div>
                     
-                    <!-- Downsampling Control for Aliasing Effect -->
-                    <div class="mb-4 border border-gray-600 rounded-lg p-3 bg-gray-800/50">
-                        <label for="downsampleSlider" class="block text-xs font-medium mb-1 text-gray-300">Downsampling Factor (Aliasing Effect)
-                            <span id="downsampleValue" class="ml-2 text-accent font-bold">1x</span>
-                        </label>
-                        <input type="range" id="downsampleSlider" min="1" max="32" value="1" step="1" class="w-full">
-                        <div class="flex justify-between text-[10px] text-gray-400 mt-1">
-                            <span>1x (Original)</span>
-                            <span>16x (Heavy Aliasing)</span>
-                            <span>32x (Severe Aliasing)</span>
-                        </div>
-                        <p class="text-[10px] text-gray-400 mt-2">⚠️ Higher values cause aliasing and affect prediction accuracy</p>
-                    </div>
+                    
                     <div id="streamingButtons" class="mt-4 mb-6">
                         <div class="flex gap-2 mb-2">
                             <button type="button" id="startContinueButton" class="flex-1 flex items-center justify-center bg-accent hover:bg-accent-hover text-text-dark font-extrabold py-3 rounded-xl transition duration-200 shadow-lg text-sm" >
@@ -311,6 +300,7 @@
         const BASE_INTERVAL_MS = 100; 
         
         let xorPreviousWindow = {};
+        let eegTimePlotIds = {}; // shared stacked time plot ids
         // XOR animation state per channel
         let xorPhase = {}; // 'forward' | 'reverse'
         let xorShownForward = {};
@@ -407,7 +397,7 @@
                     let node = Plotly.d3.select(`#${id}`).node();
                     if (node && node.layout) {
                         // Plotly's relayout(autosize) forces a redraw to the new container size
-                        Plotly.relayout(id, { autosize: true });
+                        plotRelayout(id, { autosize: true });
                     }
                 } catch(e) { /* ignore if plot isn't initialized */ }
             });
@@ -481,49 +471,15 @@
             fs = Math.max(1, parseInt(newFs || fs, 10));
             if (fsValue) fsValue.textContent = `${fs} Hz`;
         }
-        fsSlider.addEventListener('input', (e) => {
-            updateFs(e.target.value);
-            // keep downsample slider in sync with manual FS changes
-            const desiredFs = Math.max(1, parseInt(e.target.value || fs, 10));
-            const factor = Math.max(1, Math.round(nativeFs / desiredFs));
-            if (!isNaN(factor)) {
-                downsampleSlider.value = String(factor);
-                downsampleValue.textContent = factor + 'x';
-            }
+        // Shared sampling controller wiring (single common slider)
+        const samplingCtrlEEG = createSamplingController({
+            sliderEl: fsSlider,
+            valueEl: fsValue,
+            maxFsCap: nativeFs,
+            onFsChange: (newFs)=>{ fs = newFs; updateFs(newFs); }
         });
-
-        // Downsampling slider event listener
-        const downsampleSlider = document.getElementById('downsampleSlider');
-        const downsampleValue = document.getElementById('downsampleValue');
-        
-        downsampleSlider.addEventListener('input', (e) => {
-            const factor = Math.max(1, parseInt(e.target.value));
-            downsampleValue.textContent = factor + 'x';
-            // Store and APPLY the downsampling factor to set view FS
-            window.downsampleFactor = factor;
-            const newFs = Math.max(1, Math.floor(nativeFs / factor));
-            fs = newFs;
-            if (fsSlider) {
-                fsSlider.value = String(newFs);
-            }
-            updateFs(newFs);
-            
-            // Update visual feedback based on aliasing level
-            const container = downsampleSlider.closest('.border-gray-600');
-            if (factor === 1) {
-                container.className = container.className.replace(/border-\w+-\d+/, 'border-gray-600');
-                container.className = container.className.replace(/bg-\w+-\d+\/\d+/, 'bg-gray-800/50');
-            } else if (factor >= 16) {
-                container.className = container.className.replace(/border-\w+-\d+/, 'border-red-800');
-                container.className = container.className.replace(/bg-\w+-\d+\/\d+/, 'bg-red-900/30');
-            } else if (factor >= 8) {
-                container.className = container.className.replace(/border-\w+-\d+/, 'border-orange-800');
-                container.className = container.className.replace(/bg-\w+-\d+\/\d+/, 'bg-orange-900/30');
-            } else {
-                container.className = container.className.replace(/border-\w+-\d+/, 'border-yellow-800');
-                container.className = container.className.replace(/bg-\w+-\d+\/\d+/, 'bg-yellow-900/30');
-            }
-        });
+        samplingCtrlEEG.setNativeFs(nativeFs);
+        samplingCtrlEEG.setFs(fs, false);
 
         // --- Button State Management ---
         function updateButtonStates() {
@@ -832,7 +788,7 @@
                     let node = Plotly.d3.select(`#${id}`).node();
                     if (node && node.layout) {
                         let currentTitle = node.layout.title.text.replace(/ \(PAUSED\)/g, '').replace(/ \(STOPPED\)/g, '').replace(/ \(Time: [\d\.]+s\)/, '');
-                        Plotly.relayout(id, { title: currentTitle + " (PAUSED)" });
+                        plotRelayout(id, { title: currentTitle + " (PAUSED)" });
                     }
                 } catch (e) { /* Ignore error if plot isn't initialized */ }
             });
@@ -857,7 +813,7 @@
                     let node = Plotly.d3.select(`#${id}`).node();
                     if (node && node.layout) {
                         let currentTitle = node.layout.title.text.replace(/ \(PAUSED\)/g, '').replace(/ \(STOPPED\)/g, '').replace(/ \(Time: [\d\.]+s\)/, '');
-                        Plotly.relayout(id, { title: currentTitle });
+                        plotRelayout(id, { title: currentTitle });
                     }
                 } catch (e) { /* Ignore error if plot isn't initialized */ }
             });
@@ -932,54 +888,8 @@
             // --- Plotly Configuration based on Mode ---
 
             if (mode === "time") {
-                // Time graph plots go directly into the main #plot div.
-                
-                const totalChannels = selected.length;
-                let plotHeight = '150px'; 
-                if (totalChannels > 0 && totalChannels <= 3) {
-                    // Increase height for 1, 2, or 3 channels to make them larger
-                    plotHeight = '350px'; 
-                }
-
-                selected.forEach((chIndex, i) => {
-                    const chName = channelIndexToOriginalName[chIndex.toString()];
-                    const plotId = `plot-ch-${chIndex}`;
-
-                    const plotDivElement = document.createElement('div');
-                    plotDivElement.id = plotId;
-                    plotDivElement.className = 'w-full mb-2 border border-gray-700 rounded-lg p-1 bg-gray-800'; 
-                    plotDivElement.style.height = plotHeight; 
-                    plotDiv.appendChild(plotDivElement);
-
-                    const individualTrace = [{ 
-                        x: [], y: [], mode: "lines", line: { color: colors[i % colors.length] }, name: chName 
-                    }];
-                    
-                    const individualLayout = {
-                        title: `Channel ${chName} - Time Graph - Window: ${width}s`,
-                        paper_bgcolor: "#000000", 
-                        plot_bgcolor: "#000000", 
-                        font: { color: "#e5e7eb", family: "Inter", size: 10 },
-                        autosize: true,
-                        margin: { t: 25, r: 10, b: 20, l: 30 }, 
-                        xaxis: { 
-                            title: (i === selected.length - 1) ? "Time (s)" : "", 
-                            color: "#e5e7eb", 
-                            gridcolor: "#374151", 
-                            range: [0, width], 
-                            showticklabels: (i === selected.length - 1) 
-                        },
-                        yaxis: { 
-                            title: chName, 
-                            color: "#e5e7eb", 
-                            gridcolor: "#374151", 
-                            showticklabels: false, 
-                            autorange: true
-                        }
-                    };
-
-                    Plotly.newPlot(plotId, individualTrace, individualLayout, { responsive: true, displayModeBar: false });
-                });
+                const nameMap = channelIndexToOriginalName; // {index->name}
+                eegTimePlotIds = initStackedTime('plot', selected, nameMap, width, { fontColor: '#e5e7eb', bg: '#000', grid: '#374151', lineWidth: 1.8 });
                 
             } else { // polar, recurrence, xor all use a single plot in the #plot container
                 const singlePlotDiv = document.createElement('div');
@@ -1055,7 +965,7 @@
                     };
                 }
                 
-                Plotly.newPlot(singlePlotId, traces, layout, { responsive: true, displayModeBar: false });
+                plotNew(singlePlotId, traces, layout, { responsive: true, displayModeBar: false });
             }
             
             // --- Band Power Plot Initialization (Runs for all modes) ---
@@ -1084,7 +994,7 @@
                 margin: { t: 40, r: 10, b: 60, l: 40 }
             };
             
-            Plotly.newPlot('bandPowerPlot', bandPowerTraces, bandPowerLayout, { responsive: true, displayModeBar: false });
+            plotNew('bandPowerPlot', bandPowerTraces, bandPowerLayout, { responsive: true, displayModeBar: false });
 
 
             // Start the stream
@@ -1097,32 +1007,7 @@
 
         });
         
-        // --- Helper functions for data buffering ---
-        function resampleWithAliasing(arr, outLen) {
-            // naive decimation (aliasing) to exactly outLen samples
-            const N = arr.length;
-            if (outLen <= 1 || N <= 1) {
-                return [arr[0] ?? 0];
-            }
-            const out = new Array(outLen);
-            const step = (N - 1) / (outLen - 1);
-            for (let i = 0; i < outLen; i++) {
-                const idx = Math.floor(i * step);
-                out[i] = arr[idx] ?? arr[N - 1];
-            }
-            return out;
-        }
-        function updateBuffer(chIndex, newSignals, newTime) {
-            const buffer = channelDataBuffers[chIndex];
-            const maxPoints = width * fs;
-            buffer.data.push(...newSignals);
-            buffer.time.push(...newTime);
-            if (buffer.data.length > maxPoints) {
-                const excess = buffer.data.length - maxPoints;
-                buffer.data.splice(0, excess);
-                buffer.time.splice(0, excess);
-            }
-        }
+        // --- Helper functions moved to shared script (signal_common.js) ---
         
         // Used by polar, recurrence, and xor modes
         function updateSignalBuffer(chIndex, newSignals) {
@@ -1187,28 +1072,14 @@
 
                 // --- 1. Main Plotting Logic (Modes) ---
                 if (mode === "time") {
-                    const xmin = globalTime - width;
-                    const xmax = globalTime;
-
+                    const maxPoints = Math.max(1, Math.floor(width * fs));
                     selected.forEach((chIndex) => {
-                        const plotId = `plot-ch-${chIndex}`;
                         const rawSignals = result.signals[chIndex.toString()]; 
-                        
                         if (!rawSignals || rawSignals.length === 0) return;
                         const newSignals = resampleWithAliasing(rawSignals, timeChunk.length);
-                        
-                        updateBuffer(chIndex, newSignals, timeChunk);
-                        
-                        const xUpdate = [channelDataBuffers[chIndex].time];
-                        const yUpdate = [channelDataBuffers[chIndex].data];
-                        
-                        Plotly.restyle(plotId, { x: xUpdate, y: yUpdate });
-                        
-                        Plotly.relayout(plotId, { 
-                            'xaxis.range': [xmin, xmax], 
-                            'title': `Channel ${channelIndexToOriginalName[chIndex.toString()]} - Time Graph - Window: ${width}s (Time: ${globalTime.toFixed(2)}s)`
-                        });
+                        updateBuffer(channelDataBuffers[chIndex], newSignals, timeChunk, maxPoints);
                     });
+                    updateStackedTime(eegTimePlotIds, channelDataBuffers, width, globalTime, channelIndexToOriginalName);
 
                 } else if (mode === "polar") {
                     const rUpdate = [], thetaUpdate = [];
@@ -1233,13 +1104,13 @@
                         thetaUpdate.push(theta);
                     });
                 
-                    Plotly.restyle(singlePlotId, { r: rUpdate, theta: thetaUpdate });
+                    plotRestyle(singlePlotId, { r: rUpdate, theta: thetaUpdate });
                     
                     const polarTitle = isCumulativePolar ? 
                         `EEG - Polar Graph - CUMULATIVE MODE (Time: ${globalTime.toFixed(2)}s)` : 
                         `EEG - Polar Graph - Fixed Window: ${width}s (Time: ${globalTime.toFixed(2)}s)`;
                         
-                    Plotly.relayout(singlePlotId, { 
+                    plotRelayout(singlePlotId, { 
                         'title': polarTitle
                     });
 
@@ -1261,12 +1132,12 @@
                     const dataY = channelDataBuffers[chYIndex].data;
                     
                     // Plotly's histogram2d automatically calculates the Z-data (density) when X and Y are restyled.
-                    Plotly.restyle(singlePlotId, { x: [dataX], y: [dataY] });
+                    plotRestyle(singlePlotId, { x: [dataX], y: [dataY] });
 
                     const chX = channelIndexToOriginalName[chXIndex.toString()];
                     const chY = channelIndexToOriginalName[chYIndex.toString()];
 
-                    Plotly.relayout(singlePlotId, { 
+                    plotRelayout(singlePlotId, { 
                         'title': `EEG - Recurrence Graph (Phase Space Density): ${chX} vs ${chY} (Time: ${globalTime.toFixed(2)}s)`
                     });
 
@@ -1281,7 +1152,8 @@
                     const windowBeforeUpdate = channelDataBuffers[chIndex].data.length === chunkSize ? 
                                            [...channelDataBuffers[chIndex].data] : null;
 
-                    updateBuffer(chIndex, newSignals, timeChunk); // XOR uses the full buffer which includes time
+                    const maxPoints = Math.max(1, Math.floor(width * fs));
+                    updateBuffer(channelDataBuffers[chIndex], newSignals, timeChunk, maxPoints); // XOR uses the full buffer which includes time
                     const currentBuffer = channelDataBuffers[chIndex].data;
                     const currentTime = channelDataBuffers[chIndex].time;
 
@@ -1351,7 +1223,7 @@
 
                         // Phase 1: Show full forward line once, no dots
                         if (xorPhase[chIndex] === 'forward' && !xorShownForward[chIndex]) {
-                            Plotly.restyle(singlePlotId, { 
+                            plotRestyle(singlePlotId, { 
                                 x: [forwardXFull, []], 
                                 y: [forwardYFull, []]
                             });
@@ -1371,7 +1243,7 @@
                             const reverseXPartial = xorSnapshot[chIndex].xReverse.slice(0, xorReverseIndex[chIndex]);
                             const reverseYPartial = xorSnapshot[chIndex].yReverse.slice(0, xorReverseIndex[chIndex]);
 
-                            Plotly.restyle(singlePlotId, { 
+                            plotRestyle(singlePlotId, { 
                                 x: [forwardXPartial, reverseXPartial], 
                                 y: [forwardYPartial, reverseYPartial]
                             });
@@ -1385,7 +1257,7 @@
                         }
 
                         // Keep x-axis fixed to [0, width] to match 0..width data domain
-                        Plotly.relayout(singlePlotId, { 
+                        plotRelayout(singlePlotId, { 
                             'xaxis.range': [0, width],
                             'title': `EEG - XOR Graph - ${channelIndexToOriginalName[chIndex.toString()]} - Window: ${width}s (Time: ${globalTime.toFixed(2)}s)`
                         });
@@ -1415,14 +1287,14 @@
                         // Set new range, ensuring a minimum for stability
                         bandPowerYRange = Math.max(100000, Math.ceil(maxPower / 100000) * 100000); 
                         
-                        Plotly.relayout('bandPowerPlot', {
+                        plotRelayout('bandPowerPlot', {
                             'xaxis.range': [0, bandPowerYRange] 
                         });
                     }
 
                     // Restyle the data
                     // Update the X array for a horizontal chart
-                    Plotly.restyle('bandPowerPlot', { x: [averagedPowerArray] }); 
+                    plotRestyle('bandPowerPlot', { x: [averagedPowerArray] }); 
                 }
 
             } catch (error) {
