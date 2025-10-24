@@ -7,48 +7,52 @@
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
-        // Configure Tailwind
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        'primary-bg': '#0a0a0a',
-                        'secondary-bg': '#1f2937',
-                        'accent': '#00eaff',
-                        'accent-hover': '#00bcd4',
-                        'text-light': '#e5e7eb',
-                        'text-dark': '#030712',
-                    },
-                    fontFamily: {
-                        sans: ['Inter', 'sans-serif'],
-                    },
-                    spacing: {
-                        // Define custom size for collapsed sidebar (w-14 is 3.5rem)
-                        '14': '3.5rem', 
-                    }
+    // ✅ Configure Tailwind (this part must be ONLY JSON-like configuration)
+    tailwind.config = {
+        theme: {
+            extend: {
+                colors: {
+                    'primary-bg': '#0a0a0a',
+                    'secondary-bg': '#1f2937',
+                    'accent': '#00eaff',
+                    'accent-hover': '#00bcd4',
+                    'text-light': '#e5e7eb',
+                    'text-dark': '#030712',
+                },
+                fontFamily: {
+                    sans: ['Inter', 'sans-serif'],
+                },
+                spacing: {
+                    // Define custom size for collapsed sidebar (w-14 is 3.5rem)
+                    '14': '3.5rem',
+                },
+            },
+        },
+    };
 
-                // Expand layout for XOR to full width, hide right column
-                if (mode === 'xor') {
-                    if (leftPlotColumn) {
-                        leftPlotColumn.classList.remove('xl:w-2/3');
-                        leftPlotColumn.classList.add('xl:w-full');
-                    }
-                    if (rightColumn) {
-                        rightColumn.classList.add('hidden');
-                    }
-                } else {
-                    if (leftPlotColumn) {
-                        leftPlotColumn.classList.remove('xl:w-full');
-                        leftPlotColumn.classList.add('xl:w-2/3');
-                    }
-                    if (rightColumn) {
-                        rightColumn.classList.remove('hidden');
-                    }
-                }
-                }
+    // ✅ Separate your layout logic outside the config
+    // Expand layout for XOR to full width, hide right column
+    if (typeof mode !== 'undefined' && typeof leftPlotColumn !== 'undefined' && typeof rightColumn !== 'undefined') {
+        if (mode === 'xor') {
+            if (leftPlotColumn) {
+                leftPlotColumn.classList.remove('xl:w-2/3');
+                leftPlotColumn.classList.add('xl:w-full');
+            }
+            if (rightColumn) {
+                rightColumn.classList.add('hidden');
+            }
+        } else {
+            if (leftPlotColumn) {
+                leftPlotColumn.classList.remove('xl:w-full');
+                leftPlotColumn.classList.add('xl:w-2/3');
+            }
+            if (rightColumn) {
+                rightColumn.classList.remove('hidden');
             }
         }
-    </script>
+    }
+</script>
+
     <style>
         body { font-family: 'Inter', sans-serif; background: #000 !important; }
         /* EEG Plot Wrapper (allows page elongation) */

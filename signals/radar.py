@@ -7,6 +7,7 @@ import uuid
 import time
 from scipy.io import wavfile
 import numpy as np
+from .resampling import resample_signal
 
 bp = Blueprint('radar', __name__, template_folder='templates')
 
@@ -58,7 +59,7 @@ def analyze():
     
     try:
         audio_data, sr = librosa.load(file.stream, sr=None)
-        audio_16k = librosa.resample(audio_data, orig_sr=sr, target_sr=16000)
+        audio_16k = resample_signal(audio_data, sr, 16000, method="librosa", aa=True)
         predicted_class, confidence = run_inference(audio_16k)
         
         return jsonify({
@@ -86,12 +87,12 @@ def analyze_downsampled():
         audio_data, original_sr = librosa.load(file.stream, sr=None)
         
         # Original analysis (16kHz)
-        audio_16k = librosa.resample(audio_data, orig_sr=original_sr, target_sr=16000)
+        audio_16k = resample_signal(audio_data, original_sr, 16000, method="librosa", aa=True)
         pred_orig, conf_orig = run_inference(audio_16k)
         
         # Downsampled analysis
-        audio_down = librosa.resample(audio_data, orig_sr=original_sr, target_sr=target_sr)
-        audio_up = librosa.resample(audio_down, orig_sr=target_sr, target_sr=16000)
+        audio_down = resample_signal(audio_data, original_sr, target_sr, method="librosa", aa=True)
+        audio_up = resample_signal(audio_down, target_sr, 16000, method="librosa", aa=True)
         pred_down, conf_down = run_inference(audio_up)
         
         # Save files

@@ -1,12 +1,13 @@
 from flask import Blueprint, render_template, request, send_file, jsonify
 import numpy as np
 from scipy.io.wavfile import write, read as wav_read
-from scipy.signal import windows, resample
+from scipy.signal import windows
 import os
 import tempfile
 import uuid
 import h5py
 import json
+from .resampling import resample_signal, decimate_with_aliasing
 
 # ============================================================
 # Configuration
@@ -69,13 +70,18 @@ def downsample_signal(signal, fs_high, fs_target, duration):
     """Downsample signal with optional decimation or resampling"""
     if fs_target == fs_high:
         return signal
-    
-    decimation_factor = max(1, fs_high // fs_target)
-    if decimation_factor > 1:
-        sig = signal[::decimation_factor]
-        target_length = int(duration * fs_target)
-        return sig[:target_length] if len(sig) > target_length else np.pad(sig, (0, target_length - len(sig)))
-    return resample(signal, int(duration * fs_target))
+    # Use aliasing decimation when reducing sample rate, otherwise high-quality resample
+    if fs_target < fs_high:
+        sig = decimate_with_aliasing(signal, fs_high, fs_target)
+    else:
+        sig = resample_signal(signal, fs_high, fs_target, method="scipy", aa=True)
+    # Conform to requested duration length
+    target_length = int(duration * fs_target)
+    if len(sig) > target_length:
+        return sig[:target_length]
+    if len(sig) < target_length:
+        return np.pad(sig, (0, target_length - len(sig)))
+    return sig
 
 
 def estimate_frequency(y, sr):
@@ -98,7 +104,7 @@ def estimate_frequency(y, sr):
 def save_audio_file(signal, fs, duration, min_fs=8000):
     """Save audio file with minimum sampling rate for playback"""
     audio_fs = max(min_fs, fs)
-    sig_audio = resample(signal, int(duration * audio_fs)) if audio_fs != fs else signal
+    sig_audio = resample_signal(signal, fs, audio_fs, method="scipy", aa=True) if audio_fs != fs else signal
     audio_data = np.clip(sig_audio * 32767, -32767, 32767).astype(np.int16)
     
     file_id = str(uuid.uuid4())
@@ -248,11 +254,11 @@ def resample_uploaded_audio():
         
         # Resample
         duration = len(y_orig) / sr_orig
-        y_resampled = resample(y_orig, int(duration * target_fs)) if target_fs != sr_orig else y_orig
+        y_resampled = resample_signal(y_orig, sr_orig, target_fs, method="scipy", aa=True) if target_fs != sr_orig else y_orig
         
         # Save for playback (minimum 8kHz)
         audio_fs = max(8000, target_fs)
-        y_audio = resample(y_resampled, int(duration * audio_fs)) if audio_fs != target_fs else y_resampled
+        y_audio = resample_signal(y_resampled, target_fs, audio_fs, method="scipy", aa=True) if audio_fs != target_fs else y_resampled
         
         audio_data = np.clip(y_audio * 32767, -32767, 32767).astype(np.int16)
         resampled_id = str(uuid.uuid4())

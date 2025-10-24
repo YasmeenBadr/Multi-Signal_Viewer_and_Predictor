@@ -4,6 +4,7 @@ import time
 import logging
 import threading
 from typing import Optional
+from .resampling import decimate_with_aliasing
 
 import numpy as np
 import torch
@@ -379,94 +380,10 @@ if not _stream["loaded"]:
 # Downsample **with aliasing** (raw slicing, no anti-aliasing)
 # -------------------------
 def resample_with_aliasing(sig, native_fs, target_fs, pos_native: int = 0):
-    """Strict decimation without anti-aliasing using a persistent phase.
-    - Integer factor: take every k-th sample starting at stored phase p in [0,k-1].
-    - Non-integer: use phase-accumulator with initial offset p in [0,factor).
-    Phase is stored in `_stream["alias_phase"][int(target_fs)]` and reset on sampling change.
-    """
-    sig = np.asarray(sig, dtype=np.float32)
-    if target_fs <= 0 or target_fs >= native_fs:
-        return sig
-
-    factor = float(native_fs) / float(target_fs)
-    if factor <= 1.0:
-        return sig
-
-    # Get or initialize persistent phase for this target fs
-    phase_map = _stream.setdefault("alias_phase", {})
-    key = int(round(target_fs))
-    # For multi-channel signals we store a dict of phases per channel under this key
-    p_entry = phase_map.get(key, None)
-
-    N = sig.shape[0]
-    # Integer decimation fast path
-    k = int(np.floor(factor))
-    if abs(factor - k) < 1e-6 and k >= 2:
-        if sig.ndim == 1:
-            if p_entry is None or not isinstance(p_entry, (int, float)):
-                p = int(np.random.randint(0, k))
-                phase_map[key] = p
-            else:
-                p = int(p_entry)
-            # position-aware phase to avoid repeatedly sampling R-peaks
-            start = int((min(max(p, 0), k - 1) + (pos_native % k)) % k)
-            return sig[start::k]
-        else:
-            # per-channel phase
-            C = sig.shape[1]
-            if p_entry is None or not isinstance(p_entry, dict):
-                p_dict = {c: int(np.random.randint(0, k)) for c in range(C)}
-                phase_map[key] = p_dict
-            else:
-                p_dict = p_entry
-            out_list = []
-            for c in range(C):
-                pc = int(min(max(int(p_dict.get(c, 0)), 0), k - 1))
-                pc = int((pc + (pos_native % k)) % k)
-                out_list.append(sig[pc::k, c])
-            # Stack columns back
-            maxlen = min(len(col) for col in out_list) if out_list else 0
-            if maxlen == 0:
-                return sig[:1, :]
-            arr = np.stack([col[:maxlen] for col in out_list], axis=1)
-            return arr
-
-    # Non-integer: phase-accumulator indices
-    if sig.ndim == 1:
-        if p_entry is None or not isinstance(p_entry, (int, float)):
-            p = float(np.random.uniform(0.0, factor))
-            phase_map[key] = p
-        else:
-            p = float(p_entry)
-        p_eff = p + (pos_native % factor)
-        nmax = int(np.floor((N - 1 - p_eff) / factor)) + 1 if N > 0 else 0
-        if nmax <= 0:
-            return sig[:1]
-        idx = np.floor(p_eff + np.arange(nmax, dtype=np.float64) * factor).astype(np.int64)
-        idx = np.clip(idx, 0, N - 1)
-        return sig[idx]
-    else:
-        C = sig.shape[1]
-        if p_entry is None or not isinstance(p_entry, dict):
-            p_dict = {c: float(np.random.uniform(0.0, factor)) for c in range(C)}
-            phase_map[key] = p_dict
-        else:
-            p_dict = p_entry
-        cols = []
-        minlen = None
-        for c in range(C):
-            pc = float(p_dict.get(c, 0.0))
-            pc_eff = pc + (pos_native % factor)
-            nmax = int(np.floor((N - 1 - pc_eff) / factor)) + 1 if N > 0 else 0
-            if nmax <= 0:
-                return sig[:1, :]
-            idx = np.floor(pc_eff + np.arange(nmax, dtype=np.float64) * factor).astype(np.int64)
-            idx = np.clip(idx, 0, N - 1)
-            col = sig[idx, c]
-            cols.append(col)
-            minlen = len(col) if minlen is None else min(minlen, len(col))
-        arr = np.stack([col[:minlen] for col in cols], axis=1)
-        return arr
+    """Strict decimation without anti-aliasing using persistent phase state stored in _stream['alias_phase']."""
+    # Delegate to the shared implementation, preserving ECG's alias_phase state
+    phase_state = _stream.setdefault("alias_phase", {})
+    return decimate_with_aliasing(sig, native_fs, target_fs, pos_native=pos_native, phase_state=phase_state)
 
 # Example of streaming a chunk
 def get_stream_chunk(duration_s=1.0):
@@ -542,6 +459,9 @@ def set_freq():
         _stream["fs"] = int(new_fs) # The *current* FS
         _stream["pos"] = 0
         _stream["alias_phase"] = {}
+        # Clear prediction buffers/history so predictions reflect new aliased stream only
+        _stream["pred_buffers"] = {}
+        _stream["pred_history"] = []
         
         # Preserve all buffers/state to avoid clearing history when sampling changes
         # Only reset position, keep prediction buffers, history, and other state intact
@@ -584,6 +504,9 @@ def set_sampling():
         _stream["fs"] = int(new_fs)
         _stream["pos"] = 0
         _stream["alias_phase"] = {}
+        # Clear prediction buffers/history so predictions reflect new aliased stream only
+        _stream["pred_buffers"] = {}
+        _stream["pred_history"] = []
         # Preserve buffers/state to avoid clearing history when sampling changes
         # Track sampling change timestamp and whether reduced
         _stream["last_sampling_change_ts"] = time.time()
@@ -608,6 +531,9 @@ def reset_sampling():
         _stream["fs"] = int(native_fs)
         _stream["pos"] = 0
         _stream["alias_phase"] = {}
+        # Clear prediction buffers/history on reset as well
+        _stream["pred_buffers"] = {}
+        _stream["pred_history"] = []
         # Preserve all buffers/state to avoid clearing history when resetting sampling
         # Only reset position, keep prediction buffers, history, and other state intact
         _stream["last_sampling_change_ts"] = time.time()
