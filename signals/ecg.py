@@ -694,16 +694,12 @@ def upload():
     
     # Attempt to load record if both .hea and .dat are present
     if saved["hea"] and saved["dat"]:
-        if wfdb is None:
-            msg.append(".hea + .dat detected, but WFDB is not installed. Install 'wfdb' or upload .csv/.txt/.npy.")
-            success = False
+        full_dat_path = os.path.join(upload_dir, base_name + ".dat")
+        if _try_load_record_after_upload(full_dat_path):
+            msg.append(f"Record loaded successfully. Diagnosis: {_stream.get('hea_diagnosis', 'Unknown')}")
+            success = True
         else:
-            full_dat_path = os.path.join(upload_dir, base_name + ".dat")
-            if _try_load_record_after_upload(full_dat_path):
-                msg.append(f"Record loaded successfully. Diagnosis: {_stream.get('hea_diagnosis', 'Unknown')}")
-                success = True
-            else:
-                msg.append("Failed to load uploaded record.")
+            msg.append("Failed to load uploaded record.")
     else:
         msg.append("Files uploaded. Please upload both .hea and .dat for record reload.")
         if saved["xyz"]:
@@ -720,50 +716,39 @@ def _try_load_record_after_upload(file_path):
     Uses WFDB if available; otherwise, treat as CSV/NumPy.
     """
     try:
-        # Extract diagnosis first (if .hea exists alongside record)
+        # EDITED: Extract diagnosis first
         record_base = file_path.replace(".dat", "")
         hea_diag = extract_diagnosis_from_hea(record_base)
-
-        # Normalize handling by file extension
-        ext = os.path.splitext(file_path)[1].lower()
-
-        if ext == ".dat" and wfdb is not None:
-            # Proper WFDB path for binary .dat
+        
+        if wfdb is not None and file_path.endswith(".dat"):
             sigs, names, fs = load_wfdb_record(record_base)
-        elif ext in (".csv", ".txt"):
-            # Text formats: use safe decoding; ignore undecodable bytes
-            with open(file_path, 'r', encoding='utf-8', errors='ignore') as fh:
-                data = np.loadtxt(fh, delimiter=',')
-            sigs = data.astype(np.float32)
-            names = [f"Lead {i+1}" for i in range(sigs.shape[1] if sigs.ndim > 1 else 1)]
-            if sigs.ndim == 1:
-                sigs = sigs[:, None]
-            fs = _stream.get("fs", FREQ_DEFAULT)
-        elif ext == ".npy":
-            # NumPy array
-            data = np.load(file_path)
-            sigs = data.astype(np.float32)
-            if sigs.ndim == 1:
-                sigs = sigs[:, None]
-            names = [f"Lead {i+1}" for i in range(sigs.shape[1])]
-            fs = _stream.get("fs", FREQ_DEFAULT)
+            update_data = {
+                "signals": sigs,
+                "signals_raw": sigs.copy(),
+                "channels": names,
+                "fs": fs,
+                "fs_native": fs, # ADDED: Store the true native FS
+                "pos": 0,
+                "record_path": file_path,
+                "loaded": True,
+                "hea_diagnosis": hea_diag # ADDED: Store diagnosis
+            }
         else:
-            # Unknown format or .dat without WFDB support: fail gracefully
-            logger.error("Unsupported ECG upload format '%s'. Install WFDB for .dat or upload .csv/.txt/.npy.", ext)
-            return False
-
-        update_data = {
-            "signals": sigs,
-            "signals_raw": sigs.copy(),
-            "channels": names,
-            "fs": fs,
-            "fs_native": fs,
-            "pos": 0,
-            "record_path": file_path,
-            "loaded": True,
-            "hea_diagnosis": hea_diag
-        }
-
+            # fallback: assume CSV
+            data = np.loadtxt(file_path, delimiter=',')
+            fs = _stream.get("fs", FREQ_DEFAULT)
+            update_data = {
+                "signals": data.astype(np.float32),
+                "signals_raw": data.astype(np.float32).copy(),
+                "channels": [f"Lead {i+1}" for i in range(data.shape[1])],
+                "fs": fs,
+                "fs_native": fs, # ADDED: Store the true native FS
+                "pos": 0,
+                "record_path": file_path,
+                "loaded": True,
+                "hea_diagnosis": hea_diag
+            }
+        
         # Reset all buffers on successful load
         _stream["pred_buffers"] = {}
         _stream["pred_history"] = []

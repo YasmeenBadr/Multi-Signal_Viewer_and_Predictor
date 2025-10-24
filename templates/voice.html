@@ -729,6 +729,9 @@ function reconstructSignal(downsampledRate, tempDownsampled) {
                 
                 const formData = new FormData();
                 formData.append('audio', wavFile);
+                // Include effective sample rate used before reconstruction
+                const effectiveSr2 = parseInt(frequencySlider.value);
+                formData.append('effective_sr', String(effectiveSr2));
                 // Pass effective sample rate to backend for aliasing-aware behavior
                 const effectiveSr = parseInt(frequencySlider.value);
                 formData.append('effective_sr', String(effectiveSr));
