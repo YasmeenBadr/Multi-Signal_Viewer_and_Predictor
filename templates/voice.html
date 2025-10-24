@@ -509,92 +509,72 @@ Audio API to convert the file into raw audio data that can be processed.*/
 
         // --- 2. Resampling Logic with Anti-Aliasing Filter ---
         
-       // Defines the main function, which takes the desired new sample rate as input.
-function resampleAudio(targetRate) {
-    // If no audio has been loaded, stop the function immediately.
-    if (!originalBuffer) return;
+        function resampleAudio(targetRate) {
+            if (!originalBuffer) return;
 
-    // Checks if the "Anti-Aliasing" switch is turned on in the user interface.
-    const useAntiAliasing = antiAliasingToggle.checked;
-    // Calculates the ratio for scaling down. e.g., A ratio of 4 means we keep 1 out of every 4 samples.
-    const ratio = originalRate / targetRate;
-    
-    // Calculates the duration of the audio clip in seconds.
-    const duration = originalBuffer.length / originalRate;
-    // Calculates the new no of samples of the downsampled audio clip in the same duration.
-    const downsampledLength = Math.floor(duration * targetRate);
+            const useAntiAliasing = antiAliasingToggle.checked;
+            const ratio = originalRate / targetRate;
+            
+            // Calculate new length to maintain same duration
+            // Duration = samples / sampleRate, so samples = duration * sampleRate
+            const duration = originalBuffer.length / originalRate;
+            const downsampledLength = Math.floor(duration * targetRate);
 
-    // Creates a temporary array to hold the low-quality audio data for all channels.
-    const tempDownsampled = [];
-    
-    // Starts a loop to process each audio channel separately.
-    for (let channel = 0; channel < originalBuffer.numberOfChannels; channel++) {
-        // Gets the raw audio data from the original, high-quality buffer for the current channel.
-        let originalData = originalBuffer.getChannelData(channel);
-        
-        // If the user enabled anti-aliasing...
-        if (useAntiAliasing) {
-            // ...replace the original data with the smoothed version from our filter function.
-            originalData = applyLowPassFilter(originalData, originalRate, targetRate / 2);
+            // Create a temporary downsampled buffer
+            const tempDownsampled = [];
+            
+            for (let channel = 0; channel < originalBuffer.numberOfChannels; channel++) {
+                let originalData = originalBuffer.getChannelData(channel);
+                
+                // Apply low-pass filter if anti-aliasing is enabled
+                if (useAntiAliasing) {
+                    originalData = applyLowPassFilter(originalData, originalRate, targetRate / 2);
+                }
+                
+                // Downsample: pick every Nth sample
+                const channelDownsampled = new Float32Array(downsampledLength);
+                for (let i = 0; i < downsampledLength; i++) {
+                    const originalIndex = Math.floor(i * ratio);
+                    channelDownsampled[i] = originalData[Math.min(originalIndex, originalData.length - 1)];
+                }
+                tempDownsampled.push(channelDownsampled);
+            }
+
+            // Build a low-rate buffer for classification with true target sample rate
+            resampledLowRateBuffer = audioContext.createBuffer(
+                originalBuffer.numberOfChannels,
+                downsampledLength,
+                targetRate
+            );
+            for (let channel = 0; channel < originalBuffer.numberOfChannels; channel++) {
+                const dst = resampledLowRateBuffer.getChannelData(channel);
+                dst.set(tempDownsampled[channel]);
+            }
+
+            // Now upsample back to original length to maintain playback duration
+            // This simulates what happens when you play low sample rate audio at normal speed
+            resampledBuffer = audioContext.createBuffer(
+                originalBuffer.numberOfChannels,
+                originalBuffer.length,
+                originalBuffer.sampleRate
+            );
+
+            for (let channel = 0; channel < originalBuffer.numberOfChannels; channel++) {
+                const downsampledData = tempDownsampled[channel];
+                const resampledData = resampledBuffer.getChannelData(channel);
+                
+                // Upsample using zero-order hold (repeat samples) to show aliasing
+                for (let i = 0; i < resampledData.length; i++) {
+                    const downsampledIndex = Math.floor(i / ratio);
+                    resampledData[i] = downsampledData[Math.min(downsampledIndex, downsampledData.length - 1)];
+                }
+            }
+
+            // Create reconstructed buffer (with better interpolation)
+            if (useAntiAliasing) {
+                reconstructSignal(targetRate, tempDownsampled);
+            }
         }
-        
-        // Creates a new, empty array to store the final downsampled (low-quality) audio.
-        const channelDownsampled = new Float32Array(downsampledLength);
-        // This loop performs the actual downsampling.
-        for (let i = 0; i < downsampledLength; i++) {
-            // Calculates which sample to pick from the original audio by scaling up the index `i`.
-            const originalIndex = Math.floor(i * ratio);
-            // Copies that single sample, discarding all others in between.
-            channelDownsampled[i] = originalData[Math.min(originalIndex, originalData.length - 1)];
-        }
-        // Adds the newly created low-quality channel data to our temporary array.
-        tempDownsampled.push(channelDownsampled);
-    }
-    
-    // --- At this point, `tempDownsampled` holds the low-quality audio data ---
-
-    // Creates a new audio buffer specifically for the classification engine. This buffer has the *true* low sample rate.
-    resampledLowRateBuffer = audioContext.createBuffer(
-        originalBuffer.numberOfChannels,
-        downsampledLength,
-        targetRate // Note: the sample rate is the new, low targetRate
-    );
-    // This loop copies the low-quality data into the new buffer.
-    for (let channel = 0; channel < originalBuffer.numberOfChannels; channel++) {
-        const dst = resampledLowRateBuffer.getChannelData(channel);
-        dst.set(tempDownsampled[channel]);
-    }
-
-    // Now, create a SEPARATE buffer for playback. This one is upsampled back to the original length and rate.
-    resampledBuffer = audioContext.createBuffer(
-        originalBuffer.numberOfChannels,
-        originalBuffer.length, // Back to the original full length
-        originalBuffer.sampleRate // Back to the original high sample rate
-    );
-
-    // Loop through each channel to perform the upsampling for playback.
-    for (let channel = 0; channel < originalBuffer.numberOfChannels; channel++) {
-        // Gets the low-quality data for the current channel.
-        const downsampledData = tempDownsampled[channel];
-        // Gets a reference to the output array where the upsampled data will be written.
-        const resampledData = resampledBuffer.getChannelData(channel);
-        
-        // This loop performs a simple "zero-order hold" upsampling, which sounds harsh and robotic.
-        // It's used to demonstrate what happens without proper interpolation.
-        for (let i = 0; i < resampledData.length; i++) {
-            // Calculates which sample from the small, low-quality array to use.
-            const downsampledIndex = Math.floor(i / ratio);
-            // Copies that sample. This same sample will be copied multiple times in a row, creating a "stair-step" effect.
-            resampledData[i] = downsampledData[Math.min(downsampledIndex, downsampledData.length - 1)];
-        }
-    }
-
-    // Finally, if anti-aliasing was used...
-    if (useAntiAliasing) {
-        // ...call the high-quality reconstruction function to create a third, clean-sounding version of the audio.
-        reconstructSignal(targetRate, tempDownsampled);
-    }
-}
 
         // Low-pass filter using simple moving average (anti-aliasing filter)
         function applyLowPassFilter(data, sampleRate, cutoffFreq) {
@@ -617,48 +597,35 @@ function resampleAudio(targetRate) {
         }
 
         // Reconstruct signal using linear interpolation (upsampling)
-       // Defines the function 'reconstructSignal'.
-function reconstructSignal(downsampledRate, tempDownsampled) {
-    // A "guard clause" that stops the function if there's no data to process.
-    if (!tempDownsampled) return;
+        function reconstructSignal(downsampledRate, tempDownsampled) {
+            if (!tempDownsampled) return;
 
-    // Recalculates the ratio needed to scale the short clip back up to the long one.
-    const ratio = originalRate / downsampledRate;
-    // Gets the target length, which is the length of the original high-quality audio.
-    const reconstructedLength = originalBuffer.length;
+            const ratio = originalRate / downsampledRate;
+            const reconstructedLength = originalBuffer.length;
 
-    // Creates a new, empty, full-length audio buffer to store the final high-quality result.
-    reconstructedBuffer = audioContext.createBuffer(
-        originalBuffer.numberOfChannels,
-        reconstructedLength,
-        originalBuffer.sampleRate
-    );
+            reconstructedBuffer = audioContext.createBuffer(
+                originalBuffer.numberOfChannels,
+                reconstructedLength,
+                originalBuffer.sampleRate
+            );
 
-    // Starts a loop to process each audio channel (e.g., left and right for stereo).
-    for (let channel = 0; channel < originalBuffer.numberOfChannels; channel++) {
-        // Gets the low-quality audio data for the current channel.
-        const downsampledData = tempDownsampled[channel];
-        // Gets a reference to the output array where the new, high-quality data will be written.
-        const reconstructedData = reconstructedBuffer.getChannelData(channel);
+            for (let channel = 0; channel < originalBuffer.numberOfChannels; channel++) {
+                const downsampledData = tempDownsampled[channel];
+                const reconstructedData = reconstructedBuffer.getChannelData(channel);
 
-        // Starts a loop to generate every single sample for the final, full-length audio.
-        for (let i = 0; i < reconstructedLength; i++) {
-            // Calculates the "ideal" position in the small, low-quality array. This will be a decimal number (e.g., 5.7).
-            const downsampledIndex = i / ratio;
-            // Finds the index of the known sample to the LEFT of our ideal position (e.g., 5).
-            const lowerIndex = Math.floor(downsampledIndex);
-            // Finds the index of the known sample to the RIGHT of our ideal position (e.g., 6).
-            const upperIndex = Math.min(lowerIndex + 1, downsampledData.length - 1);
-            // Calculates how far we are between the left and right points (e.g., 0.7 for 70% of the way).
-            const fraction = downsampledIndex - lowerIndex;
+                // Linear interpolation for upsampling (proper reconstruction)
+                for (let i = 0; i < reconstructedLength; i++) {
+                    const downsampledIndex = i / ratio;
+                    const lowerIndex = Math.floor(downsampledIndex);
+                    const upperIndex = Math.min(lowerIndex + 1, downsampledData.length - 1);
+                    const fraction = downsampledIndex - lowerIndex;
 
-            // This is the linear interpolation formula. It creates a new sample value by taking a weighted average
-            // of the left and right samples, effectively drawing a straight line between them.
-            reconstructedData[i] = downsampledData[lowerIndex] * (1 - fraction) + 
-                                  downsampledData[upperIndex] * fraction;
+                    // Linear interpolation
+                    reconstructedData[i] = downsampledData[lowerIndex] * (1 - fraction) + 
+                                          downsampledData[upperIndex] * fraction;
+                }
+            }
         }
-    }
-}
         
         // --- 3. Gender Classification Functions ---
         
@@ -729,9 +696,6 @@ function reconstructSignal(downsampledRate, tempDownsampled) {
                 
                 const formData = new FormData();
                 formData.append('audio', wavFile);
-                // Include effective sample rate used before reconstruction
-                const effectiveSr2 = parseInt(frequencySlider.value);
-                formData.append('effective_sr', String(effectiveSr2));
                 // Pass effective sample rate to backend for aliasing-aware behavior
                 const effectiveSr = parseInt(frequencySlider.value);
                 formData.append('effective_sr', String(effectiveSr));
