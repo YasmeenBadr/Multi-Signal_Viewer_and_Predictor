@@ -2,6 +2,8 @@ import os
 import sys
 from flask import Blueprint, render_template, request, jsonify
 from werkzeug.utils import secure_filename
+import io
+import base64
 
 # Try to import required libraries
 try:
@@ -19,19 +21,27 @@ except ImportError as e:
     print(f"Warning: librosa not available: {e}")
     LIBROSA_AVAILABLE = False
 
-# Optional audio header readers for detecting true sample rate of uploaded WAV
 try:
     import soundfile as sf
     SOUNDFILE_AVAILABLE = True
 except Exception as e:
     print(f"Warning: soundfile not available: {e}")
     SOUNDFILE_AVAILABLE = False
+
 try:
     import wave
     WAVE_AVAILABLE = True
 except Exception as e:
     print(f"Warning: wave module not available: {e}")
     WAVE_AVAILABLE = False
+
+# TensorFlow for anti-aliasing model
+try:
+    import tensorflow as tf
+    TF_AVAILABLE = True
+except ImportError as e:
+    print(f"Warning: TensorFlow not available: {e}")
+    TF_AVAILABLE = False
 
 # Add the voice-gender-classifier directory to the path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'voice-gender-classifier'))
@@ -46,9 +56,69 @@ except ImportError as e:
 # Define the blueprint for the Voice Processing Suite
 bp = Blueprint('voice', __name__, template_folder='templates')
 
-# Global model variable
+# Global model variables
 model = None
 device = None
+aa_model = None
+AA_MODEL_LOADED = False
+
+# Path to anti-aliasing model
+ANTI_ALIAS_MODEL_PATH = os.path.join(os.path.dirname(__file__), '..', 'models', 'anti_alias_model.h5')
+
+def load_antialiasing_model():
+    """Load the TensorFlow anti-aliasing model"""
+    global aa_model, AA_MODEL_LOADED
+    if not TF_AVAILABLE:
+        print("⚠ TensorFlow not available. Anti-aliasing will use standard upsampling.")
+        return
+    
+    if aa_model is None:
+        try:
+            aa_model = tf.keras.models.load_model(ANTI_ALIAS_MODEL_PATH, compile=False)
+            AA_MODEL_LOADED = True
+            print("✅ Anti-aliasing model loaded successfully!")
+        except Exception as e:
+            print(f"⚠ Could not load anti-aliasing model: {e}")
+            AA_MODEL_LOADED = False
+            aa_model = None
+
+def apply_antialiasing(y_input, sr_input, target_sr=16000):
+    """
+    Apply anti-aliasing reconstruction using the TensorFlow model.
+    If model is not available, perform standard upsampling.
+    """
+    if not AA_MODEL_LOADED or aa_model is None:
+        print("⚠ ML model not available, performing standard upsampling.")
+        return librosa.resample(y_input, orig_sr=sr_input, target_sr=target_sr)
+    
+    try:
+        model_len = 48000
+        y_upsampled = librosa.resample(y_input, orig_sr=sr_input, target_sr=target_sr)
+        
+        reconstructed_chunks = []
+        
+        for i in range(0, len(y_upsampled), model_len):
+            chunk = y_upsampled[i:i + model_len]
+            len_chunk = len(chunk)
+            
+            if len_chunk < model_len:
+                chunk = np.pad(chunk, (0, model_len - len_chunk), mode='constant')
+            
+            model_input = chunk[np.newaxis, ..., np.newaxis]
+            pred_chunk = np.squeeze(aa_model.predict(model_input, verbose=0))
+            
+            if len_chunk < model_len:
+                pred_chunk = pred_chunk[:len_chunk]
+            
+            reconstructed_chunks.append(pred_chunk)
+        
+        y_reconstructed = np.concatenate(reconstructed_chunks)
+        print(f"✅ ML anti-aliasing applied successfully")
+        return y_reconstructed
+        
+    except Exception as e:
+        print(f"❌ Error during ML anti-aliasing: {e}")
+        return librosa.resample(y_input, orig_sr=sr_input, target_sr=target_sr)
 
 def load_model():
     """Load the gender classification model"""
@@ -66,31 +136,31 @@ def load_model():
 
 @bp.route("/")
 def voice_dashboard():
-    """Renders the voice processing template, accessible via /voice."""
+    """Renders the voice processing template"""
     return render_template("voice.html")
 
 @bp.route("/classify", methods=["POST"])
 def classify_gender():
     """Classify the gender of the uploaded audio file"""
     try:
-        # Check if dependencies are available
         if not TORCH_AVAILABLE:
-            return jsonify({"error": "PyTorch is not installed. Please install: pip install torch torchaudio"}), 500
+            return jsonify({"error": "PyTorch is not installed"}), 500
         
         if not LIBROSA_AVAILABLE:
-            return jsonify({"error": "librosa is not installed. Please install: pip install librosa"}), 500
+            return jsonify({"error": "librosa is not installed"}), 500
         
         if not MODEL_AVAILABLE:
-            return jsonify({"error": "Model not available. Please check voice-gender-classifier directory"}), 500
+            return jsonify({"error": "Model not available"}), 500
         
-        # Load model if not already loaded
         if model is None:
             try:
                 load_model()
             except Exception as e:
                 return jsonify({"error": f"Failed to load model: {str(e)}"}), 500
         
-        # Check if file is present
+        if aa_model is None:
+            load_antialiasing_model()
+        
         if 'audio' not in request.files:
             return jsonify({"error": "No audio file provided"}), 400
         
@@ -98,7 +168,9 @@ def classify_gender():
         if file.filename == '':
             return jsonify({"error": "No file selected"}), 400
         
-        # Save the uploaded file temporarily
+        # Check if anti-aliasing should be applied (ML model or raw)
+        use_antialiasing = request.form.get('use_antialiasing', 'false').lower() == 'true'
+        
         upload_folder = os.path.join(os.path.dirname(__file__), '..', 'uploads')
         os.makedirs(upload_folder, exist_ok=True)
         
@@ -106,34 +178,47 @@ def classify_gender():
         filepath = os.path.join(upload_folder, filename)
         file.save(filepath)
         
-        # Perform gender classification
+        # Apply ML anti-aliasing if requested and model is available
+        if use_antialiasing:
+            if AA_MODEL_LOADED:
+                try:
+                    y, sr = librosa.load(filepath, sr=None)
+                    y_enhanced = apply_antialiasing(y, sr, target_sr=16000)
+                    
+                    enhanced_path = filepath.replace('.wav', '_ml_enhanced.wav')
+                    sf.write(enhanced_path, y_enhanced, 16000)
+                    filepath = enhanced_path
+                    print("✅ Using ML-enhanced audio for classification")
+                except Exception as e:
+                    print(f"⚠ ML anti-aliasing failed: {e}")
+                    use_antialiasing = False
+            else:
+                print("⚠ ML model not loaded, processing raw signal")
+                use_antialiasing = False
+        
+        # Perform classification
         try:
             with torch.no_grad():
                 result = model.predict(filepath, device=device)
-                # Handle both old (string) and new (tuple) return formats
                 if isinstance(result, tuple):
                     gender, model_confidence = result
-                    print(f"[DEBUG] Using new model format: {gender} with confidence {model_confidence:.4f}")
                 else:
-                    # Fallback for old model version - get confidence manually
                     gender = result
-                    # Load audio and get model output directly
                     audio = model.load_audio(filepath).to(device)
                     output = model.forward(audio)
                     probabilities = torch.softmax(output, dim=1)
                     model_confidence = probabilities.max(1)[0].item()
-                    print(f"[DEBUG] Using fallback method: {gender} with confidence {model_confidence:.4f}")
 
-            # Aliasing-aware override: detect effective sample rate either from client hint or file header
+            # Get effective sample rate for raw undersampled signals
             try:
                 eff_sr_str = request.form.get('effective_sr', None)
                 eff_sr = int(float(eff_sr_str)) if eff_sr_str is not None else None
             except Exception:
                 eff_sr = None
 
+            # Detect sample rate if not provided
             detected_sr = None
-            if eff_sr is None:
-                # Try to detect true sample rate of uploaded audio without resampling
+            if eff_sr is None and not use_antialiasing:
                 try:
                     if SOUNDFILE_AVAILABLE:
                         info = sf.info(filepath)
@@ -141,57 +226,46 @@ def classify_gender():
                     elif WAVE_AVAILABLE and filepath.lower().endswith('.wav'):
                         with wave.open(filepath, 'rb') as wf:
                             detected_sr = int(wf.getframerate())
-                except Exception as det_err:
-                    print(f"[WARN] Could not detect uploaded audio sample rate: {det_err}")
+                except Exception:
+                    pass
 
             eff_sr_final = eff_sr if eff_sr is not None else detected_sr
 
-            if eff_sr_final is not None and eff_sr_final <= 7200:
+            # Apply corrections for severely undersampled signals (only for raw, not ML-enhanced)
+            if not use_antialiasing and eff_sr_final is not None and eff_sr_final <= 7200:
                 gender = 'female' if gender == 'male' else 'male'
-                # Moderate the confidence to reflect uncertainty under severe downsampling
                 model_confidence = max(0.55, min(0.75, float(model_confidence)))
         except Exception as e:
-            # Clean up the temporary file
             try:
                 os.remove(filepath)
             except:
                 pass
-            return jsonify({"error": f"Model prediction failed: {str(e)}"}), 500
+            return jsonify({"error": f"Prediction failed: {str(e)}"}), 500
         
-        # Extract additional audio features for display
+        # Extract pitch
         avg_pitch = 0
         if LIBROSA_AVAILABLE:
             try:
-                audio, sr = librosa.load(filepath, sr=16000)
-                
-                # Calculate pitch (fundamental frequency)
-                pitches, magnitudes = librosa.piptrack(y=audio, sr=sr)
+                audio_data, sr = librosa.load(filepath, sr=16000)
+                pitches, magnitudes = librosa.piptrack(y=audio_data, sr=sr)
                 pitch_values = []
                 for t in range(pitches.shape[1]):
                     index = magnitudes[:, t].argmax()
                     pitch = pitches[index, t]
                     if pitch > 0:
                         pitch_values.append(pitch)
-                
                 avg_pitch = np.mean(pitch_values) if pitch_values else 0
-            except Exception as e:
-                print(f"Warning: Could not extract pitch: {e}")
-                # Use default pitch values based on gender
+            except Exception:
                 avg_pitch = 120 if gender == 'male' else 210
         else:
-            # Use default pitch values based on gender if librosa not available
             avg_pitch = 120 if gender == 'male' else 210
 
-        # If severe/low effective sampling rate indicated or detected, increase pitch significantly
+        # Adjust pitch for severely undersampled raw signals
         try:
-            if (locals().get('eff_sr') is not None and locals().get('eff_sr') <= 7200) or \
-               (locals().get('eff_sr_final') is not None and locals().get('eff_sr_final') <= 7200):
-                # Ensure we start from a reasonable baseline
+            if not use_antialiasing and eff_sr_final is not None and eff_sr_final <= 7200:
                 if not isinstance(avg_pitch, (int, float)) or avg_pitch <= 0:
                     avg_pitch = 120 if gender == 'male' else 210
-                # Boost pitch strongly to reflect aliasing/perceptual change request
                 avg_pitch = float(avg_pitch) * 1.8
-                # Clamp to reasonable minimums for the flipped/returned gender space
                 if gender == 'female':
                     avg_pitch = max(230.0, avg_pitch)
                 else:
@@ -199,24 +273,26 @@ def classify_gender():
         except Exception:
             pass
         
-        # Use the actual model confidence from softmax probabilities
         confidence = model_confidence
         
-        # Clean up the temporary file
+        # Cleanup
         try:
             os.remove(filepath)
+            if use_antialiasing:
+                enhanced_path = filepath.replace('.wav', '_ml_enhanced.wav')
+                if os.path.exists(enhanced_path):
+                    os.remove(enhanced_path)
         except:
             pass
         
         return jsonify({
             "gender": gender,
             "confidence": float(confidence),
-            "pitch": float(avg_pitch)
+            "pitch": float(avg_pitch),
+            "antialiasing_applied": use_antialiasing and AA_MODEL_LOADED
         })
     
     except Exception as e:
         import traceback
-        error_details = traceback.format_exc()
-        print(f"Error in classification: {e}")
-        print(error_details)
+        print(traceback.format_exc())
         return jsonify({"error": f"Classification failed: {str(e)}"}), 500
