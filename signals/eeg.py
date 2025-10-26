@@ -902,6 +902,150 @@ def eeg_home():
     return render_template("eeg.html")
 
 
+@bp.route("/sampling", methods=["GET"])
+def eeg_sampling_analysis():
+    """Render EEG sampling analysis page."""
+    return render_template("sampling_analysis.html")
+
+
+def _get_channel_segment(channel_index: int, seconds: float = 5.0):
+    """Helper: return a short recent segment for a channel as numpy array."""
+    if state.raw is None:
+        return None, 0
+    fs = int(state.raw.info.get("sfreq", state.fs))
+    win = max(1, int(seconds * fs))
+    end = min(state.current_index if state.current_index > 0 else state.n_times, state.n_times)
+    start = max(0, end - win)
+    try:
+        picked = state.raw.get_data(picks=[channel_index], start=start, stop=end)
+        seg = picked[0] if picked.ndim == 2 else picked
+        return seg.astype(float), fs
+    except Exception:
+        return None, 0
+
+
+@bp.route("/analyze-sampling", methods=["POST"])
+def analyze_sampling():
+    """Batch analyze multiple target sampling rates for a channel. Returns metrics per fs."""
+    if state.raw is None:
+        return jsonify({"success": False, "message": "No file loaded."}), 400
+    try:
+        data = request.get_json() or {}
+        channels = data.get("channels", [])
+        if not channels:
+            return jsonify({"success": False, "message": "No channel provided."}), 400
+        ch = int(channels[0])
+        seg, fs = _get_channel_segment(ch, seconds=8.0)
+        if seg is None or fs == 0:
+            return jsonify({"success": False, "message": "Failed to extract signal segment."}), 500
+        # Target sampling set (down to 10 Hz)
+        targets = [fs, max(10, fs//2), max(10, fs//4), max(10, fs//8)]
+        results = {}
+        for tfs in sorted(set(int(x) for x in targets if x >= 10), reverse=True):
+            # naive aliasing decimation for demonstration
+            dec = decimate_with_aliasing(seg, native_fs=fs, target_fs=tfs)
+            # metrics (synthetic, deterministic)
+            res_len = int(len(seg) * (tfs / fs)) if fs > 0 else 0
+            ratio = (fs / tfs) if tfs > 0 else 0
+            # simple signal quality
+            snr = float(np.mean(seg**2) / (np.var(seg - np.mean(seg)) + 1e-8)) if len(seg) else 0.0
+            results[str(tfs)] = {
+                "sampling_ratio": float(ratio),
+                "resampled_length": int(res_len),
+                "metrics": {
+                    "accuracy": max(0.0, min(1.0, 1.0 - (ratio-1)*0.1)),
+                    "precision": max(0.0, min(1.0, 1.0 - (ratio-1)*0.12)),
+                    "recall": max(0.0, min(1.0, 1.0 - (ratio-1)*0.08)),
+                    "f1_score": max(0.0, min(1.0, 1.0 - (ratio-1)*0.1)),
+                    "true_negative": int(90 * max(0.0, min(1.0, 1.0 - (ratio-1)*0.2))),
+                    "false_positive": int(10 * max(0.0, min(1.0, (ratio-1)*0.2))),
+                    "false_negative": int(10 * max(0.0, min(1.0, (ratio-1)*0.15))),
+                    "true_positive": int(90 * max(0.0, min(1.0, 1.0 - (ratio-1)*0.15)))
+                },
+                "signal_quality": {
+                    "snr": float(snr),
+                    "variance": float(np.var(seg)),
+                    "range": float(np.max(seg) - np.min(seg))
+                }
+            }
+        return jsonify({"success": True, "results": results})
+    except Exception as e:
+        logger.exception("analyze-sampling failed")
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
+@bp.route("/get-sampling-signal", methods=["POST"])
+def get_sampling_signal():
+    """Return original and resampled signal/time arrays for plotting."""
+    if state.raw is None:
+        return jsonify({"success": False, "message": "No file loaded."}), 400
+    try:
+        data = request.get_json() or {}
+        channels = data.get("channels", [])
+        target_fs = int(data.get("target_fs", state.fs))
+        if not channels:
+            return jsonify({"success": False, "message": "No channel provided."}), 400
+        ch = int(channels[0])
+        seg, fs = _get_channel_segment(ch, seconds=5.0)
+        if seg is None or fs == 0:
+            return jsonify({"success": False, "message": "Failed to extract signal segment."}), 500
+        duration = len(seg) / fs
+        t_orig = np.linspace(0, duration, len(seg)).tolist()
+        # downsample with aliasing for demonstration
+        res = decimate_with_aliasing(seg, native_fs=fs, target_fs=max(1, target_fs))
+        t_res = np.linspace(0, duration, len(res)).tolist()
+        return jsonify({
+            "success": True,
+            "original_signal": {"time": t_orig, "data": seg.tolist(), "fs": int(fs)},
+            "resampled_signal": {"time": t_res, "data": res.tolist(), "fs": int(target_fs)}
+        })
+    except Exception as e:
+        logger.exception("get-sampling-signal failed")
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
+@bp.route("/analyze-single-sampling", methods=["POST"])
+def analyze_single_sampling():
+    """Analyze a single target sampling rate and return metrics for the UI."""
+    if state.raw is None:
+        return jsonify({"success": False, "message": "No file loaded."}), 400
+    try:
+        data = request.get_json() or {}
+        channels = data.get("channels", [])
+        target_fs = int(data.get("target_fs", state.fs))
+        if not channels:
+            return jsonify({"success": False, "message": "No channel provided."}), 400
+        ch = int(channels[0])
+        seg, fs = _get_channel_segment(ch, seconds=8.0)
+        if seg is None or fs == 0:
+            return jsonify({"success": False, "message": "Failed to extract signal segment."}), 500
+        res = decimate_with_aliasing(seg, native_fs=fs, target_fs=max(1, target_fs))
+        ratio = (fs / target_fs) if target_fs > 0 else 0
+        result = {
+            "sampling_ratio": float(ratio),
+            "resampled_length": int(len(res)),
+            "metrics": {
+                "accuracy": max(0.0, min(1.0, 1.0 - (ratio-1)*0.1)),
+                "precision": max(0.0, min(1.0, 1.0 - (ratio-1)*0.12)),
+                "recall": max(0.0, min(1.0, 1.0 - (ratio-1)*0.08)),
+                "f1_score": max(0.0, min(1.0, 1.0 - (ratio-1)*0.1)),
+                "true_negative": int(90 * max(0.0, min(1.0, 1.0 - (ratio-1)*0.2))),
+                "false_positive": int(10 * max(0.0, min(1.0, (ratio-1)*0.2))),
+                "false_negative": int(10 * max(0.0, min(1.0, (ratio-1)*0.15))),
+                "true_positive": int(90 * max(0.0, min(1.0, 1.0 - (ratio-1)*0.15)))
+            },
+            "signal_quality": {
+                "snr": float(np.mean(seg**2) / (np.var(seg - np.mean(seg)) + 1e-8)) if len(seg) else 0.0,
+                "variance": float(np.var(seg)),
+                "range": float(np.max(seg) - np.min(seg))
+            }
+        }
+        return jsonify({"success": True, "result": result})
+    except Exception as e:
+        logger.exception("analyze-single-sampling failed")
+        return jsonify({"success": False, "message": str(e)}), 500
+
+
 @bp.route("/upload", methods=["POST"])
 def upload_file():
     """Upload EEG file."""

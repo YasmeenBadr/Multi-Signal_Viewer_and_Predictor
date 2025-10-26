@@ -42,9 +42,9 @@
 
         .header h1 { font-size: 1.75rem; font-weight: 800; margin: 0; color: #ffffff; text-shadow: 0 1px 2px rgba(0,0,0,0.25); }
 
-        .status-indicator { display: flex; align-items: center; gap: 0.75rem; background: rgba(255,255,255,0.2); padding: 0.5rem 1rem; border-radius: 20px; font-size: 0.9rem; font-weight: 600; }
-        .status-dot { width: 10px; height: 10px; border-radius: 50%; background: #10b981; animation: pulse 2s infinite; }
-        .status-dot.inactive { background: #ef4444; animation: none; }
+        .status-indicator { display: none !important; }
+        .status-dot { display: none !important; }
+        .status-dot.inactive { display: none !important; }
 
         /* Header navigation buttons */
         .header .nav { display: flex; gap: 0.5rem; }
@@ -138,10 +138,7 @@
 <body>
 <div class="header">
     <h1>EEG Viewer</h1>
-    <div class="status-indicator">
-        <div class="status-dot inactive" id="statusDot"></div>
-        <span id="statusText">Ready</span>
-    </div>
+    
     <div class="nav">
         <button id="timeModeButton" class="btn-secondary" type="button">Time Graph</button>
         <button id="polarModeButton" class="btn-secondary" type="button">Polar Graph</button>
@@ -252,6 +249,7 @@
                 <div id="predictionResults" style="font-size: 0.9rem; color: var(--text-light);">
                     <div style="text-align: center; padding: 1rem;">Click "Run Disease Predictions" to analyze EEG data.</div>
                 </div>
+                <a id="samplingAnalysisUnderPrediction" href="/eeg/sampling" class="btn-secondary" style="width:100%; margin-top:0.75rem; text-align:center; display:inline-block;">Sampling Analysis</a>
             </div>
         </div>
 
