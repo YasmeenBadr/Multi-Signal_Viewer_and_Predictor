@@ -40,11 +40,34 @@
           animation: slideDown 0.6s ease-out;
         }
 
-        .header h1 { font-size: 1.75rem; font-weight: 800; margin: 0; }
+        .header h1 { font-size: 1.75rem; font-weight: 800; margin: 0; color: #ffffff; text-shadow: 0 1px 2px rgba(0,0,0,0.25); }
 
         .status-indicator { display: flex; align-items: center; gap: 0.75rem; background: rgba(255,255,255,0.2); padding: 0.5rem 1rem; border-radius: 20px; font-size: 0.9rem; font-weight: 600; }
         .status-dot { width: 10px; height: 10px; border-radius: 50%; background: #10b981; animation: pulse 2s infinite; }
         .status-dot.inactive { background: #ef4444; animation: none; }
+
+        /* Header navigation buttons */
+        .header .nav { display: flex; gap: 0.5rem; }
+        .header .nav .btn-secondary {
+          background: rgba(255,255,255,0.15);
+          color: #ffffff;
+          border: 2px solid rgba(255,255,255,0.25);
+          padding: 0.5rem 0.9rem;
+          border-radius: 10px;
+          transition: all 0.2s ease;
+        }
+        .header .nav .btn-secondary:hover {
+          background: rgba(255,255,255,0.25);
+          transform: translateY(-1px);
+          border-color: rgba(255,255,255,0.35);
+        }
+        .header .nav .btn-secondary.active {
+          background: linear-gradient(135deg, var(--accent) 0%, var(--secondary) 100%);
+          color: #ffffff;
+          border-color: transparent;
+          box-shadow: 0 6px 16px rgba(236,72,153,0.35);
+          transform: translateY(-1px);
+        }
 
         .main-container { display: grid; grid-template-columns: 280px 1fr 320px; gap: 1.5rem; padding: 1.5rem 2rem; max-width: 1600px; margin: 0 auto; min-height: calc(100vh - 80px); }
 
@@ -119,6 +142,11 @@
         <div class="status-dot inactive" id="statusDot"></div>
         <span id="statusText">Ready</span>
     </div>
+    <div class="nav">
+        <button id="timeModeButton" class="btn-secondary" type="button">Time Graph</button>
+        <button id="polarModeButton" class="btn-secondary" type="button">Polar Graph</button>
+        <button id="recurrenceModeButton" class="btn-secondary" type="button">Recurrence Graph</button>
+    </div>
 </div>
 
 <div class="main-container">
@@ -162,7 +190,7 @@
                 <label>Stream Speed (x)</label>
                 <input id="speedMultiplier" type="number" min="0.1" max="5.0" step="0.1" value="1.0"/>
             </div>
-            <div class="form-group">
+            <div class="form-group" id="graphModeGroup" style="display:none;">
                 <label>Display Mode</label>
                 <select id="graphMode">
                     <option value="time">Time Graph (Multi-Channel Stacked)</option>
@@ -174,7 +202,7 @@
 
         <div class="sidebar-section">
             <h3>🔧 Advanced</h3>
-            <div class="form-group">
+            <div class="form-group" id="fsContainer">
                 <label>Sampling Frequency (Hz) <span id="fsValue" class="form-text"></span></label>
                 <input id="fsSlider" type="range" min="1" max="160" value="160" step="1" style="width: 100%; cursor: pointer;"/>
             </div>
@@ -191,7 +219,7 @@
             <div class="form-group" id="mainPolarModeContainer" style="display:none;">
                 <label><input type="checkbox" id="mainCumulativePolarCheckbox"/> Cumulative Polar Plot</label>
             </div>
-            <div class="form-group">
+            <div class="form-group" id="downsampleContainer">
                 <label>Downsampling Factor (Aliasing Effect) <span id="downsampleValue">1x</span></label>
                 <input type="range" id="downsampleSlider" min="1" max="32" value="1" step="1" style="width: 100%; cursor: pointer;"/>
                 <div class="form-text">Higher values cause aliasing and affect prediction accuracy</div>
@@ -282,21 +310,26 @@
         const startContinueButton = document.getElementById('startContinueButton');
         const pauseButton = document.getElementById('pauseButton');
         const stopButton = document.getElementById('stopButton');
+        // Common inputs
+        const fsSlider = document.getElementById('fsSlider');
+        const fsValue = document.getElementById('fsValue');
+        const widthInput = document.getElementById('width');
+        const speedMultiplierInput = document.getElementById('speedMultiplier');
+        // Plot containers
+        const plotDiv = document.getElementById('plot');
+        const bandPowerPlotDiv = document.getElementById('bandPowerPlot');
+        // Channel section
         const channelListDiv = document.getElementById('channelList');
         const channelForm = document.getElementById('channelForm');
-        // The div with id="plot" is *inside* the div with class="plot-container"
-        const plotContainerOuterDiv = document.querySelector('.plot-container'); // This is the container 
-        const plotDiv = document.getElementById('plot'); // The Plotly target div
-        const bandPowerPlotDiv = document.getElementById('bandPowerPlot'); 
-        const graphModeSelector = document.getElementById('graphMode');
         const montageSelector = document.getElementById('montageSelector');
         const montageSelectorContainer = document.getElementById('montageSelectorContainer');
         const channelInstructions = document.getElementById('channelInstructions');
-        const channelSelectionContainer = document.getElementById('channelSelectionContainer'); 
-        const speedMultiplierInput = document.getElementById('speedMultiplier');
-        const widthInput = document.getElementById('width'); 
-        const fsSlider = document.getElementById('fsSlider');
-        const fsValue = document.getElementById('fsValue');
+        const channelSelectionContainer = document.getElementById('channelSelectionContainer');
+        // Mode selection
+        const graphModeSelector = document.getElementById('graphMode');
+        const timeModeButton = document.getElementById('timeModeButton');
+        const polarModeButton = document.getElementById('polarModeButton');
+        const recurrenceModeButton = document.getElementById('recurrenceModeButton');
         
     // New Controls
     const polarModeContainer = document.getElementById('polarModeContainer');
@@ -402,7 +435,8 @@
         
         // --- SPEED CONTROL FUNCTIONS ---
         function getIntervalDelay() {
-            streamSpeedMultiplier = parseFloat(speedMultiplierInput.value) || 1.0;
+            const spEl = document.getElementById('speedMultiplier');
+            streamSpeedMultiplier = parseFloat(spEl && spEl.value) || 1.0;
             return Math.max(20, Math.floor(BASE_INTERVAL_MS / streamSpeedMultiplier)); 
         }
 
@@ -432,8 +466,11 @@
             }
         }
 
-        speedMultiplierInput.addEventListener('change', resetStreamingInterval);
-        speedMultiplierInput.addEventListener('input', resetStreamingInterval);
+        const __spEl = document.getElementById('speedMultiplier');
+        if (__spEl) {
+            __spEl.addEventListener('change', resetStreamingInterval);
+            __spEl.addEventListener('input', resetStreamingInterval);
+        }
         widthInput.addEventListener('change', () => {
              width = parseFloat(widthInput.value);
         });
@@ -596,12 +633,12 @@
             // Hide both polar mode containers by default
             if (polarModeContainer) { polarModeContainer.classList.add('hidden'); }
             mainPolarModeContainer.style.display = 'none';
-            colormapContainer.classList.add('hidden');
+            colormapContainer.style.display = 'none';
 
             if (currentMode === 'recurrence') {
                 channelInstructions.classList.remove('hidden');
                 channelInstructions.innerHTML = '⚠️ **RECURRENCE GRAPH (Phase Space Density):** Please select **two channels (ChX and ChY)** to generate a density heatmap of their relationship.';
-                colormapContainer.classList.remove('hidden');
+                colormapContainer.style.display = '';
             } else if (currentMode === 'polar') {
                 // Show polar mode controls in main plot area
                 mainPolarModeContainer.style.display = '';
@@ -616,7 +653,38 @@
         
         graphModeSelector.addEventListener('change', () => {
             toggleChannelListDisplay(); 
+            updateModeButtonsActive();
         });
+
+        function updateModeButtonsActive() {
+            const mode = graphModeSelector ? graphModeSelector.value : 'time';
+            if (timeModeButton) timeModeButton.classList.toggle('active', mode === 'time');
+            if (polarModeButton) polarModeButton.classList.toggle('active', mode === 'polar');
+            if (recurrenceModeButton) recurrenceModeButton.classList.toggle('active', mode === 'recurrence');
+        }
+
+        // Wire top header mode buttons
+        if (timeModeButton) {
+            timeModeButton.addEventListener('click', () => {
+                graphModeSelector.value = 'time';
+                graphModeSelector.dispatchEvent(new Event('change'));
+                if (isStreaming) { stopStreaming(); }
+            });
+        }
+        if (polarModeButton) {
+            polarModeButton.addEventListener('click', () => {
+                graphModeSelector.value = 'polar';
+                graphModeSelector.dispatchEvent(new Event('change'));
+                if (isStreaming) { stopStreaming(); }
+            });
+        }
+        if (recurrenceModeButton) {
+            recurrenceModeButton.addEventListener('click', () => {
+                graphModeSelector.value = 'recurrence';
+                graphModeSelector.dispatchEvent(new Event('change'));
+                if (isStreaming) { stopStreaming(); }
+            });
+        }
 
         // --- FILE UPLOAD HANDLERS ---
         function handleFileUpload(file) {
@@ -661,6 +729,7 @@
                     graphModeSelector.value = 'time'; 
                     montageSelector.value = 'none';
                     toggleChannelListDisplay(); 
+                    updateModeButtonsActive();
                     
                     Plotly.purge(plotDiv.id); 
                     plotDiv.innerHTML = '<div style="width:100%;height:100%;"><div class="text-center p-10 text-xl text-gray-500">Select channels and click \'Start Streaming\'.</div></div>';
@@ -884,13 +953,13 @@
 
                     const individualTrace = [{ x: [], y: [], mode: 'lines', line: { color: colors[i % colors.length] }, name: chName }];
                     const individualLayout = {
-                        title: '',
+                        title: { text: '', font: { size: 11 } },
                         paper_bgcolor: '#ffffff',
                         plot_bgcolor: '#ffffff',
                         font: { color: '#1e293b', family: 'Inter', size: 10 },
                         showlegend: false,
                         autosize: true,
-                        margin: { t: 10, r: 10, b: 18, l: 40 },
+                        margin: { t: 28, r: 10, b: 18, l: 40 },
                         xaxis: {
                             title: (i === selected.length - 1) ? 'Time (s)' : '',
                             color: '#1e293b',
@@ -1165,6 +1234,8 @@
             if (document.getElementById('cumulativePolarCheckbox')) {
                 isCumulativePolar = document.getElementById('cumulativePolarCheckbox').checked;
             }
+            // Set initial active mode state
+            try { updateModeButtonsActive(); } catch(_){}
         });
 
     </script>

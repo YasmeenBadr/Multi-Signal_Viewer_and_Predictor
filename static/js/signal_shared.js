@@ -140,7 +140,25 @@
         const plotId = `${ids.timePrefix}${chIndex}`;
         const raw = result.signals[String(chIndex)] || [];
         if (!raw.length) return;
-        SS.updateBuffer(buffers[chIndex], raw, timeChunk, Math.round(width * fs));
+        // Ensure incoming chunk matches the view sampling length (M)
+        const use = (raw.length === M) ? raw : SS.resampleWithAliasing(raw, M);
+        // Defensive: make sure buffer object exists with expected shape
+        if (!buffers[chIndex] || !Array.isArray(buffers[chIndex].data) || !Array.isArray(buffers[chIndex].time)) {
+          buffers[chIndex] = { data: [], time: [] };
+        }
+        // Push new samples
+        buffers[chIndex].data.push(...use);
+        buffers[chIndex].time.push(...timeChunk);
+        // Time-based trimming: keep only the last `width` seconds using timestamps, not sample count.
+        const cutoff = globalTime - width;
+        let drop = 0;
+        const tArr = buffers[chIndex].time;
+        // Find first index whose time is within the window
+        while (drop < tArr.length && tArr[drop] < cutoff) drop++;
+        if (drop > 0){
+          buffers[chIndex].data.splice(0, drop);
+          buffers[chIndex].time.splice(0, drop);
+        }
         const xUpdate = [buffers[chIndex].time];
         const yUpdate = [buffers[chIndex].data];
         Plotly.restyle(plotId, { x: xUpdate, y: yUpdate });
