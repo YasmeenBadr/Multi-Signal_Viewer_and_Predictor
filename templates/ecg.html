@@ -25,9 +25,8 @@
   }
 
   .plot-container {
-    background: #ffffff;
-    padding: 12px;
-    
+    background: transparent;
+    padding: 0;
     margin-bottom: 16px;
   }
 
@@ -68,7 +67,7 @@
 
   /* Drop zone */
   #dropZone {
-    border: 2px dashed #6366f1;
+    border: 2px dashed #8b5cf6;
     padding: 12px;
     border-radius: 8px;
     background: #eef2ff;
@@ -76,7 +75,7 @@
     text-align: center;
   }
   #pickFiles {
-    color:#6366f1;
+    color:#8b5cf6;
     text-decoration: underline;
     cursor: pointer;
   }
@@ -106,20 +105,79 @@
     color: #1e293b;
     cursor: pointer;
   }
-  .form-check-input { cursor: pointer; accent-color:#6366f1; }
+  .form-check-input { cursor: pointer; accent-color:#8b5cf6; }
+  /* EEG-like channel list spacing */
+  #channelList { max-height: 240px; overflow-y: auto; padding: 0.5rem 0; }
+  #channelList .form-check { display:flex; align-items:center; gap:.5rem; margin-bottom: .35rem; }
+  #channelList .form-check-input { width: 18px; height: 18px; }
+  #channelList .form-check-label { font-size: 0.9rem; font-weight: 500; }
   /* Emphasize label when selected */
   .form-check-input:checked + .form-check-label { font-weight:700; color:#1f2937; }
   /* Stronger visible state for checked boxes */
   .form-check-input:checked { background-color:#6366f1 !important; border-color:#6366f1 !important; box-shadow: 0 0 0 2px rgba(139,92,246,.15); }
   .form-check-input:focus { border-color:#6366f1; box-shadow: 0 0 0 0.15rem rgba(139,92,246,.25); }
+  /* Custom purple check icon inside the box (only for channel list) */
+  #channelList .form-check-input {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    width: 18px; height: 18px;
+    border: 2px solid #94a3b8; /* slate-400 */
+    border-radius: 4px;
+    background-color: #ffffff;
+    position: relative;
+    display: inline-block;
+    vertical-align: middle;
+    transition: border-color .15s ease, box-shadow .15s ease;
+  }
+  #channelList .form-check-input:hover { border-color: #6366f1; }
+  #channelList .form-check-input:focus { outline: none; border-color: #6366f1; box-shadow: 0 0 0 2px rgba(99,102,241,0.15); }
+  #channelList .form-check-input:checked {
+    border-color: #8b5cf6;
+    background-color: #ffffff; /* keep white box */
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M20 6L9 17l-5-5' fill='none' stroke='%238b5cf6' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: 16px 16px;
+    box-shadow: 0 0 0 2px rgba(139,92,246,.15);
+  }
+  /* Keep 'choose files' link color consistent */
+  #pickFiles { color:#8b5cf6; text-decoration: underline; cursor: pointer; }
+  #pickFiles:hover, #pickFiles:active, #pickFiles:focus { color:#8b5cf6; outline:none; }
+  /* Keep drop zone background stable (no red on click) */
+  #dropZone {
+    border: 2px dashed #8b5cf6;
+    background: #ffffff;
+    border-radius: 8px;
+    padding: 1rem;
+    text-align: center;
+    transition: border-color .15s ease, box-shadow .15s ease;
+  }
+  #dropZone:hover, #dropZone:active, #dropZone:focus {
+    background: #ffffff;
+    border-color: #8b5cf6;
+    box-shadow: 0 0 0 2px rgba(99,102,241,0.12);
+    outline: none;
+  }
   
 
 .form-check-input:checked {
-    background-color: #6366f1; /* purple */
+    background-color: #6366f1; 
     border-color: #6366f1;
 }
 
   .form-text { color: #475569; }
+
+  /* Override for channel list: force white box with purple check SVG */
+  #channelList .form-check-input:checked{
+    background-color:#ffffff !important;
+    border-color:#8b5cf6 !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M20 6L9 17l-5-5' fill='none' stroke='%238b5cf6' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") !important;
+    background-repeat: no-repeat !important;
+    background-position: center !important;
+    background-size: 16px 16px !important;
+    box-shadow: 0 0 0 2px rgba(139,92,246,.15) !important;
+  }
 
   /* Heading */
   h1 {
@@ -132,7 +190,7 @@
   /* frequency slider */
   #freqLabel { color: #1e293b; font-weight:700; margin-bottom:6px; }
   #freqValue { color: #334155; font-weight:700; }
-  #freqSlider { width:100%; accent-color:#6366f1; margin-bottom:6px; }
+  #freqSlider { width:100%; accent-color:#8b5cf6; margin-bottom:6px; }
 
   /* Header/Nav like EEG */
   .header { background: linear-gradient(135deg, #6366f1 0%, #ec4899 100%); color: #fff; padding: 1rem 1.5rem; box-shadow: 0 8px 24px rgba(99,102,241,0.2); display:flex; justify-content:space-between; align-items:center; border-radius: 8px; margin: 8px; }
@@ -175,13 +233,13 @@
           <input id="width" class="form-control" type="number" min="0.5" step="0.5" value="5"/>
         </div>
         <div class="mb-2">
-          <label class="form-label">Select Channels</label>
-          <div id="channelList" style="max-height:240px; overflow:auto;">Loading...</div>
-        </div>
-        <div class="mb-2">
           <label class="form-label">Upload .hea/.dat (drag & drop)</label>
           <div id="dropZone">Drop files here or <a href="#" id="pickFiles">choose files</a></div>
           <input id="filePicker" type="file" accept=".hea,.dat,.xyz" multiple style="display:none;" />
+        </div>
+        <div class="mb-2">
+          <label class="form-label">Select Channels</label>
+          <div id="channelList" style="max-height:240px; overflow:auto; padding:.25rem 0;">Channels load after file upload.</div>
         </div>
         <div class="mb-2">
           <label class="form-label">Recurrence Colormap</label>
@@ -223,7 +281,7 @@
         </div>
 
         <div class="mb-3">
-          <label id="freqLabel" class="form-label">Sampling Frequency (Hz) <span id="freqValue" style="margin-left:8px;color:#9cf;">500 Hz</span></label>
+          <label id="freqLabel" class="form-label">Sampling Frequency (Hz) <span id="freqValue" style="margin-left:8px;color:#8b5cf6;">500 Hz</span></label>
           <input id="freqSlider" type="range" min="10" max="500" step="10" value="500" />
           <div style="display:flex; justify-content:space-between; align-items:center;">
             <div class="small-muted">Min:10</div>
@@ -265,15 +323,13 @@
       <!-- Polar plot -->
       <div class="row">
         <div class="col-12 plot-container">
-          <div style="display:flex; gap:12px; align-items:flex-start;">
-            <div id="polarPlot" style="flex:1; width:100%; height:500px;"></div>
-            <div style="width:220px;">
-              <label class="form-label">Polar Mode</label>
-              <select id="polarModeSelect" class="form-select">
-                <option value="fixed">Fixed (current chunk)</option>
-                <option value="cumulative">Cumulative</option>
-              </select>
-            </div>
+          <div id="polarPlot" style="width:100%; height:500px;"></div>
+          <div style="margin-top:8px; max-width:260px;">
+            <label class="form-label">Polar Mode</label>
+            <select id="polarModeSelect" class="form-select">
+              <option value="fixed">Fixed (current chunk)</option>
+              <option value="cumulative">Cumulative</option>
+            </select>
           </div>
         </div>
       </div>
@@ -303,13 +359,29 @@ let nameMap = {};   // { "0": "Lead 1", ... }
 let ssGlobalTime = 0;
 
 // Enable Start only if files uploaded and at least one channel selected
+function getSelectedChannels(){
+  // EEG-like: checkboxes inside #channelList
+  const boxes = document.querySelectorAll('#channelList input[name=channels]:checked');
+  if(boxes && boxes.length){
+    return Array.from(boxes).map(cb=>parseInt(cb.value)).filter(v=>!isNaN(v));
+  }
+  // fallback to multi-select if present
+  const sel = document.getElementById('channelSelect');
+  if(sel){
+    return Array.from(sel.selectedOptions).map(o=>parseInt(o.value)).filter(v=>!isNaN(v));
+  }
+  return [];
+}
+
 function updateStartEnable(){
   try{
-    const anySelected = document.querySelectorAll("input[name=channels]:checked").length>0;
+    const anySelected = getSelectedChannels().length>0;
     const canStart = filesUploaded && anySelected;
     if(startBtn){ startBtn.disabled = !canStart; }
   }catch(e){}
 }
+
+function renderChannelSummary(){ /* not used in ECG when matching EEG; safe no-op */ }
 
 // Init config
 async function initConfig(){
@@ -324,22 +396,18 @@ async function initConfig(){
     sliderEl.value = requestedSampling;
     document.getElementById("freqValue").innerText = requestedSampling + " Hz";
     allChannels = cfg.channels || (Array.from({length:12}, (_,i)=>"Lead "+(i+1)));
-    const cdiv = document.getElementById("channelList");
-    cdiv.innerHTML="";
-    allChannels.forEach((name,i)=>{
-      const checked=""; // no default selection
-      const id = `ch_${i}`;
-      cdiv.insertAdjacentHTML("beforeend",
-        `<div class="form-check">
-          <input id="${id}" class="form-check-input channel-checkbox" type="checkbox" name="channels" value="${i}" ${checked}>
-          <label class="form-check-label" for="${id}">${name}</label>
-        </div>`
-      );
-    });
-    // wire change listeners for gating
-    document.querySelectorAll('.channel-checkbox').forEach(cb=>{
-      cb.addEventListener('change', ()=>{ updateStartEnable(); applyDisplaySelection(currentDisplay); });
-    });
+    const list = document.getElementById('channelList');
+    if(list){
+      list.innerHTML = '';
+      allChannels.forEach((name,i)=>{
+        const id = `ch_${i}`;
+        const row = document.createElement('div');
+        row.className = 'form-check';
+        row.innerHTML = `<input class="form-check-input" type="checkbox" name="channels" value="${i}" id="${id}"> <label class="form-check-label" for="${id}">${name}</label>`;
+        list.appendChild(row);
+      });
+      list.addEventListener('change', ()=>{ selectedChannels = getSelectedChannels(); updateStartEnable(); applyDisplaySelection(currentDisplay); });
+    }
     updateStartEnable();
   }catch(e){ console.warn("Config fetch failed", e); }
 }
@@ -446,7 +514,7 @@ function setStatus(active, text){
 
 function applyDisplaySelection(val){
   currentDisplay = val;
-  const sizes = {'Time':'650px','XOR':'500px','Polar':'600px','Recurrence':'600px'};
+  const sizes = {'Time':'700px','XOR':'560px','Polar':'650px','Recurrence':'650px'};
   Object.keys(containers).forEach(k=>{
     const plotId = (k==='Time')?'timePlot':(k==='XOR')?'xorPlot':(k==='Polar')?'polarPlot':'recurrenceScatterPlot';
     const plotDiv = document.getElementById(plotId);
@@ -530,8 +598,7 @@ document.getElementById('applyFreq').addEventListener('click', async ()=>{
   if(j && j.success){
     requestedSampling = j.current_sampling;
     alert("Applied sampling: " + requestedSampling + " Hz.");
-    // Reset buffers/plots so stream restarts cleanly at new sampling
-    resetFrontBuffersAndPlots();
+    // Keep timeline continuous: do not reset buffers
     if(streaming){ if(intervalId) clearInterval(intervalId); intervalId=setInterval(fetchData,1000/updateSpeed); }
   } else {
     alert("Failed to apply sampling: " + JSON.stringify(j));
@@ -545,7 +612,7 @@ document.getElementById('resetFreq').addEventListener('click', async ()=>{
     freqSlider.value = requestedSampling;
     freqValue.innerText = requestedSampling + " Hz";
     alert("Reset sampling to native: " + requestedSampling + " Hz");
-    resetFrontBuffersAndPlots();
+    // Keep timeline continuous: do not reset buffers
     if(streaming){ if(intervalId) clearInterval(intervalId); intervalId=setInterval(fetchData,1000/updateSpeed); }
   } else {
     alert("Failed to reset sampling: " + JSON.stringify(j));
@@ -599,23 +666,23 @@ function initPlots(channels){
     showlegend:false, hoverinfo:'none'
   }));
   Plotly.newPlot("timePlot", timeTraces, {
-    title:'Real-time ECG (time domain)',
+    title:{ text:'Real-time ECG (time domain)', x:0.5, xanchor:'center' },
     paper_bgcolor:"#ffffff", plot_bgcolor:"#ffffff", font:{color:"#1e293b"},
-    margin:{l:60,r:20,t:60,b:60}, autosize:true,
-    xaxis:{title:"Time (s)", range:[0,widthSec], gridcolor:"#e2e8f0", dtick:2},
-    yaxis:{title:"Amplitude", gridcolor:"#e2e8f0", autorange:true},
+    margin:{l:60,r:14,t:48,b:52}, autosize:true,
+    xaxis:{title:{text:"Time (s)", standoff:10}, range:[0,widthSec], gridcolor:"#e2e8f0", dtick:2},
+    yaxis:{title:{text:"Amplitude", standoff:10}, gridcolor:"#e2e8f0", autorange:true},
     showlegend:false
   }, {responsive:true});
 
   if(channels.length===1){
     Plotly.newPlot("xorPlot", [{x:[],y:[],mode:"markers",marker:{size:6,color:'#3b82f6'},showlegend:false,hoverinfo:'x+y'}],
-      {title:'XOR: Chunk N vs Chunk N-1', paper_bgcolor:"#ffffff", plot_bgcolor:"#ffffff", font:{color:"#1e293b"},
-       margin:{l:60,r:20,t:60,b:60}, autosize:true,
-       xaxis:{title:'Time within Chunk [s]', gridcolor:'#e2e8f0'}, yaxis:{title:'Absolute Difference', gridcolor:'#e2e8f0'}, showlegend:false}, {responsive:true});
+      {title:{ text:'XOR: Chunk N vs Chunk N-1', x:0.5, xanchor:'center' }, paper_bgcolor:"#ffffff", plot_bgcolor:"#ffffff", font:{color:"#1e293b"},
+       margin:{l:60,r:14,t:48,b:52}, autosize:true,
+       xaxis:{title:{text:'Time within Chunk [s]', standoff:10}, gridcolor:'#e2e8f0'}, yaxis:{title:{text:'Absolute Difference', standoff:10}, gridcolor:'#e2e8f0'}, showlegend:false}, {responsive:true});
   }
 
   const polarTraces = channels.map(ch=>({r:[],theta:[],mode:"lines",type:"scatterpolar",name:"",showlegend:false,hoverinfo:'none'}));
-  Plotly.newPlot("polarPlot", polarTraces, {title:'Polar Plot', paper_bgcolor:"#ffffff", font:{color:"#1e293b"}, margin:{l:60,r:20,t:60,b:60}, autosize:true, polar:{bgcolor:'#ffffff', radialaxis:{gridcolor:'#e2e8f0', color:'#1e293b'}, angularaxis:{gridcolor:'#e2e8f0', color:'#1e293b'}}, showlegend:false}, {responsive:true});
+  Plotly.newPlot("polarPlot", polarTraces, {title:{ text:'Polar Plot', x:0.5, xanchor:'center' }, paper_bgcolor:"#ffffff", font:{color:"#1e293b"}, margin:{l:60,r:14,t:48,b:52}, autosize:true, polar:{bgcolor:'#ffffff', radialaxis:{gridcolor:'#e2e8f0', color:'#1e293b'}, angularaxis:{gridcolor:'#e2e8f0', color:'#1e293b'}}, showlegend:false}, {responsive:true});
 
   if(channels.length===2){
     const names = channels.map(ch=> (nameMap && nameMap[String(ch)]) ? nameMap[String(ch)] : `Lead ${ch+1}`);
@@ -623,8 +690,8 @@ function initPlots(channels){
     Plotly.newPlot("recurrenceScatterPlot", [
       { x:[], y:[], type:"histogram2d", colorscale:colormap, showscale:true, name:'Density' }
     ], {
-      title:'Recurrence (density)', paper_bgcolor:'#ffffff', plot_bgcolor:'#ffffff', font:{color:'#1e293b'}, margin:{l:60,r:20,t:60,b:60}, autosize:true,
-      xaxis:{title:names[0], color:'#1e293b', gridcolor:'#e2e8f0'}, yaxis:{title:names[1], color:'#1e293b', gridcolor:'#e2e8f0'}
+      title:{ text:'Recurrence (density)', x:0.5, xanchor:'center' }, paper_bgcolor:'#ffffff', plot_bgcolor:'#ffffff', font:{color:'#1e293b'}, margin:{l:60,r:14,t:48,b:52}, autosize:true,
+      xaxis:{title:{text:names[0], standoff:10}, color:'#1e293b', gridcolor:'#e2e8f0'}, yaxis:{title:{text:names[1], standoff:10}, color:'#1e293b', gridcolor:'#e2e8f0'}
     }, {responsive:true});
   } else {
     // Leave existing figure; fetchData gating will avoid updating until valid
@@ -699,7 +766,9 @@ async function fetchData(){
       globalTime: ssGlobalTime,
       display: mapped
     });
-    if(out && typeof out.globalTime === 'number') ssGlobalTime = out.globalTime;
+    if(out && typeof out.globalTime === 'number' && !Number.isNaN(out.globalTime)){
+      ssGlobalTime = out.globalTime;
+    }
 
     const result = out && out.result ? out.result : {};
     const plotFs = result.display_fs || displayFs;
