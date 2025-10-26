@@ -22,7 +22,12 @@
     border-radius: 10px;
     max-height: 95vh;
     overflow-y: auto; /* scrollable sidebar */
+    
   }
+  .mx-auto {
+    margin-right: 0px;
+    margin-left: 0px;
+}
 
   .plot-container {
     background: transparent;
@@ -64,6 +69,53 @@
   /* Override any legacy dark secondary button styles */
   .btn-secondary { background: #f8fafc; border: 2px solid #e2e8f0; color:#1e293b; }
   .btn-secondary:hover { background:#ffffff; border-color:#6366f1; color:#6366f1; }
+
+  
+  .header { background: linear-gradient(135deg, #b244b4 0%, #c338cf 35%, #ab5bb6 70%, #fa8bf1 100%); color: #fff; padding: 1rem 1.5rem; box-shadow: 0 8px 24px rgba(99,102,241,0.2); display:flex; justify-content:space-between; align-items:center; border-radius: 8px; margin: 0; }
+  .header h1 { font-size: 1.25rem; font-weight: 800; margin: 0; }
+  .nav { display:flex; gap:.5rem; }
+  .nav .btn-secondary { background: rgba(255,255,255,0.12); color:#ffffff; border:2px solid rgba(255,255,255,0.28); }
+  .nav .btn-secondary:hover { background: rgba(255,255,255,0.22); color:#ffffff; border-color: rgba(255,255,255,0.38); }
+  .nav .btn-secondary.active { background: linear-gradient(135deg, #9250a4 0%, #d0a7cd 100%); color:#ffffff; border-color: rgba(255,255,255,0.0); box-shadow: 0 6px 16px rgba(139,92,246,0.45); }
+
+  /* Plot cards */
+  .plot-card { background:#ffffff; border:1px solid #e2e8f0; border-radius: 10px; padding: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.06); }
+  .info-panel { margin-left: 12px; }
+  .plots-col { padding-left: 12px; }
+  .plot-container { position: relative; overflow: hidden; }
+  .plot-container > div[id$='Plot']{ width: 100% !important; height: 100% !important; }
+  body{ margin:0 !important; padding:0 !important; }
+  .container, .container-fluid{ padding-left:0 !important; padding-right:0 !important; }
+  .row{ margin-left:0 !important; margin-right:0 !important; --bs-gutter-x: 0; }
+
+  /* Animations (like EEG) */
+  @keyframes slideDown { from { opacity: 0; transform: translateY(-20px);} to { opacity: 1; transform: translateY(0);} }
+  @keyframes slideUp { from { opacity: 0; transform: translateY(20px);} to { opacity: 1; transform: translateY(0);} }
+  .header { animation: slideDown 0.6s ease-out; }
+  .sidebar, .plots-col, .info-panel { animation: slideUp 0.6s ease-out 0.1s both; }
+
+  /* Prettier sliders and buttons */
+  input[type=range] { appearance: none; width:100%; height:6px; border-radius:999px; background: linear-gradient(90deg, #ede9fe 0%, #ddd6fe 50%, #c4b5fd 100%); outline:none; }
+  input[type=range]::-webkit-slider-runnable-track{ height:6px; border-radius:999px; background: linear-gradient(90deg, #ede9fe 0%, #ddd6fe 50%, #c4b5fd 100%); }
+  input[type=range]::-moz-range-track{ height:6px; border-radius:999px; background: linear-gradient(90deg, #ede9fe 0%, #ddd6fe 50%, #c4b5fd 100%); }
+  input[type=range]::-webkit-slider-thumb { appearance:none; width:16px; height:16px; border-radius:50%; background:#8b5cf6; box-shadow:0 0 0 3px rgba(139,92,246,.25); cursor:pointer; margin-top:-5px; }
+  input[type=range]::-moz-range-thumb { width:16px; height:16px; border-radius:50%; background:#8b5cf6; border:none; box-shadow:0 0 0 3px rgba(139,92,246,.25); cursor:pointer; }
+  .btn-primary, .btn-secondary { border-radius:999px; }
+  .btn-primary { background: linear-gradient(135deg, #8016c2 0%, #8016c2 100%); border: 0; }
+  .btn-primary:hover { filter: brightness(1.05); }
+  .btn-secondary { background:#f8fafc; border:2px solid #e2e8f0; color:#1e293b; }
+  .btn-secondary:hover { background:#ffffff; border-color:#6366f1; color:#6366f1; }
+
+  /* Responsive layout borrowed from EEG */
+  @media (max-width: 1400px) {
+    .main-container { grid-template-columns: 250px 1fr 280px; gap: 1rem; padding: 1rem; }
+  }
+  @media (max-width: 1024px) {
+    .main-container { grid-template-columns: 1fr; gap: 1.5rem; }
+    .sidebar { max-height: auto; }
+    .info-panel { max-height: auto; }
+    .plots-grid { grid-template-columns: 1fr; }
+  }
 
   /* Drop zone */
   #dropZone {
@@ -142,7 +194,7 @@
     box-shadow: 0 0 0 2px rgba(139,92,246,.15);
   }
   /* Keep 'choose files' link color consistent */
-  #pickFiles { color:#8b5cf6; text-decoration: underline; cursor: pointer; }
+  #pickFiles { color:#8016c2; text-decoration: underline; cursor: pointer; }
   #pickFiles:hover, #pickFiles:active, #pickFiles:focus { color:#8b5cf6; outline:none; }
   /* Keep drop zone background stable (no red on click) */
   #dropZone {
@@ -190,10 +242,10 @@
   /* frequency slider */
   #freqLabel { color: #1e293b; font-weight:700; margin-bottom:6px; }
   #freqValue { color: #334155; font-weight:700; }
-  #freqSlider { width:100%; accent-color:#8b5cf6; margin-bottom:6px; }
+  #freqSlider { width:100%; accent-color:#8016c2; margin-bottom:6px; }
 
   /* Header/Nav like EEG */
-  .header { background: linear-gradient(135deg, #6366f1 0%, #ec4899 100%); color: #fff; padding: 1rem 1.5rem; box-shadow: 0 8px 24px rgba(99,102,241,0.2); display:flex; justify-content:space-between; align-items:center; border-radius: 8px; margin: 8px; }
+  .header { background: linear-gradient(135deg, #8016c2 0%, #e754c2 100%); color: #fff; padding: 1rem 1.5rem; box-shadow: 0 8px 24px rgba(99,102,241,0.2); display:flex; justify-content:space-between; align-items:center; border-radius: 8px; margin: 8px; }
   .header h1 { color: #fff; margin: 0; font-size: 1.5rem; }
   .status-indicator { display:flex; align-items:center; gap:.5rem; background: rgba(255,255,255,0.2); padding:.35rem .75rem; border-radius: 20px; font-weight:600; }
   .status-dot { width:10px; height:10px; border-radius:50%; background:#ef4444; }
@@ -211,17 +263,20 @@
   }
 </style>
 </head>
-<body class="min-h-screen bg-primary-bg text-text-light p-4">
-  <div class="header">
-    <h1>ECG Viewer</h1>
-    <div class="header-controls">
-      <div class="status-indicator"><div id="statusDot" class="status-dot"></div><span id="statusText">Ready</span></div>
-    </div>
+<body class="min-h-screen bg-primary-bg text-text-light">
+  
+<div class="header">
+  <h1>ECG Viewer</h1>
+  <div class="nav">
+    <button id="timeModeButton" class="btn btn-secondary" type="button">Time</button>
+    <button id="xorModeButton" class="btn btn-secondary" type="button">XOR</button>
+    <button id="polarModeButton" class="btn btn-secondary" type="button">Polar</button>
+    <button id="recurrenceModeButton" class="btn btn-secondary" type="button">Recurrence</button>
   </div>
-<div class="container mx-auto">
-  <h1 class="text-3xl font-extrabold mb-3 text-center">Real-Time ECG Viewer</h1>
+</div>
+<div class="container-fluid main-container">
   <div class="row">
-    <div class="col-md-3 sidebar">
+    <div class="col-md-2 sidebar">
       <h5>ECG Controls</h5>
       <form id="channelForm">
         <div class="mb-2">
@@ -238,8 +293,11 @@
           <input id="filePicker" type="file" accept=".hea,.dat,.xyz" multiple style="display:none;" />
         </div>
         <div class="mb-2">
-          <label class="form-label">Select Channels</label>
-          <div id="channelList" style="max-height:240px; overflow:auto; padding:.25rem 0;">Channels load after file upload.</div>
+          <label class="form-label">Channels</label>
+          <div id="channelSelectionContainer">
+            <div id="channelInstructions" class="form-text" style="display:none;">Channels load after file upload.</div>
+            <div id="channelList" style="max-height:240px; overflow:auto; padding:.25rem 0;">Channels load after file upload.</div>
+          </div>
         </div>
         <div class="mb-2">
           <label class="form-label">Recurrence Colormap</label>
@@ -250,35 +308,9 @@
             <option value="Rainbow">Rainbow</option>
           </select>
         </div>
-        <div class="mb-2">
-          <label class="form-label">Display</label>
-          <select id="displaySelect" class="form-select">
-            <option value="Time" selected>Time</option>
-            <option value="XOR">XOR</option>
-            <option value="Polar">Polar</option>
-            <option value="Recurrence">Recurrence</option>
-          </select>
-        </div>
+        
 
-        <div id="xorControls" class="mb-3" style="display:none; border:1px solid #e2e8f0; border-radius:10px; padding:12px; background:#fff;">
-          <div style="font-weight:700; color:#1f2937; margin-bottom:6px; display:flex; align-items:center; gap:6px;">
-            <span style="width:8px;height:8px;border-radius:50%;background:#8b5cf6;display:inline-block;"></span>
-            XOR Controls
-          </div>
-          <div class="mb-2">
-            <label class="form-label">Chunk Period: <span id="xorChunkPeriodLabel">1.0s</span></label>
-            <input id="xorChunkPeriod" type="range" min="0.5" max="5" step="0.5" value="1" />
-          </div>
-          <div class="mb-2">
-            <label class="form-label">Duration: <span id="xorDurationLabel">10s</span></label>
-            <input id="xorDuration" type="range" min="1" max="30" step="1" value="10" />
-          </div>
-          <div class="mb-2">
-            <label class="form-label">Threshold: <span id="xorThresholdLabel">0.05</span></label>
-            <input id="xorThreshold" type="range" min="0.0" max="0.5" step="0.01" value="0.05" />
-            <div class="form-text">Only show points where abs(diff) exceeds threshold.</div>
-          </div>
-        </div>
+        
 
         <div class="mb-3">
           <label id="freqLabel" class="form-label">Sampling Frequency (Hz) <span id="freqValue" style="margin-left:8px;color:#8b5cf6;">500 Hz</span></label>
@@ -287,43 +319,30 @@
             <div class="small-muted">Min:10</div>
             <div class="small-muted">Max: 500</div>
           </div>
-          <div class="mt-2" style="display:flex; gap:8px;">
-            <button id="applyFreq" class="btn btn-primary" type="button">Apply Sampling</button>
-            <button id="resetFreq" class="btn btn-secondary" type="button">Reset Sampling</button>
-          </div>
           <div class="form-text small-muted">Lower frequency simulates lower-sampling hardware — predictions & signal will change.</div>
-        </div>
-
-        <div class="prediction-box mb-3">
-          <h6>Prediction</h6>
-          <div id="predictionResult" class="prediction-result">Waiting for data...</div>
-          <div id="predictionDescription" style="margin-top:8px; color:#475569; font-size:0.9rem;"></div>
-          <div id="recurrencePrediction" style="margin-top:6px; color:#334155; font-size:0.9rem;"></div>
-          <div id="diseaseName" class="disease-name"></div>
-          <div id="aliasingNote" style="margin-top:6px; color:#ffb74d; font-size:0.85rem;"></div>
         </div>
         <button id="startBtn" class="btn btn-primary w-100" style="color:#e0e0e0;" type="submit" disabled>Start Streaming</button>
         <button id="stopBtn" class="btn btn-secondary w-100 mt-2" type="button">Stop</button>
       </form>
     </div>
 
-    <div class="col-md-9">
+    <div class="col-md-7 plots-col plots-grid">
       <!-- Time plot -->
-      <div class="plot-container">
-        <div id="timePlot" style="width:100%;height:550px;"></div>
+      <div class="plot-container plot-card">
+        <div id="timePlot" style="width:100%;height:100%;"></div>
       </div>
 
       <!-- XOR plot -->
       <div class="row">
-        <div class="col-12 plot-container">
-          <div id="xorPlot" style="width:100%; height:420px;"></div>
+        <div class="col-12 plot-container plot-card">
+          <div id="xorPlot" style="width:100%; height:100%;"></div>
         </div>
       </div>
 
       <!-- Polar plot -->
       <div class="row">
-        <div class="col-12 plot-container">
-          <div id="polarPlot" style="width:100%; height:500px;"></div>
+        <div class="col-12 plot-container plot-card">
+          <div id="polarPlot" style="width:100%; height:100%;"></div>
           <div style="margin-top:8px; max-width:260px;">
             <label class="form-label">Polar Mode</label>
             <select id="polarModeSelect" class="form-select">
@@ -335,10 +354,61 @@
       </div>
 
       <!-- Recurrence plot -->
-      <div class="plot-container mt-3">
+      <div class="plot-container plot-card">
         <div id="recurrenceScatterPlot" style="width:100%;height:400px;"></div>
       </div>
     </div>
+
+    <!-- Right info panel like EEG -->
+    <div class="col-md-3">
+      <div class="plot-card info-panel" style="position:sticky; top:0.75rem;">
+        <h6 style="font-weight:700; color:#6366f1;">Prediction</h6>
+        <div id="predictionResult" class="prediction-result">Waiting for data...</div>
+        <div id="predictionDescription" style="margin-top:8px; color:#475569; font-size:0.9rem;"></div>
+        <div id="recurrencePrediction" style="margin-top:6px; color:#334155; font-size:0.9rem;"></div>
+        <div id="diseaseName" class="disease-name"></div>
+        <div id="aliasingNote" style="margin-top:6px; color:#ffb74d; font-size:0.85rem;"></div>
+        <hr style="margin:12px 0;"/>
+        <h6 style="font-weight:700; color:#6366f1;">Statistics</h6>
+        <div class="stat-item" style="display:flex; justify-content:space-between; padding:4px 0;">
+          <span>Status</span><span id="ecgStatus">Idle</span>
+        </div>
+        <div class="stat-item" style="display:flex; justify-content:space-between; padding:4px 0;">
+          <span>Channels</span><span id="ecgChannelCount">0</span>
+        </div>
+        <div class="stat-item" style="display:flex; justify-content:space-between; padding:4px 0;">
+          <span>Sample Rate</span><span id="ecgSampleRate">500 Hz</span>
+        </div>
+        <div class="stat-item" style="display:flex; justify-content:space-between; padding:4px 0;">
+          <span>Window</span><span id="ecgWindowSize">5s</span>
+        </div>
+        <div id="xorControls" class="mb-1 mt-2" style="display:none; border:1px solid #e2e8f0; border-radius:10px; padding:12px; background: linear-gradient(135deg, rgba(139,92,246,0.06) 0%, rgba(217,92,233,0.06) 100%);">
+          <div style="display:flex; align-items:center; justify-content:space-between;">
+            <h6 style="font-weight:700; color:#6366f1; margin:0;">XOR Controls</h6>
+            <button id="xorToggleBtn" type="button" class="btn btn-secondary" style="padding:.25rem .5rem; border-radius:8px;">
+              <span id="xorToggleIcon" style="display:inline-block; transition: transform .2s ease; transform: rotate(0deg);">▾</span>
+            </button>
+          </div>
+          <div id="xorControlsContent" style="margin-top:8px;">
+            <div class="mb-2">
+              <label class="form-label">Chunk Period: <span id="xorChunkPeriodLabel">1.0s</span></label>
+              <input id="xorChunkPeriod" type="range" min="0.5" max="5" step="0.5" value="1" />
+            </div>
+            <div class="mb-2">
+              <label class="form-label">Duration: <span id="xorDurationLabel">10s</span></label>
+              <input id="xorDuration" type="range" min="1" max="30" step="1" value="10" />
+            </div>
+            <div class="mb-2">
+              <label class="form-label">Threshold: <span id="xorThresholdLabel">0.05</span></label>
+              <input id="xorThreshold" type="range" min="0.0" max="0.5" step="0.01" value="0.05" />
+              <div class="form-text">Only show points where abs(diff) exceeds threshold.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Removed separate XOR controls card -->
   </div>
 </div>
 
@@ -358,6 +428,63 @@ let ssBuffers = {}; // { chIndex: {data:[], time:[]} }
 let nameMap = {};   // { "0": "Lead 1", ... }
 let ssGlobalTime = 0;
 
+// EEG-like channel maps and montage support
+let channelNameMap = {};                 // cleanedName -> index
+let channelIndexToOriginalName = {};     // index -> original name
+let allAvailableChannels = {};           // index -> original name
+
+const montages = {
+  'standard': ['FP1','FP2','F3','F4','C3','C4','P3','P4','O1','O2','FZ','CZ','PZ'],
+  'frontal': ['FP1','FP2','F3','F4','F7','F8','FZ'],
+  'occipital': ['P3','P4','O1','O2','OZ'],
+  'all': []
+};
+
+function cleanChannelName(name){
+  return String(name).trim().toUpperCase().split(/[-_/\s().]/)[0].replace(/[^A-Z0-9]/g, '');
+}
+
+function renderChannelCheckboxes(channelsToShow){
+  const channelListDiv = document.getElementById('channelList');
+  if(!channelListDiv) return;
+  channelListDiv.innerHTML = '';
+  const indices = Object.keys(channelsToShow).sort((a,b)=>parseInt(a)-parseInt(b));
+  if(indices.length===0){ channelListDiv.innerHTML = '<p class="text-center text-gray-500">Channels load after file upload.</p>'; return; }
+  indices.forEach(idx=>{
+    const id = `ch_${idx}`;
+    const div = document.createElement('div');
+    div.className = 'form-check';
+    const label = channelsToShow[idx];
+    div.innerHTML = `<input class="form-check-input" type="checkbox" name="channels" value="${idx}" id="${id}"> <label class="form-check-label" for="${id}">${label}</label>`;
+    channelListDiv.appendChild(div);
+  });
+  channelListDiv.addEventListener('change', ()=>{ selectedChannels = getSelectedChannels(); updateStartEnable(); applyDisplaySelection(currentDisplay); });
+  // reflect count
+  const cc = document.getElementById('ecgChannelCount');
+  if(cc){ cc.textContent = String(document.querySelectorAll('#channelList input[name=channels]:checked').length); }
+}
+
+function applyMontage(key){
+  const show = {};
+  let names = [];
+  if(key==='none' || key==='all'){
+    Object.assign(show, allAvailableChannels);
+  } else {
+    names = montages[key] || [];
+  }
+  if(names.length>0){
+    names.forEach(n=>{
+      const idx = channelNameMap[cleanChannelName(n)];
+      if(idx!==undefined){ show[idx] = channelIndexToOriginalName[idx]; }
+    });
+  }
+  renderChannelCheckboxes(show);
+  // select all when 'all'
+  if(key==='all'){
+    document.querySelectorAll('#channelList input[name=channels]').forEach(cb=> cb.checked = true);
+  }
+  updateStartEnable();
+}
 // Enable Start only if files uploaded and at least one channel selected
 function getSelectedChannels(){
   // EEG-like: checkboxes inside #channelList
@@ -378,6 +505,8 @@ function updateStartEnable(){
     const anySelected = getSelectedChannels().length>0;
     const canStart = filesUploaded && anySelected;
     if(startBtn){ startBtn.disabled = !canStart; }
+    const cc = document.getElementById('ecgChannelCount');
+    if(cc){ cc.textContent = String(getSelectedChannels().length); }
   }catch(e){}
 }
 
@@ -395,19 +524,11 @@ async function initConfig(){
     sliderEl.max = Math.min(500, nativeFs);
     sliderEl.value = requestedSampling;
     document.getElementById("freqValue").innerText = requestedSampling + " Hz";
-    allChannels = cfg.channels || (Array.from({length:12}, (_,i)=>"Lead "+(i+1)));
-    const list = document.getElementById('channelList');
-    if(list){
-      list.innerHTML = '';
-      allChannels.forEach((name,i)=>{
-        const id = `ch_${i}`;
-        const row = document.createElement('div');
-        row.className = 'form-check';
-        row.innerHTML = `<input class="form-check-input" type="checkbox" name="channels" value="${i}" id="${id}"> <label class="form-check-label" for="${id}">${name}</label>`;
-        list.appendChild(row);
-      });
-      list.addEventListener('change', ()=>{ selectedChannels = getSelectedChannels(); updateStartEnable(); applyDisplaySelection(currentDisplay); });
-    }
+    // Build channel maps like EEG
+    allChannels = cfg.channels || Array.from({length:12}, (_,i)=>`Lead ${i+1}`);
+    channelNameMap = {}; channelIndexToOriginalName = {}; allAvailableChannels = {};
+    allChannels.forEach((nm,i)=>{ channelIndexToOriginalName[i]=nm; channelNameMap[cleanChannelName(nm)] = i; allAvailableChannels[i]=nm; });
+    renderChannelCheckboxes(allAvailableChannels);
     updateStartEnable();
   }catch(e){ console.warn("Config fetch failed", e); }
 }
@@ -428,6 +549,18 @@ const xorHint = document.getElementById('xorHint');
 let xorDurationSec = 10;
 let xorPeriodSec = 1.0;
 
+// XOR collapsible toggle
+const xorToggleBtn = document.getElementById('xorToggleBtn');
+const xorToggleIcon = document.getElementById('xorToggleIcon');
+const xorControlsContent = document.getElementById('xorControlsContent');
+if(xorToggleBtn && xorControlsContent && xorToggleIcon){
+  xorToggleBtn.addEventListener('click', ()=>{
+    const nowHidden = xorControlsContent.style.display !== '' && xorControlsContent.style.display !== 'block';
+    xorControlsContent.style.display = nowHidden ? 'block' : 'none';
+    xorToggleIcon.style.transform = nowHidden ? 'rotate(0deg)' : 'rotate(-90deg)';
+  });
+}
+
 // XOR controls listeners
 if(xorChunkPeriod){ xorChunkPeriod.addEventListener('input', (e)=>{ xorPeriodSec = parseFloat(e.target.value)||1; xorChunkPeriodLabel.textContent = `${xorPeriodSec.toFixed(1)}s`; }); }
 if(xorDuration){ xorDuration.addEventListener('input', (e)=>{ xorDurationSec = parseFloat(e.target.value)||10; xorDurationLabel.textContent = `${xorDurationSec}s`; }); }
@@ -440,9 +573,9 @@ document.getElementById('pickFiles').addEventListener('click', (e)=>{ e.preventD
 
 ['dragenter','dragover','dragleave','drop'].forEach(evt => dropZone.addEventListener(evt, e=>e.preventDefault()));
 dropZone.addEventListener('dragover', ()=> dropZone.style.borderColor = '#88cc88');
-dropZone.addEventListener('dragleave', ()=> dropZone.style.borderColor = '#00eaff');
+dropZone.addEventListener('dragleave', ()=> dropZone.style.borderColor = '#a78bfa');
 dropZone.addEventListener('drop', (e)=>{
-  dropZone.style.borderColor='#00eaff';
+  dropZone.style.borderColor='#a78bfa';
   handleFiles(e.dataTransfer.files);
 });
 filePicker.addEventListener('change', (e)=> handleFiles(e.target.files));
@@ -482,17 +615,34 @@ function resizeVisiblePlots(){
   const active = currentDisplay||'Time';
   const map = { 'Time':'timePlot', 'XOR':'xorPlot', 'Polar':'polarPlot', 'Recurrence':'recurrenceScatterPlot' };
   const pid = map[active];
-  if(!pid) return;
-  const div = document.getElementById(pid);
-  if(!div) return;
-  try{
-    Plotly.Plots.resize(div);
-    const w = div.clientWidth;
-    if(w>0){ Plotly.relayout(pid,{width:w}); }
-  }catch(e){}
+  fitPlotToContainer(pid);
 }
 
 window.addEventListener('resize', resizeVisiblePlots);
+
+// Force a plot to exactly match its closest .plot-container dimensions
+function fitPlotToContainer(plotId){
+  if(!plotId) return;
+  const plotDiv = document.getElementById(plotId);
+  if(!plotDiv) return;
+  const container = plotDiv.closest('.plot-container') || plotDiv.parentElement;
+  if(!container) return;
+  try{
+    const cs = getComputedStyle(container);
+    const padX = parseFloat(cs.paddingLeft||'0') + parseFloat(cs.paddingRight||'0');
+    const padY = parseFloat(cs.paddingTop||'0') + parseFloat(cs.paddingBottom||'0');
+    const w = Math.max(0, container.clientWidth - padX);
+    const h = Math.max(0, container.clientHeight - padY);
+    if(w>0 && h>0){
+      // Ensure the inner plot DIV matches the content height exactly
+      plotDiv.style.height = h + 'px';
+      plotDiv.style.width = w + 'px';
+      Plotly.relayout(plotId, { width: w, height: h, autosize: false });
+    } else {
+      Plotly.Plots.resize(plotDiv);
+    }
+  }catch(e){}
+}
 
 // Display selection
 const containers = {
@@ -501,39 +651,54 @@ const containers = {
   'Polar': document.getElementById('polarPlot').closest('.plot-container'),
   'Recurrence': document.getElementById('recurrenceScatterPlot').closest('.plot-container')
 };
-const displaySelect = document.getElementById('displaySelect');
 const statusDot = document.getElementById('statusDot');
 const statusText = document.getElementById('statusText');
+const timeModeButton = document.getElementById('timeModeButton');
+const xorModeButton = document.getElementById('xorModeButton');
+const polarModeButton = document.getElementById('polarModeButton');
+const recurrenceModeButton = document.getElementById('recurrenceModeButton');
+
+function syncNavActive(){
+  const map = { 'Time': timeModeButton, 'XOR': xorModeButton, 'Polar': polarModeButton, 'Recurrence': recurrenceModeButton };
+  ['Time','XOR','Polar','Recurrence'].forEach(k=>{
+    const btn = map[k]; if(!btn) return;
+    if(currentDisplay===k){ btn.classList.add('active'); } else { btn.classList.remove('active'); }
+  });
+}
 
 function setStatus(active, text){
   if(statusDot){
     statusDot.classList.toggle('active', !!active);
   }
   if(statusText){ statusText.textContent = text || (active ? 'Streaming' : 'Ready'); }
+  const st = document.getElementById('ecgStatus');
+  if(st){ st.textContent = active ? 'Streaming' : 'Idle'; }
 }
 
 function applyDisplaySelection(val){
   currentDisplay = val;
-  const sizes = {'Time':'700px','XOR':'560px','Polar':'650px','Recurrence':'650px'};
+  const sizes = {'Time':'750px','XOR':'560px','Polar':'700px','Recurrence':'650px'};
   Object.keys(containers).forEach(k=>{
     const plotId = (k==='Time')?'timePlot':(k==='XOR')?'xorPlot':(k==='Polar')?'polarPlot':'recurrenceScatterPlot';
     const plotDiv = document.getElementById(plotId);
     if(k===currentDisplay){
       containers[k].style.display='block';
-      if(plotDiv) plotDiv.style.height=sizes[k]||'500px';
+      // Set the container card height; inner plot fills 100%
+      containers[k].style.height = sizes[k] || '500px';
+      if(plotDiv) plotDiv.style.height='100%';
       try{
         if(plotDiv){
-          const h = parseInt(sizes[k]||'500px');
-          Plotly.relayout(plotId,{height:h, autosize:true});
-          // Force width to container width
-          const w = plotDiv.clientWidth;
-          if(w>0){ Plotly.relayout(plotId,{width:w}); }
+          // Force autosize to container bounds
+          Plotly.relayout(plotId,{autosize:true});
+          // Ensure a resize to adopt new container size
+          Plotly.Plots.resize(plotDiv);
         }
       }catch(e){}
     } else { containers[k].style.display='none'; }
   });
   // Resize visible plot once more after layout shifts
   resizeVisiblePlots();
+  syncNavActive();
   // XOR controls visibility + channel dropdown sync
   if(currentDisplay==='XOR'){
     const one = selectedChannels.length===1;
@@ -561,63 +726,38 @@ function applyDisplaySelection(val){
     if(recHint) recHint.style.display = 'none';
   }
 }
-if(displaySelect){
-  displaySelect.addEventListener('change', (e)=> applyDisplaySelection(e.target.value));
-  applyDisplaySelection(displaySelect.value || 'Time');
-} else {
-  applyDisplaySelection('Time');
-}
+
+// Wire header nav buttons
+if(timeModeButton) timeModeButton.addEventListener('click', ()=> applyDisplaySelection('Time'));
+if(xorModeButton) xorModeButton.addEventListener('click', ()=> applyDisplaySelection('XOR'));
+if(polarModeButton) polarModeButton.addEventListener('click', ()=> applyDisplaySelection('Polar'));
+if(recurrenceModeButton) recurrenceModeButton.addEventListener('click', ()=> applyDisplaySelection('Recurrence'));
+
+// Initial mode
+applyDisplaySelection('Time');
 
 // Frequency slider
 const freqSlider = document.getElementById('freqSlider');
 const freqValue = document.getElementById('freqValue');
+let __freqDebounce = null;
 freqSlider.addEventListener('input', (e)=>{
-  freqValue.innerText = e.target.value + " Hz";
+  const val = parseFloat(e.target.value)||requestedSampling||nativeFs;
+  freqValue.innerText = val + " Hz";
+  if(__freqDebounce) clearTimeout(__freqDebounce);
+  __freqDebounce = setTimeout(async ()=>{
+    try{
+      const res = await fetch('/ecg/set_sampling', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ sampling_freq: val }) });
+      const j = await res.json();
+      if(j && j.success){
+        requestedSampling = j.current_sampling;
+        const sr = document.getElementById('ecgSampleRate');
+        if(sr) sr.textContent = requestedSampling + ' Hz';
+      }
+    }catch(err){}
+  }, 200);
 });
 
-function resetFrontBuffersAndPlots(){
-  // Clear orchestrator and local buffers so plots restart from the left
-  ssGlobalTime = 0;
-  globalStart = 0;
-  ssBuffers = {};
-  channelData = {};
-  selectedChannels.forEach(ch=>{
-    ssBuffers[ch] = { data: [], time: [] };
-    channelData[ch] = [];
-  });
-  initPlots(selectedChannels);
-}
-document.getElementById('applyFreq').addEventListener('click', async ()=>{
-  const val = parseFloat(freqSlider.value);
-  // call backend to set sampling (clears buffers so model will predict freshly)
-  const res = await fetch('/ecg/set_sampling', {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({sampling_freq: val})
-  });
-  const j = await res.json();
-  if(j && j.success){
-    requestedSampling = j.current_sampling;
-    alert("Applied sampling: " + requestedSampling + " Hz.");
-    // Keep timeline continuous: do not reset buffers
-    if(streaming){ if(intervalId) clearInterval(intervalId); intervalId=setInterval(fetchData,1000/updateSpeed); }
-  } else {
-    alert("Failed to apply sampling: " + JSON.stringify(j));
-  }
-});
-document.getElementById('resetFreq').addEventListener('click', async ()=>{
-  const res = await fetch('/ecg/reset_sampling',{method:'POST'});
-  const j = await res.json();
-  if(j && j.success){
-    requestedSampling = j.current_sampling;
-    freqSlider.value = requestedSampling;
-    freqValue.innerText = requestedSampling + " Hz";
-    alert("Reset sampling to native: " + requestedSampling + " Hz");
-    // Keep timeline continuous: do not reset buffers
-    if(streaming){ if(intervalId) clearInterval(intervalId); intervalId=setInterval(fetchData,1000/updateSpeed); }
-  } else {
-    alert("Failed to reset sampling: " + JSON.stringify(j));
-  }
-});
+// Removed Apply/Reset sampling buttons; slider applies in real time.
 
 // Form submit (start)  
 document.getElementById("channelForm").addEventListener("submit", ev=>{
@@ -668,21 +808,26 @@ function initPlots(channels){
   Plotly.newPlot("timePlot", timeTraces, {
     title:{ text:'Real-time ECG (time domain)', x:0.5, xanchor:'center' },
     paper_bgcolor:"#ffffff", plot_bgcolor:"#ffffff", font:{color:"#1e293b"},
-    margin:{l:60,r:14,t:48,b:52}, autosize:true,
+    margin:{l:60,r:14,t:56,b:52}, autosize:true,
     xaxis:{title:{text:"Time (s)", standoff:10}, range:[0,widthSec], gridcolor:"#e2e8f0", dtick:2},
     yaxis:{title:{text:"Amplitude", standoff:10}, gridcolor:"#e2e8f0", autorange:true},
     showlegend:false
-  }, {responsive:true});
+  }, {responsive:true, displayModeBar:false, displaylogo:false});
+  fitPlotToContainer('timePlot');
 
   if(channels.length===1){
     Plotly.newPlot("xorPlot", [{x:[],y:[],mode:"markers",marker:{size:6,color:'#3b82f6'},showlegend:false,hoverinfo:'x+y'}],
       {title:{ text:'XOR: Chunk N vs Chunk N-1', x:0.5, xanchor:'center' }, paper_bgcolor:"#ffffff", plot_bgcolor:"#ffffff", font:{color:"#1e293b"},
        margin:{l:60,r:14,t:48,b:52}, autosize:true,
        xaxis:{title:{text:'Time within Chunk [s]', standoff:10}, gridcolor:'#e2e8f0'}, yaxis:{title:{text:'Absolute Difference', standoff:10}, gridcolor:'#e2e8f0'}, showlegend:false}, {responsive:true});
+    Plotly.relayout("xorPlot", {}); // noop to ensure init
+    Plotly.Plots.resize(document.getElementById('xorPlot'));
+    fitPlotToContainer('xorPlot');
   }
 
   const polarTraces = channels.map(ch=>({r:[],theta:[],mode:"lines",type:"scatterpolar",name:"",showlegend:false,hoverinfo:'none'}));
-  Plotly.newPlot("polarPlot", polarTraces, {title:{ text:'Polar Plot', x:0.5, xanchor:'center' }, paper_bgcolor:"#ffffff", font:{color:"#1e293b"}, margin:{l:60,r:14,t:48,b:52}, autosize:true, polar:{bgcolor:'#ffffff', radialaxis:{gridcolor:'#e2e8f0', color:'#1e293b'}, angularaxis:{gridcolor:'#e2e8f0', color:'#1e293b'}}, showlegend:false}, {responsive:true});
+  Plotly.newPlot("polarPlot", polarTraces, {title:{ text:'Polar Plot', x:0.5, xanchor:'center' }, paper_bgcolor:"#ffffff", font:{color:"#1e293b"}, margin:{l:60,r:14,t:48,b:52}, autosize:true, polar:{bgcolor:'#ffffff', radialaxis:{gridcolor:'#e2e8f0', color:'#1e293b'}, angularaxis:{gridcolor:'#e2e8f0', color:'#1e293b'}}, showlegend:false}, {responsive:true, displayModeBar:false, displaylogo:false});
+  fitPlotToContainer('polarPlot');
 
   if(channels.length===2){
     const names = channels.map(ch=> (nameMap && nameMap[String(ch)]) ? nameMap[String(ch)] : `Lead ${ch+1}`);
@@ -692,7 +837,8 @@ function initPlots(channels){
     ], {
       title:{ text:'Recurrence (density)', x:0.5, xanchor:'center' }, paper_bgcolor:'#ffffff', plot_bgcolor:'#ffffff', font:{color:'#1e293b'}, margin:{l:60,r:14,t:48,b:52}, autosize:true,
       xaxis:{title:{text:names[0], standoff:10}, color:'#1e293b', gridcolor:'#e2e8f0'}, yaxis:{title:{text:names[1], standoff:10}, color:'#1e293b', gridcolor:'#e2e8f0'}
-    }, {responsive:true});
+    }, {responsive:true, displayModeBar:false, displaylogo:false});
+    fitPlotToContainer('recurrenceScatterPlot');
   } else {
     // Leave existing figure; fetchData gating will avoid updating until valid
   }
@@ -761,7 +907,7 @@ async function fetchData(){
       selected: selectedChannels,
       buffers: ssBuffers,
       names: nameMap,
-      colors: ["#FF5733","#33FF57","#3357FF","#F3FF33","#FF33EC","#33FFF6","#FF8F33","#8F33FF","#33FF99","#FF3333"],
+      colors: ["#A855F7","#D946EF","#7C3AED","#C084FC","#E879F9","#A78BFA","#9333EA","#E9D5FF","#C026D3","#F0ABFC"],
       colormap: colormap,
       globalTime: ssGlobalTime,
       display: mapped
@@ -820,13 +966,9 @@ async function fetchData(){
         recEl.innerText='';
       }
 
-      if(alias && alias.is_undersampled){
-        aliasEl.innerText = alias.note || 'Potential aliasing detected at current sampling.';
-        aliasEl.style.color = '#ff6b6b';
-        aliasEl.style.fontWeight = 'bold';
-      } else {
-        aliasEl.innerText = '';
-      }
+      // Aliasing notice removed as requested (no moderate/severe alerting)
+      aliasEl.innerText = '';
+      aliasEl.removeAttribute('style');
     }
 
   }catch(err){
