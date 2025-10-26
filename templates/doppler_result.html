@@ -8,96 +8,97 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     body {
-      background: linear-gradient(135deg, #000 0%, #1a1a2e 100%);
-      color: #e0e0e0;
+      background: linear-gradient(135deg, #F5F7FA 0%, #E0E7FF 100%);
+      color: #1F2937;
       text-align: center;
-      font-family: "Segoe UI", sans-serif;
+      font-family: 'Inter', -apple-system, sans-serif;
       padding-bottom: 50px;
       min-height: 100vh;
     }
     h1 { 
-      color: #00eaff; 
-      font-weight: bold; 
+      color: #6366F1; 
+      font-weight: 700; 
       margin: 30px 0;
-      text-shadow: 0 0 20px rgba(0, 234, 255, 0.5);
     }
     h2 { 
-      color: #00eaff; 
+      color: #6366F1; 
       margin-top: 40px;
       font-size: 1.5rem;
+      font-weight: 600;
     }
     .doppler-btn { 
-      background: linear-gradient(135deg, #00eaff 0%, #00c0cc 100%);
+      background: linear-gradient(135deg, #6366F1 0%, #4F46E5 100%);
       border: none; 
-      color: black; 
-      font-weight: bold;
+      color: white; 
+      font-weight: 600;
       padding: 12px 30px;
-      border-radius: 8px;
+      border-radius: 10px;
       transition: all 0.3s;
-      box-shadow: 0 4px 15px rgba(0, 234, 255, 0.3);
+      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
     }
     .doppler-btn:hover { 
-      background: linear-gradient(135deg, #00c0cc 0%, #00a0b0 100%);
+      background: linear-gradient(135deg, #4F46E5 0%, #4338CA 100%);
       color: white;
       transform: translateY(-2px);
-      box-shadow: 0 6px 20px rgba(0, 234, 255, 0.5);
+      box-shadow: 0 6px 16px rgba(99, 102, 241, 0.4);
     }
     .back-btn { 
       background: white; 
-      border: none; 
-      color: black; 
-      font-weight: bold;
+      border: 2px solid #6366F1; 
+      color: #6366F1; 
+      font-weight: 600;
       padding: 12px 30px;
-      border-radius: 8px;
+      border-radius: 10px;
       transition: all 0.3s;
     }
     .back-btn:hover { 
-      background: #e0e0e0; 
+      background: #6366F1; 
+      color: white;
       transform: translateY(-2px);
     }
     .chart-container {
       position: relative;
       height: 450px;
       margin: 30px auto;
-      background: rgba(17, 17, 17, 0.8);
-      border-radius: 15px;
+      background: white;
+      border-radius: 16px;
       padding: 25px;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-      border: 1px solid rgba(0, 234, 255, 0.2);
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05), 0 2px 4px rgba(0, 0, 0, 0.05);
+      border: 1px solid #E5E7EB;
       max-width: 900px;
     }
     #sampling_status { 
-      font-weight: bold; 
-      font-size: 1.4rem; 
+      font-weight: 600; 
+      font-size: 1.3rem; 
       margin: 20px auto;
       padding: 15px 25px;
-      border-radius: 10px;
+      border-radius: 12px;
       max-width: 600px;
-      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     }
     .status-good { 
-      color: #00ff00; 
-      background: rgba(0, 255, 0, 0.15);
-      border: 2px solid rgba(0, 255, 0, 0.3);
+      color: #065F46; 
+      background: #D1FAE5;
+      border: 2px solid #10B981;
     }
     .status-warning { 
-      color: #ffea00; 
-      background: rgba(255, 234, 0, 0.15);
-      border: 2px solid rgba(255, 234, 0, 0.3);
+      color: #92400E; 
+      background: #FEF3C7;
+      border: 2px solid #F59E0B;
     }
     .status-danger { 
-      color: #ff3333; 
-      background: rgba(255, 51, 51, 0.15);
-      border: 2px solid rgba(255, 51, 51, 0.3);
+      color: #991B1B; 
+      background: #FEE2E2;
+      border: 2px solid #EF4444;
     }
     .params-box {
-      background: rgba(26, 26, 46, 0.6);
-      border-radius: 15px;
+      background: white;
+      border-radius: 16px;
       padding: 25px;
       margin: 25px auto;
       max-width: 700px;
-      border: 2px solid rgba(0, 234, 255, 0.2);
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      border: 1px solid #E5E7EB;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05), 0 2px 4px rgba(0, 0, 0, 0.05);
     }
     .params-box ul {
       list-style: none;
@@ -106,7 +107,7 @@
     }
     .params-box li {
       padding: 12px 0;
-      border-bottom: 1px solid rgba(0, 234, 255, 0.1);
+      border-bottom: 1px solid #E5E7EB;
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -115,11 +116,12 @@
       border-bottom: none;
     }
     .param-label {
-      color: #aaa;
+      color: #6B7280;
+      font-weight: 500;
     }
     .param-value {
-      color: #00eaff;
-      font-weight: bold;
+      color: #6366F1;
+      font-weight: 700;
     }
     audio {
       margin: 20px 0;
@@ -135,39 +137,46 @@
       gap: 20px;
     }
     .freq-card {
-      background: rgba(0, 234, 255, 0.1);
+      background: #EEF2FF;
       padding: 15px;
-      border-radius: 10px;
-      border: 1px solid rgba(0, 234, 255, 0.3);
+      border-radius: 12px;
+      border: 1px solid #C7D2FE;
       flex: 1;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
     }
     .freq-card h4 {
-      color: #00eaff;
+      color: #6366F1;
       font-size: 0.9rem;
       margin-bottom: 5px;
+      font-weight: 600;
     }
     .freq-card p {
-      color: white;
+      color: #1F2937;
       font-size: 1.3rem;
-      font-weight: bold;
+      font-weight: 700;
       margin: 0;
     }
     .error-message {
-      background: rgba(255, 0, 0, 0.2);
-      color: #ff6666;
+      background: #FEE2E2;
+      color: #991B1B;
       padding: 20px;
-      border-radius: 10px;
-      border: 2px solid rgba(255, 0, 0, 0.5);
+      border-radius: 12px;
+      border: 2px solid #EF4444;
       margin: 20px;
     }
     .doppler-explanation {
-      background: rgba(0, 234, 255, 0.1);
-      border-left: 4px solid #00eaff;
+      background: #EEF2FF;
+      border-left: 4px solid #6366F1;
       padding: 15px;
       margin: 20px auto;
       max-width: 700px;
       border-radius: 8px;
       text-align: left;
+      color: #1F2937;
+    }
+    .params-box > p > strong {
+      color: #1F2937;
+      font-size: 1.1rem;
     }
   </style>
 </head>
@@ -231,7 +240,7 @@
     <!-- Signal Plot -->
     <div>
         <h2>📉 Time-Domain Signal Waveform</h2>
-        <p style="color: #aaa; font-size: 0.95rem;">Showing complete {{ duration }} second signal </p>
+        <p style="color: #6B7280; font-size: 0.95rem;">Showing complete {{ duration }} second signal </p>
         <div class="chart-container">
           <canvas id="signalPlot"></canvas>
         </div>
@@ -287,9 +296,9 @@
               datasets: [{
                   label: 'Amplitude',
                   data: yData,
-                  borderColor: 'rgba(0, 234, 255, 1)',
-                  backgroundColor: 'rgba(0, 234, 255, 0.1)',
-                  borderWidth: 1.5,
+                  borderColor: '#6366F1',
+                  backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                  borderWidth: 2,
                   pointRadius: 0,
                   fill: true,
                   tension: 0, // No smoothing to see actual aliasing
@@ -310,17 +319,18 @@
                   legend: { 
                       display: true,
                       labels: { 
-                          color: '#e0e0e0',
-                          font: { size: 13 }
+                          color: '#1F2937',
+                          font: { size: 13, weight: '500' }
                       } 
                   },
                   tooltip: {
                       enabled: true,
-                      backgroundColor: 'rgba(0, 0, 0, 0.9)',
-                      titleColor: '#00eaff',
-                      bodyColor: '#e0e0e0',
-                      borderColor: '#00eaff',
-                      borderWidth: 1,
+                      backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                      titleColor: '#6366F1',
+                      bodyColor: '#1F2937',
+                      borderColor: '#6366F1',
+                      borderWidth: 2,
+                      padding: 12,
                       callbacks: {
                           label: function(context) {
                               return 'Amplitude: ' + context.parsed.y.toFixed(4);
@@ -337,18 +347,18 @@
                       title: { 
                           display: true, 
                           text: 'Time (seconds)', 
-                          color: '#00eaff',
+                          color: '#6366F1',
                           font: { size: 14, weight: 'bold' }
                       },
                       ticks: { 
-                          color: '#e0e0e0',
+                          color: '#1F2937',
                           maxTicksLimit: 12, // More ticks for 6 seconds
                           callback: function(value) {
                               return value.toFixed(1) + 's';
                           }
                       },
                       grid: { 
-                          color: 'rgba(0, 234, 255, 0.1)',
+                          color: '#E5E7EB',
                           lineWidth: 1
                       },
                       min: 0,
@@ -358,17 +368,17 @@
                       title: { 
                           display: true, 
                           text: 'Amplitude', 
-                          color: '#00eaff',
+                          color: '#6366F1',
                           font: { size: 14, weight: 'bold' }
                       },
                       ticks: { 
-                          color: '#e0e0e0',
+                          color: '#1F2937',
                           callback: function(value) {
                               return value.toFixed(2);
                           }
                       },
                       grid: { 
-                          color: 'rgba(0, 234, 255, 0.1)',
+                          color: '#E5E7EB',
                           lineWidth: 1
                       },
                       min: -1,
