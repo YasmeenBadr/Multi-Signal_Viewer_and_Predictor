@@ -7,23 +7,27 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
     <style>
         :root {
-            --bg-dark: #0A0A0A;
-            --bg-card: #141414;
-            --primary-color: #00E8FF;
-            --text-light: #E0E0E0;
-            --glass-border: rgba(0, 232, 255, 0.2);
-            --glass-shadow: rgba(0, 232, 255, 0.1);
+            --bg-light: #F5F7FA;
+            --bg-card: #FFFFFF;
+            --primary-color: #6366F1;
+            --primary-hover: #4F46E5;
+            --text-dark: #1F2937;
+            --text-muted: #6B7280;
+            --border-color: #E5E7EB;
+            --shadow-sm: rgba(0, 0, 0, 0.05);
+            --shadow-md: rgba(0, 0, 0, 0.1);
+            --accent-bg: #EEF2FF;
         }
 
         body {
-            background: var(--bg-dark);
-            color: var(--text-light); 
+            background: linear-gradient(135deg, #F5F7FA 0%, #E0E7FF 100%);
+            color: var(--text-dark); 
             font-family: 'Inter', sans-serif;
+            min-height: 100vh;
         }
 
         h1 {
             color: var(--primary-color);
-            text-shadow: 0 0 8px var(--glass-shadow);
             font-weight: 700;
             text-align: center;
         }
@@ -36,115 +40,148 @@
 
         .card {
             background-color: var(--bg-card);
-            border: 1px solid var(--glass-border);
-            box-shadow: 0 8px 32px var(--glass-shadow);
-            backdrop-filter: blur(10px);
-            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 4px 6px var(--shadow-sm), 0 2px 4px var(--shadow-sm);
+            border-radius: 16px;
             transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
             text-align: left; 
         }
 
         .card:hover {
             transform: translateY(-3px);
-            box-shadow: 0 12px 40px var(--glass-shadow);
+            box-shadow: 0 12px 24px var(--shadow-md), 0 6px 12px var(--shadow-sm);
         }
 
         .btn-custom {
-            background-color: var(--primary-color);
-            color: var(--bg-dark);
-            font-weight: bold;
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-hover) 100%);
+            color: white;
+            font-weight: 600;
             border: none;
-            padding: 10px 20px;
-            border-radius: 8px;
+            padding: 12px 24px;
+            border-radius: 10px;
             transition: all 0.3s;
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
         }
 
         .btn-custom:hover {
-            background-color: #00c0cc;
+            background: linear-gradient(135deg, var(--primary-hover) 0%, #4338CA 100%);
             color: white;
-            box-shadow: 0 0 15px rgba(0, 232, 255, 0.5);
+            box-shadow: 0 6px 16px rgba(99, 102, 241, 0.4);
             transform: translateY(-2px);
         }
         
         .btn-outline-light {
-            border-color: var(--text-light); 
-            color: var(--text-light);      
+            border-color: var(--primary-color); 
+            color: var(--primary-color);      
             transition: all 0.3s;
+            border-width: 2px;
+            font-weight: 500;
         }
 
         .btn-outline-light:hover {
-            color: var(--primary-color);
+            color: white;
             border-color: var(--primary-color);
-            background-color: transparent;
+            background-color: var(--primary-color);
         }
         
         .form-control, .form-range {
-            background-color: #1A1A1A;
-            border: 1px solid var(--glass-border);
-            color: var(--text-light);
+            background-color: #F9FAFB;
+            border: 2px solid var(--border-color);
+            color: var(--text-dark);
+            border-radius: 8px;
         }
 
         .form-control:focus {
-            background-color: #1A1A1A;
-            color: var(--text-light);
+            background-color: #FFFFFF;
+            color: var(--text-dark);
             border-color: var(--primary-color);
-            box-shadow: 0 0 0 0.25rem rgba(0, 232, 255, 0.25);
+            box-shadow: 0 0 0 0.25rem rgba(99, 102, 241, 0.15);
         }
 
         .form-range::-webkit-slider-thumb {
             background: var(--primary-color);
+            border: 2px solid white;
+            box-shadow: 0 2px 4px var(--shadow-md);
         }
 
         .form-range::-moz-range-thumb {
             background: var(--primary-color);
+            border: 2px solid white;
+            box-shadow: 0 2px 4px var(--shadow-md);
+        }
+
+        .form-range::-webkit-slider-runnable-track {
+            background: #E5E7EB;
+            border-radius: 4px;
         }
 
         .hint {
-            color: var(--text-light); 
+            color: var(--text-muted); 
             font-size: 0.9rem;
         }
         
         .descriptive-text {
-            color: var(--text-light) !important;
+            color: var(--text-muted) !important;
             font-size: 1.1rem;
         }
 
         .sampling-info {
-            background: rgba(0, 232, 255, 0.1);
+            background: var(--accent-bg);
             border-left: 4px solid var(--primary-color);
-            padding: 12px;
+            padding: 16px;
             margin: 15px 0;
-            border-radius: 5px;
+            border-radius: 8px;
+            color: var(--text-dark);
         }
 
         .status-badge {
             display: inline-block;
-            padding: 5px 12px;
-            border-radius: 15px;
+            padding: 6px 14px;
+            border-radius: 20px;
             font-size: 0.85rem;
-            font-weight: bold;
+            font-weight: 600;
             margin-left: 10px;
         }
 
         .status-good {
-            background: rgba(0, 255, 0, 0.2);
-            color: #00ff00;
-            border: 1px solid #00ff00;
+            background: #D1FAE5;
+            color: #065F46;
+            border: 2px solid #10B981;
         }
 
         .status-warning {
-            background: rgba(255, 200, 0, 0.2);
-            color: #ffc800;
-            border: 1px solid #ffc800;
+            background: #FEF3C7;
+            color: #92400E;
+            border: 2px solid #F59E0B;
         }
+        
         .status-danger {
-            background: rgba(255, 0, 0, 0.2);
-            color: #ff0000;
-            border: 1px solid #ff0000;
+            background: #FEE2E2;
+            color: #991B1B;
+            border: 2px solid #EF4444;
         }
 
         hr {
-            border-color: var(--glass-border) !important;
+            border-color: var(--border-color) !important;
+            opacity: 1;
+        }
+
+        .form-label {
+            color: var(--text-dark);
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+        }
+
+        small {
+            color: var(--text-muted);
+        }
+
+        .text-warning {
+            color: #92400E !important;
+        }
+
+        strong {
+            color: var(--text-dark);
         }
     </style>
 </head>
@@ -159,7 +196,7 @@
             
             <button id="detect-btn" class="btn btn-custom w-100">📡 Begin Detection</button>
             
-            <form id="detect-form" method="POST" action="/doppler/upload" enctype="multipart/form-data" style="display:none;">
+            <form id="detect-form" method="POST" action="upload" enctype="multipart/form-data" style="display:none;">
                 <hr class="mt-4 mb-3">
                 <p class="hint">Upload a .wav file (e.g., recorded sound of a passing object).</p>
                 <input type="file" name="audio_file" accept=".wav" class="form-control" required>
@@ -171,7 +208,7 @@
             <h2><i class="bi bi-soundwave"></i> Generate Doppler Sound</h2>
             <p>Simulate the Doppler effect and experiment with sampling rates</p>
             
-            <form method="POST" action="{{ url_for('doppler.generate') }}" class="mt-4" id="generateForm">
+            <form method="POST" action="generate" class="mt-4" id="generateForm">
                 <div class="row">
                     <div class="col-md-6 mb-3">
                         <label class="form-label">Velocity (m/s)</label>
@@ -280,8 +317,8 @@
                 <strong>Nyquist rate: ${nyquistFreq.toFixed(0)} Hz</strong><br>
                 Current sampling: <strong>${fs.toFixed(0)} Hz</strong> (${ratio.toFixed(2)}× Nyquist)<br>
                 ${fs < nyquistFreq ? 
-                    '<span style="color:#ff3333; font-weight:bold;">⚠️ ALIASING WILL OCCUR!</span>' : 
-                    '<span style="color:#00ff00; font-weight:bold;">✓ No aliasing</span>'}
+                    '<span style="color:#DC2626; font-weight:bold;">⚠️ ALIASING WILL OCCUR!</span>' : 
+                    '<span style="color:#059669; font-weight:bold;">✓ No aliasing</span>'}
             `;
         }
 
