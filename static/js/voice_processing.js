@@ -212,6 +212,7 @@ async function classifyOriginal() {
     const formData = new FormData();
     formData.append('audio', uploadedFile);
     formData.append('use_antialiasing', 'false');
+    // ✅ NO target_sr parameter - keep original audio unprocessed
 
     try {
         const response = await fetch('/voice/classify', {
@@ -263,6 +264,7 @@ async function classifyResampled() {
         formData.append('audio', wavFile);
         formData.append('use_antialiasing', 'false');
         const targetRate = parseInt(frequencySlider.value);
+        formData.append('target_sr', targetRate.toString());
         formData.append('effective_sr', targetRate.toString());
         if (originalClassification && originalClassification.gender) {
             formData.append('original_gender', String(originalClassification.gender));
@@ -319,7 +321,7 @@ async function classifyReconstructed() {
         const formData = new FormData();
         formData.append('audio', wavFile);
         formData.append('use_antialiasing', useMLModel ? 'true' : 'false');
-        
+        formData.append('target_sr', targetRate.toString());  
         // If using ML, send the original classification gender so server can preserve it
         if (useMLModel && originalClassification && originalClassification.gender) {
             formData.append('original_gender', String(originalClassification.gender));

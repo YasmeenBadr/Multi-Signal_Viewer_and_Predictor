@@ -4,7 +4,17 @@ from flask import Blueprint, render_template, request, jsonify
 from werkzeug.utils import secure_filename
 import io
 import base64
-
+try:
+    from resampling import (
+        resample_signal, 
+        decimate_with_aliasing,
+        estimate_aliasing_level,
+        get_nyquist_limit
+    )
+    RESAMPLING_AVAILABLE = True
+except ImportError as e:
+    print(f"Warning: resampling utilities not available: {e}")
+    RESAMPLING_AVAILABLE = False
 # Try to import required libraries
 try:
     import torch
@@ -122,6 +132,60 @@ def apply_antialiasing(y_input, sr_input, target_sr=16000):
         print(f"[ERROR] Error during ML anti-aliasing: {e}")
         return librosa.resample(y_input, orig_sr=sr_input, target_sr=target_sr)
 
+def process_audio_with_resampling(filepath: str, target_sr: int, use_ml: bool = False):
+    """
+    Process audio through the complete resampling pipeline.
+    
+    Args:
+        filepath: Path to original audio file
+        target_sr: Target sample rate for undersampling
+        use_ml: Whether to apply ML anti-aliasing
+    
+    Returns:
+        Path to processed audio file
+    """
+    if not LIBROSA_AVAILABLE:
+        return filepath
+    
+    # Load original audio
+    y_original, sr_original = librosa.load(filepath, sr=None)
+    
+    # Step 1: Decimate with aliasing (introduces artifacts)
+    if RESAMPLING_AVAILABLE and target_sr < sr_original:
+        y_decimated = decimate_with_aliasing(y_original, sr_original, target_sr)
+        print(f"[OK] Decimated from {sr_original}Hz to {target_sr}Hz using decimate_with_aliasing()")
+    else:
+        # Fallback if resampling.py not available
+        y_decimated = librosa.resample(y_original, orig_sr=sr_original, target_sr=target_sr)
+        print(f"[WARN] Using librosa fallback decimation")
+    
+    # Step 2: Upsample back to 16kHz for model
+    MODEL_SR = 16000
+    
+    if use_ml and AA_MODEL_LOADED:
+        # Use ML model for reconstruction
+        y_reconstructed = apply_antialiasing(y_decimated, target_sr, target_sr=MODEL_SR)
+        print(f"[OK] ML reconstruction applied")
+    else:
+        # Use standard upsampling (cubic interpolation via librosa)
+        if RESAMPLING_AVAILABLE and target_sr < MODEL_SR:
+            # Use proper resampling from resampling.py
+            y_reconstructed = resample_signal(y_decimated, target_sr, MODEL_SR, method='cubic')
+            print(f"[OK] Cubic interpolation upsampling from {target_sr}Hz to {MODEL_SR}Hz")
+        else:
+            # Fallback to librosa
+            y_reconstructed = librosa.resample(y_decimated, orig_sr=target_sr, target_sr=MODEL_SR)
+            print(f"[WARN] Using librosa fallback upsampling")
+    
+    # Save processed audio
+    base, ext = os.path.splitext(filepath)
+    processed_path = f"{base}_processed.wav"
+    sf.write(processed_path, y_reconstructed, MODEL_SR)
+    
+    return processed_path
+
+
+
 def _compute_aa_diagnostics(y_up: np.ndarray, y_rec: np.ndarray, sr: int):
     try:
         n = min(len(y_up), len(y_rec))
@@ -215,33 +279,30 @@ def classify_gender():
         
         aa_diag = None
         # Apply ML anti-aliasing if requested and model is available
-        if use_antialiasing:
-            if AA_MODEL_LOADED:
-                try:
-                    y, sr = librosa.load(uploaded_path, sr=None)
-                    # Baseline upsample for diagnostics comparison
-                    y_up = librosa.resample(y, orig_sr=sr, target_sr=16000)
-                    y_enhanced = apply_antialiasing(y, sr, target_sr=16000)
-                    
-                    base, ext = os.path.splitext(uploaded_path)
-                    enhanced_path = f"{base}_ml_enhanced.wav"
-                    sf.write(enhanced_path, y_enhanced, 16000)
-                    processed_path = enhanced_path
-                    print("[OK] Using ML-enhanced audio for classification")
-                    # Optional diagnostics if requested
-                    try:
-                        if request.form.get('aa_debug', 'false').lower() == 'true':
-                            aa_diag = _compute_aa_diagnostics(y_up, y_enhanced, 16000)
-                            if aa_diag is not None:
-                                print(f"[AA DIAG] snr_db={aa_diag['snr_db']:.2f} hf_gain_db={aa_diag['hf_gain_db']:.2f} l2_rel={aa_diag['l2_rel']:.4f}")
-                    except Exception:
-                        pass
-                except Exception as e:
-                    print(f"[WARN] ML anti-aliasing failed: {e}")
-                    use_antialiasing = False
-            else:
-                print("[WARN] ML model not loaded, processing raw signal")
-                use_antialiasing = False
+        # Get target sample rate from frontend
+        target_sr_str = request.form.get('target_sr', None)
+        target_sr = int(float(target_sr_str)) if target_sr_str else None
+        
+        # Determine if we should process the audio
+        should_process = False
+        if target_sr and target_sr < 16000:
+            should_process = True
+        
+        aa_diag = None
+        processed_path = uploaded_path
+        
+        # Process audio through resampling pipeline if needed
+        if should_process:
+            try:
+                processed_path = process_audio_with_resampling(
+                    uploaded_path, 
+                    target_sr, 
+                    use_ml=use_antialiasing
+                )
+                print(f"[OK] Audio processed through resampling pipeline")
+            except Exception as e:
+                print(f"[ERROR] Resampling pipeline failed: {e}")
+                processed_path = uploaded_path
         # If NOT using anti-aliasing, keep the uploaded audio as-is
         if not use_antialiasing:
             processed_path = uploaded_path
