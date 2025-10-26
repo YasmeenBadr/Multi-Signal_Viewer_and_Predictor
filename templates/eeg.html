@@ -216,11 +216,6 @@
             <div class="form-group" id="mainPolarModeContainer" style="display:none;">
                 <label><input type="checkbox" id="mainCumulativePolarCheckbox"/> Cumulative Polar Plot</label>
             </div>
-            <div class="form-group" id="downsampleContainer">
-                <label>Downsampling Factor (Aliasing Effect) <span id="downsampleValue">1x</span></label>
-                <input type="range" id="downsampleSlider" min="1" max="32" value="1" step="1" style="width: 100%; cursor: pointer;"/>
-                <div class="form-text">Higher values cause aliasing and affect prediction accuracy</div>
-            </div>
         </div>
 
         <div class="sidebar-section">
@@ -245,7 +240,9 @@
         <div class="info-section">
             <h4>Prediction</h4>
             <div class="prediction-box">
-                <button id="predictButton" class="btn-primary" style="width: 100%; margin-bottom: 1rem;" disabled>🧠 Run Disease Predictions</button>
+                <button id="predictButton" class="btn-primary" style="width: 100%; margin-bottom: 0.5rem;" disabled>🧠 Run Disease Predictions</button>
+                <button id="predictResampledButton" class="btn-secondary" style="width: 100%; margin-bottom: 1rem;" disabled>🧠 Predict at Selected FS</button>
+
                 <div id="predictionResults" style="font-size: 0.9rem; color: var(--text-light);">
                     <div style="text-align: center; padding: 1rem;">Click "Run Disease Predictions" to analyze EEG data.</div>
                 </div>
@@ -261,7 +258,6 @@
             <div class="stat-item"><span class="stat-label">Window</span><span class="stat-value" id="windowSize">5s</span></div>
         </div>
     </div>
-</div>
     
     <script>
         // --- GLOBAL VARIABLES ---
@@ -490,33 +486,6 @@
         widthInput.addEventListener('input', () => { width = parseFloat(widthInput.value)||width; updateWindowStat(); });
         widthInput.addEventListener('change', () => { width = parseFloat(widthInput.value)||width; updateWindowStat(); });
 
-        // Downsampling slider event listener
-        const downsampleSlider = document.getElementById('downsampleSlider');
-        const downsampleValue = document.getElementById('downsampleValue');
-        
-        downsampleSlider.addEventListener('input', (e) => {
-            const factor = parseInt(e.target.value);
-            downsampleValue.textContent = factor + 'x';
-            // Store the downsampling factor for use in predictions
-            window.downsampleFactor = factor;
-            
-            // Update visual feedback based on aliasing level
-            const container = downsampleSlider.closest('.border-gray-600');
-            if (factor === 1) {
-                container.className = container.className.replace(/border-\w+-\d+/, 'border-gray-600');
-                container.className = container.className.replace(/bg-\w+-\d+\/\d+/, 'bg-gray-800/50');
-            } else if (factor >= 16) {
-                container.className = container.className.replace(/border-\w+-\d+/, 'border-red-800');
-                container.className = container.className.replace(/bg-\w+-\d+\/\d+/, 'bg-red-900/30');
-            } else if (factor >= 8) {
-                container.className = container.className.replace(/border-\w+-\d+/, 'border-orange-800');
-                container.className = container.className.replace(/bg-\w+-\d+\/\d+/, 'bg-orange-900/30');
-            } else {
-                container.className = container.className.replace(/border-\w+-\d+/, 'border-yellow-800');
-                container.className = container.className.replace(/bg-\w+-\d+\/\d+/, 'bg-yellow-900/30');
-            }
-        });
-
         // --- Button State Management ---
         function updateButtonStates() {
             startContinueButton.disabled = false;
@@ -544,6 +513,12 @@
             predictButton.disabled = !hasChannels;
             predictButton.classList.toggle('opacity-50', !hasChannels);
             predictButton.classList.toggle('cursor-not-allowed', !hasChannels);
+            const predictResampledButton = document.getElementById('predictResampledButton');
+            if (predictResampledButton) {
+                predictResampledButton.disabled = !hasChannels;
+                predictResampledButton.classList.toggle('opacity-50', !hasChannels);
+                predictResampledButton.classList.toggle('cursor-not-allowed', !hasChannels);
+            }
         }
 
         // --- DYNAMIC CHANNEL LIST RENDERING ---
@@ -617,7 +592,7 @@
             // Update channel count after montage application
             const chCountEl = document.getElementById('channelCount');
             if (chCountEl) {
-                const count = document.querySelectorAll('#channelList input[name=channels]:checked').length;
+                const count = document.querySelectorAll("#channelList input[name=channels]:checked").length;
                 chCountEl.textContent = String(count);
             }
         }
@@ -655,7 +630,7 @@
         });
 
         function updateModeButtonsActive() {
-            const mode = graphModeSelector ? graphModeSelector.value : 'time';
+            const mode = graphModeSelector.value;
             if (timeModeButton) timeModeButton.classList.toggle('active', mode === 'time');
             if (polarModeButton) polarModeButton.classList.toggle('active', mode === 'polar');
             if (recurrenceModeButton) recurrenceModeButton.classList.toggle('active', mode === 'recurrence');
@@ -1112,13 +1087,12 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        channels: selectedChannels,
-                        downsample_factor: window.downsampleFactor || 1
+                        channels: selectedChannels
                     })
                 });
                 
                 if (result.success) {
-                    displayPredictionResults(result.predictions, result.channel_used, result.downsample_factor);
+                    displayPredictionResults(result.predictions, result.channel_used, result.target_fs);
                 } else {
                     predictionResults.innerHTML = `<div class="text-center p-4 text-sm text-red-400">Error: ${result.message}</div>`;
                 }
@@ -1134,7 +1108,7 @@
             }
         }
         
-        function displayPredictionResults(predictions, channelUsed, downsampleFactor = 1) {
+        function displayPredictionResults(predictions, channelUsed, targetFs) {
             const diseaseNames = {
                 'epilepsy': 'Epilepsy',
                 'alzheimer': 'Alzheimer\'s',
@@ -1150,27 +1124,7 @@
             };
             
             let html = `<div class="space-y-3">`;
-            html += `<div class="text-xs text-gray-400 mb-3">Channel: ${channelIndexToOriginalName[channelUsed] || channelUsed}</div>`;
-            
-            // Add downsampling information
-            if (downsampleFactor > 1) {
-                const aliasingWarning = downsampleFactor >= 16 ? '⚠️ Severe Aliasing' : 
-                                       downsampleFactor >= 8 ? '⚠️ Heavy Aliasing' : 
-                                       downsampleFactor >= 4 ? '⚠️ Moderate Aliasing' : '⚠️ Light Aliasing';
-                
-                let warningClass = 'text-gray-400 bg-gray-800/50 border-gray-600';
-                if (downsampleFactor >= 16) {
-                    warningClass = 'text-red-300 bg-red-900/30 border-red-800';
-                } else if (downsampleFactor >= 8) {
-                    warningClass = 'text-orange-300 bg-orange-900/30 border-orange-800';
-                } else if (downsampleFactor >= 4) {
-                    warningClass = 'text-yellow-300 bg-yellow-900/30 border-yellow-800';
-                }
-                
-                html += `<div class="text-xs ${warningClass} mb-3 p-2 rounded border">
-                    ${aliasingWarning} - Downsampling: ${downsampleFactor}x
-                </div>`;
-            }
+            html += `<div class="text-xs text-gray-400 mb-3">Channel: ${channelIndexToOriginalName[channelUsed] || channelUsed}${targetFs ? ` • Target FS: ${targetFs} Hz` : ''}</div>`;
             
             Object.entries(predictions).forEach(([disease, result]) => {
                 const confidence = (result.confidence * 100).toFixed(1);
@@ -1197,8 +1151,36 @@
             predictionResults.innerHTML = html;
         }
         
-        // Event listener for prediction button
+        // Event listeners for prediction buttons
         predictButton.addEventListener('click', runPredictions);
+        const predictResampledButton = document.getElementById('predictResampledButton');
+        async function runPredictionsResampled() {
+            const selectedChannels = Array.from(document.querySelectorAll("#channelList input[name=channels]:checked")).map(ch => parseInt(ch.value));
+            if (selectedChannels.length === 0) { alert("Please select at least one channel for prediction."); return; }
+            const tfs = parseInt(fsSlider.value) || fs;
+            predictResampledButton.disabled = true;
+            predictResampledButton.innerHTML = '<span class="mr-2 text-lg">⏳</span> Predicting...';
+            predictionResults.innerHTML = '<div class="text-center p-4 text-sm text-gray-400">Running predictions at selected FS...</div>';
+            try {
+                const result = await SignalShared.fetchJson('/eeg/predict', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ channels: selectedChannels, target_fs: tfs })
+                });
+                if (result.success) {
+                    displayPredictionResults(result.predictions, result.channel_used, result.target_fs);
+                } else {
+                    predictionResults.innerHTML = `<div class="text-center p-4 text-sm text-red-400">Error: ${result.message}</div>`;
+                }
+            } catch (e) {
+                predictionResults.innerHTML = '<div class="text-center p-4 text-sm text-red-400">Prediction failed. Please try again.</div>';
+            } finally {
+                predictResampledButton.disabled = false;
+                predictResampledButton.innerHTML = '🧠 Predict at Selected FS';
+                updateButtonStates();
+            }
+        }
+        if (predictResampledButton) predictResampledButton.addEventListener('click', runPredictionsResampled);
         
         // Update prediction button state when channels change
         document.addEventListener('change', (e) => {

@@ -1177,7 +1177,7 @@ def update():
         }
         
         response = {
-            "n_samples": picked.shape[1],
+            "n_samples": picked.shape[1] if picked.ndim == 2 else len(picked),
             "signals": signals,
             "band_power": band_power_data
         }
@@ -1215,7 +1215,6 @@ def update():
             response["xor"] = xor_result
         
         return jsonify(response)
-    
     except Exception as e:
         logger.exception("Update failed")
         return jsonify({
@@ -1224,7 +1223,6 @@ def update():
             "band_power": {},
             "error": str(e)
         }), 500
-
 
 @bp.route("/predict", methods=["POST"])
 def predict_diseases():
@@ -1236,12 +1234,12 @@ def predict_diseases():
         }), 400
     
     try:
-        data = request.get_json()
+        data = request.get_json() or {}
         channels = validate_channels(
             data.get("channels", []),
             max_channels=len(state.ch_names)
         )
-        downsample_factor = data.get("downsample_factor", 1)
+        target_fs = int(data.get("target_fs", state.fs))
         
         if not channels:
             return jsonify({
@@ -1273,17 +1271,16 @@ def predict_diseases():
         
         eeg_data_for_prediction = picked[0]
         
-        # Apply downsampling if requested
-        if downsample_factor > 1:
-            target_fs = max(1, int(round(state.fs / float(downsample_factor))))
+        # Resample to requested target sampling rate if different from native
+        if target_fs != state.fs:
             eeg_data_for_prediction = decimate_with_aliasing(
                 eeg_data_for_prediction,
                 native_fs=state.fs,
-                target_fs=target_fs,
+                target_fs=max(1, int(target_fs)),
                 pos_native=start,
                 phase_state=None
             )
-            logger.info(f"Applied {downsample_factor}x downsampling ({state.fs} -> {target_fs} Hz)")
+            logger.info(f"Resampled for prediction: {state.fs} -> {target_fs} Hz")
         
         # Run predictions
         prediction_results = run_all_predictions(eeg_data_for_prediction)
@@ -1293,7 +1290,7 @@ def predict_diseases():
             "predictions": prediction_results,
             "channel_used": channels[0],
             "data_length": len(eeg_data_for_prediction),
-            "downsample_factor": downsample_factor
+            "target_fs": int(target_fs)
         })
     
     except Exception as e:

@@ -35,6 +35,8 @@ except Exception as e:
     print(f"Warning: wave module not available: {e}")
     WAVE_AVAILABLE = False
 
+# Local resampling utilities (not used in voice path now)
+
 # TensorFlow for anti-aliasing model
 try:
     import tensorflow as tf
@@ -120,6 +122,38 @@ def apply_antialiasing(y_input, sr_input, target_sr=16000):
         print(f"[ERROR] Error during ML anti-aliasing: {e}")
         return librosa.resample(y_input, orig_sr=sr_input, target_sr=target_sr)
 
+def _compute_aa_diagnostics(y_up: np.ndarray, y_rec: np.ndarray, sr: int):
+    try:
+        n = min(len(y_up), len(y_rec))
+        if n <= 0:
+            return None
+        a = y_up[:n].astype(np.float64)
+        b = y_rec[:n].astype(np.float64)
+        diff = b - a
+        mse = float(np.mean(diff * diff))
+        p_sig = float(np.mean(a * a)) + 1e-12
+        snr_db = float(10.0 * np.log10(p_sig / (mse + 1e-12)))
+        # FFT power in high band (e.g., 4-8 kHz)
+        freqs = np.fft.rfftfreq(n, d=1.0 / sr)
+        A = np.fft.rfft(a)
+        B = np.fft.rfft(b)
+        hf_mask = (freqs >= 4000.0) & (freqs <= min(8000.0, sr / 2.0))
+        pA_hf = float(np.sum((A[hf_mask] * np.conj(A[hf_mask])).real)) + 1e-20
+        pB_hf = float(np.sum((B[hf_mask] * np.conj(B[hf_mask])).real)) + 1e-20
+        hf_gain_db = float(10.0 * np.log10(pB_hf / pA_hf))
+        l2_diff = float(np.linalg.norm(diff) / (np.linalg.norm(a) + 1e-12))
+        return {
+            "mse": mse,
+            "snr_db": snr_db,
+            "hf_gain_db": hf_gain_db,
+            "l2_rel": l2_diff,
+            "n_samples": int(n),
+        }
+    except Exception:
+        return None
+
+ 
+
 def load_model():
     """Load the gender classification model"""
     global model, device
@@ -175,36 +209,52 @@ def classify_gender():
         os.makedirs(upload_folder, exist_ok=True)
         
         filename = secure_filename(file.filename)
-        filepath = os.path.join(upload_folder, filename)
-        file.save(filepath)
+        uploaded_path = os.path.join(upload_folder, filename)
+        file.save(uploaded_path)
+        processed_path = uploaded_path
         
+        aa_diag = None
         # Apply ML anti-aliasing if requested and model is available
         if use_antialiasing:
             if AA_MODEL_LOADED:
                 try:
-                    y, sr = librosa.load(filepath, sr=None)
+                    y, sr = librosa.load(uploaded_path, sr=None)
+                    # Baseline upsample for diagnostics comparison
+                    y_up = librosa.resample(y, orig_sr=sr, target_sr=16000)
                     y_enhanced = apply_antialiasing(y, sr, target_sr=16000)
                     
-                    enhanced_path = filepath.replace('.wav', '_ml_enhanced.wav')
+                    base, ext = os.path.splitext(uploaded_path)
+                    enhanced_path = f"{base}_ml_enhanced.wav"
                     sf.write(enhanced_path, y_enhanced, 16000)
-                    filepath = enhanced_path
+                    processed_path = enhanced_path
                     print("[OK] Using ML-enhanced audio for classification")
+                    # Optional diagnostics if requested
+                    try:
+                        if request.form.get('aa_debug', 'false').lower() == 'true':
+                            aa_diag = _compute_aa_diagnostics(y_up, y_enhanced, 16000)
+                            if aa_diag is not None:
+                                print(f"[AA DIAG] snr_db={aa_diag['snr_db']:.2f} hf_gain_db={aa_diag['hf_gain_db']:.2f} l2_rel={aa_diag['l2_rel']:.4f}")
+                    except Exception:
+                        pass
                 except Exception as e:
                     print(f"[WARN] ML anti-aliasing failed: {e}")
                     use_antialiasing = False
             else:
                 print("[WARN] ML model not loaded, processing raw signal")
                 use_antialiasing = False
+        # If NOT using anti-aliasing, keep the uploaded audio as-is
+        if not use_antialiasing:
+            processed_path = uploaded_path
         
         # Perform classification
         try:
             with torch.no_grad():
-                result = model.predict(filepath, device=device)
+                result = model.predict(processed_path, device=device)
                 if isinstance(result, tuple):
                     gender, model_confidence = result
                 else:
                     gender = result
-                    audio = model.load_audio(filepath).to(device)
+                    audio = model.load_audio(processed_path).to(device)
                     output = model.forward(audio)
                     probabilities = torch.softmax(output, dim=1)
                     model_confidence = probabilities.max(1)[0].item()
@@ -282,7 +332,16 @@ def classify_gender():
                 flip_applied = True
         except Exception as e:
             try:
-                os.remove(filepath)
+                try:
+                    if os.path.exists(processed_path) and processed_path != uploaded_path:
+                        os.remove(processed_path)
+                except:
+                    pass
+                try:
+                    if os.path.exists(uploaded_path):
+                        os.remove(uploaded_path)
+                except:
+                    pass
             except:
                 pass
             return jsonify({"error": f"Prediction failed: {str(e)}"}), 500
@@ -291,7 +350,7 @@ def classify_gender():
         avg_pitch = 0
         if LIBROSA_AVAILABLE:
             try:
-                audio_data, sr = librosa.load(filepath, sr=16000)
+                audio_data, sr = librosa.load(processed_path, sr=16000)
                 pitches, magnitudes = librosa.piptrack(y=audio_data, sr=sr)
                 pitch_values = []
                 for t in range(pitches.shape[1]):
@@ -322,11 +381,17 @@ def classify_gender():
         
         # Cleanup
         try:
-            os.remove(filepath)
-            if use_antialiasing:
-                enhanced_path = filepath.replace('.wav', '_ml_enhanced.wav')
-                if os.path.exists(enhanced_path):
-                    os.remove(enhanced_path)
+            # Remove processed temp (if different) and original upload
+            try:
+                if os.path.exists(processed_path) and processed_path != uploaded_path:
+                    os.remove(processed_path)
+            except:
+                pass
+            try:
+                if os.path.exists(uploaded_path):
+                    os.remove(uploaded_path)
+            except:
+                pass
         except:
             pass
         
@@ -336,7 +401,8 @@ def classify_gender():
             "pitch": float(avg_pitch),
             "antialiasing_applied": bool(use_antialiasing and AA_MODEL_LOADED),
             "effective_sr_received": int(eff_sr_final) if isinstance(eff_sr_final, (int, float)) and eff_sr_final is not None else None,
-            "flip_applied": bool(locals().get('flip_applied', False))
+            "flip_applied": bool(locals().get('flip_applied', False)),
+            "aa_diagnostics": aa_diag if (use_antialiasing and AA_MODEL_LOADED) else None
         })
     
     except Exception as e:
