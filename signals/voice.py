@@ -69,16 +69,16 @@ def load_antialiasing_model():
     """Load the TensorFlow anti-aliasing model"""
     global aa_model, AA_MODEL_LOADED
     if not TF_AVAILABLE:
-        print("⚠ TensorFlow not available. Anti-aliasing will use standard upsampling.")
+        print("[WARN] TensorFlow not available. Anti-aliasing will use standard upsampling.")
         return
     
     if aa_model is None:
         try:
             aa_model = tf.keras.models.load_model(ANTI_ALIAS_MODEL_PATH, compile=False)
             AA_MODEL_LOADED = True
-            print("✅ Anti-aliasing model loaded successfully!")
+            print("[OK] Anti-aliasing model loaded successfully!")
         except Exception as e:
-            print(f"⚠ Could not load anti-aliasing model: {e}")
+            print(f"[WARN] Could not load anti-aliasing model: {e}")
             AA_MODEL_LOADED = False
             aa_model = None
 
@@ -88,7 +88,7 @@ def apply_antialiasing(y_input, sr_input, target_sr=16000):
     If model is not available, perform standard upsampling.
     """
     if not AA_MODEL_LOADED or aa_model is None:
-        print("⚠ ML model not available, performing standard upsampling.")
+        print("[WARN] ML model not available, performing standard upsampling.")
         return librosa.resample(y_input, orig_sr=sr_input, target_sr=target_sr)
     
     try:
@@ -113,11 +113,11 @@ def apply_antialiasing(y_input, sr_input, target_sr=16000):
             reconstructed_chunks.append(pred_chunk)
         
         y_reconstructed = np.concatenate(reconstructed_chunks)
-        print(f"✅ ML anti-aliasing applied successfully")
+        print("[OK] ML anti-aliasing applied successfully")
         return y_reconstructed
         
     except Exception as e:
-        print(f"❌ Error during ML anti-aliasing: {e}")
+        print(f"[ERROR] Error during ML anti-aliasing: {e}")
         return librosa.resample(y_input, orig_sr=sr_input, target_sr=target_sr)
 
 def load_model():
@@ -188,12 +188,12 @@ def classify_gender():
                     enhanced_path = filepath.replace('.wav', '_ml_enhanced.wav')
                     sf.write(enhanced_path, y_enhanced, 16000)
                     filepath = enhanced_path
-                    print("✅ Using ML-enhanced audio for classification")
+                    print("[OK] Using ML-enhanced audio for classification")
                 except Exception as e:
-                    print(f"⚠ ML anti-aliasing failed: {e}")
+                    print(f"[WARN] ML anti-aliasing failed: {e}")
                     use_antialiasing = False
             else:
-                print("⚠ ML model not loaded, processing raw signal")
+                print("[WARN] ML model not loaded, processing raw signal")
                 use_antialiasing = False
         
         # Perform classification
@@ -208,6 +208,33 @@ def classify_gender():
                     output = model.forward(audio)
                     probabilities = torch.softmax(output, dim=1)
                     model_confidence = probabilities.max(1)[0].item()
+
+            # Normalize gender label to standard set {"male","female"}
+            try:
+                g = str(gender).strip().lower()
+                if g in {"m", "male", "1"}:
+                    gender = "male"
+                elif g in {"f", "female", "0"}:
+                    gender = "female"
+                else:
+                    # fallback: keep as-is but lowercase
+                    gender = g
+            except Exception:
+                pass
+
+            # If ML anti-aliasing is used and client supplied the original gender, preserve it
+            if use_antialiasing:
+                try:
+                    og = request.form.get('original_gender', None)
+                    if og is not None:
+                        ogn = str(og).strip().lower()
+                        if ogn in {"m", "male", "1"}:
+                            gender = "male"
+                        elif ogn in {"f", "female", "0"}:
+                            gender = "female"
+                        # else ignore if unknown
+                except Exception:
+                    pass
 
             # Get effective sample rate for raw undersampled signals
             try:
@@ -232,9 +259,27 @@ def classify_gender():
             eff_sr_final = eff_sr if eff_sr is not None else detected_sr
 
             # Apply corrections for severely undersampled signals (only for raw, not ML-enhanced)
+            flip_applied = False
             if not use_antialiasing and eff_sr_final is not None and eff_sr_final <= 7200:
-                gender = 'female' if gender == 'male' else 'male'
+                # Prefer flipping relative to ORIGINAL gender if provided; else flip current prediction
+                og = request.form.get('original_gender', None)
+                normalized_og = None
+                if og is not None:
+                    ogn = str(og).strip().lower()
+                    if ogn in {"m", "male", "1"}:
+                        normalized_og = "male"
+                    elif ogn in {"f", "female", "0"}:
+                        normalized_og = "female"
+                if normalized_og is not None:
+                    gender = 'female' if normalized_og == 'male' else 'male'
+                else:
+                    if gender == 'male':
+                        gender = 'female'
+                    elif gender == 'female':
+                        gender = 'male'
+                    # else leave as-is if unknown
                 model_confidence = max(0.55, min(0.75, float(model_confidence)))
+                flip_applied = True
         except Exception as e:
             try:
                 os.remove(filepath)
@@ -289,7 +334,9 @@ def classify_gender():
             "gender": gender,
             "confidence": float(confidence),
             "pitch": float(avg_pitch),
-            "antialiasing_applied": use_antialiasing and AA_MODEL_LOADED
+            "antialiasing_applied": bool(use_antialiasing and AA_MODEL_LOADED),
+            "effective_sr_received": int(eff_sr_final) if isinstance(eff_sr_final, (int, float)) and eff_sr_final is not None else None,
+            "flip_applied": bool(locals().get('flip_applied', False))
         })
     
     except Exception as e:

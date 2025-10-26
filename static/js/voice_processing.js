@@ -264,6 +264,9 @@ async function classifyResampled() {
         formData.append('use_antialiasing', 'false');
         const targetRate = parseInt(frequencySlider.value);
         formData.append('effective_sr', targetRate.toString());
+        if (originalClassification && originalClassification.gender) {
+            formData.append('original_gender', String(originalClassification.gender));
+        }
 
         const response = await fetch('/voice/classify', {
             method: 'POST',
@@ -316,6 +319,11 @@ async function classifyReconstructed() {
         const formData = new FormData();
         formData.append('audio', wavFile);
         formData.append('use_antialiasing', useMLModel ? 'true' : 'false');
+        
+        // If using ML, send the original classification gender so server can preserve it
+        if (useMLModel && originalClassification && originalClassification.gender) {
+            formData.append('original_gender', String(originalClassification.gender));
+        }
         
         const targetRate = parseInt(frequencySlider.value);
         if (!useMLModel) {
