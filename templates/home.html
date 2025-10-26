@@ -4,153 +4,471 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Signal Processing Dashboard</title>
-    <!-- Load Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Embedding styles directly in HTML to ensure they load properly -->
     <style>
-        /* Custom styling for dark background and primary color */
+        /* Professional Signal Processing Dashboard Styles */
+
+        /* Color Scheme - Bright and Professional */
         :root {
-            --color-primary: #00eaff;
-            --color-dark: #121212;
-            --color-card: #1f1f1f;
+          --color-primary: #6366f1;
+          --color-secondary: #ec4899;
+          --color-accent: #f59e0b;
+          --color-success: #10b981;
+          --color-light-bg: #f8fafc;
+          --color-card-bg: #ffffff;
+          --color-text-dark: #1e293b;
+          --color-text-light: #64748b;
+          --color-border: #e2e8f0;
         }
+
+        * {
+          margin: 0;
+          padding: 0;
+          box-sizing: border-box;
+        }
+
         body {
-            font-family: 'Inter', sans-serif;
-            background-color: var(--color-dark);
+          font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+          background: linear-gradient(135deg, var(--color-light-bg) 0%, #f1f5f9 100%);
+          color: var(--color-text-dark);
+          min-height: 100vh;
         }
-        .card-link {
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            border: 1px solid transparent;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+
+        /* ===== HEADER SECTION ===== */
+        header {
+          position: relative;
+          padding: 4rem 2rem 3rem;
+          background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-secondary) 100%);
+          color: white;
+          overflow: hidden;
         }
-        .card-link:hover {
-            transform: translateY(-5px);
-            border-color: var(--color-primary);
-            box-shadow: 0 10px 15px -3px rgba(0, 234, 255, 0.2), 0 4px 6px -4px rgba(0, 234, 255, 0.1);
+
+        .header-content {
+          position: relative;
+          z-index: 2;
+          text-align: center;
+          animation: fadeInDown 0.8s ease-out;
         }
-        .card-link:hover .card-icon {
-            color: var(--color-dark);
-            background-color: var(--color-primary);
-            box-shadow: 0 0 10px var(--color-primary);
+
+        header h1 {
+          font-size: 3rem;
+          font-weight: 800;
+          margin-bottom: 0.5rem;
+          letter-spacing: -0.02em;
         }
+
+        header p {
+          font-size: 1.25rem;
+          opacity: 0.95;
+          font-weight: 500;
+        }
+
+        /* Enhanced header decorative elements with floating animations */
+        .header-decoration {
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          z-index: 1;
+          overflow: hidden;
+        }
+
+        .header-decoration::before {
+          content: "";
+          position: absolute;
+          top: -50%;
+          right: -10%;
+          width: 500px;
+          height: 500px;
+          background: radial-gradient(circle, rgba(255, 255, 255, 0.15) 0%, transparent 70%);
+          border-radius: 50%;
+          animation: float 6s ease-in-out infinite;
+        }
+
+        .header-decoration::after {
+          content: "";
+          position: absolute;
+          bottom: -30%;
+          left: -5%;
+          width: 400px;
+          height: 400px;
+          background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 0%, transparent 70%);
+          border-radius: 50%;
+          animation: float 8s ease-in-out infinite reverse;
+        }
+
+        /* ===== CONTAINER & GRID ===== */
+        .container {
+          max-width: 1400px;
+          margin: 0 auto;
+          padding: 3rem 2rem;
+        }
+
+        /* Updated grid to 5 columns for integrated voice card */
+        .signals-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+          gap: 2rem;
+          margin-bottom: 4rem;
+        }
+
+        /* ===== SIGNAL CARDS ===== */
+        .signal-card {
+          background: var(--color-card-bg);
+          border-radius: 16px;
+          padding: 2rem;
+          border: 2px solid var(--color-border);
+          text-align: center;
+          cursor: pointer;
+          transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+          position: relative;
+          overflow: hidden;
+          box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
+          text-decoration: none;
+          color: inherit;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          animation: fadeInUp 0.6s ease-out;
+        }
+
+        /* Staggered animation for each card */
+        .signal-card:nth-child(1) {
+          animation-delay: 0.1s;
+        }
+        .signal-card:nth-child(2) {
+          animation-delay: 0.2s;
+        }
+        .signal-card:nth-child(3) {
+          animation-delay: 0.3s;
+        }
+        .signal-card:nth-child(4) {
+          animation-delay: 0.4s;
+        }
+        .signal-card:nth-child(5) {
+          animation-delay: 0.5s;
+        }
+
+        /* Shine effect on hover */
+        .signal-card::before {
+          content: "";
+          position: absolute;
+          top: 0;
+          left: -100%;
+          width: 100%;
+          height: 100%;
+          background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+          transition: left 0.6s ease;
+          z-index: 1;
+        }
+
+        .signal-card:hover::before {
+          left: 100%;
+        }
+
+        /* Enhanced hover effects with more sophisticated animations */
+        .signal-card:hover {
+          transform: translateY(-16px) scale(1.03);
+          box-shadow: 0 24px 48px rgba(0, 0, 0, 0.12);
+          border-color: var(--color-primary);
+        }
+
+        .signal-card:nth-child(1):hover {
+          background: linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(236, 72, 153, 0.08) 100%);
+        }
+
+        .signal-card:nth-child(2):hover {
+          background: linear-gradient(135deg, rgba(236, 72, 153, 0.08) 0%, rgba(245, 158, 11, 0.08) 100%);
+        }
+
+        .signal-card:nth-child(3):hover {
+          background: linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(16, 185, 129, 0.08) 100%);
+        }
+
+        .signal-card:nth-child(4):hover {
+          background: linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(99, 102, 241, 0.08) 100%);
+        }
+
+        .signal-card:nth-child(5):hover {
+          background: linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(245, 158, 11, 0.08) 100%);
+        }
+
+        /* ===== CARD ICONS ===== */
+        /* Professional SVG icons with stroke styling */
         .card-icon {
-            color: var(--color-primary);
-            transition: all 0.3s;
-            border: 2px solid var(--color-primary);
+          width: 80px;
+          height: 80px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          margin-bottom: 1.5rem;
+          transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+          position: relative;
+          z-index: 2;
         }
-        /* Ensure the voice card aligns its content */
-        .voice-card-content {
-            display: flex;
-            flex-direction: row;
-            align-items: center;
-            justify-content: center;
-            gap: 1.5rem;
-        }
-        /* Ensure responsive icons */
+
         .card-icon svg {
-            width: 2rem;
-            height: 2rem;
+          width: 100%;
+          height: 100%;
+          stroke-linecap: round;
+          stroke-linejoin: round;
         }
-        @media (min-width: 768px) {
-            .card-icon svg {
-                width: 3rem;
-                height: 3rem;
-            }
+
+        .signal-card:nth-child(1) .card-icon {
+          background: linear-gradient(135deg, var(--color-primary) 0%, rgba(99, 102, 241, 0.15) 100%);
+          color: var(--color-primary);
+        }
+
+        .signal-card:nth-child(2) .card-icon {
+          background: linear-gradient(135deg, var(--color-secondary) 0%, rgba(236, 72, 153, 0.15) 100%);
+          color: var(--color-secondary);
+        }
+
+        .signal-card:nth-child(3) .card-icon {
+          background: linear-gradient(135deg, var(--color-accent) 0%, rgba(245, 158, 11, 0.15) 100%);
+          color: var(--color-accent);
+        }
+
+        .signal-card:nth-child(4) .card-icon {
+          background: linear-gradient(135deg, var(--color-success) 0%, rgba(16, 185, 129, 0.15) 100%);
+          color: var(--color-success);
+        }
+
+        .signal-card:nth-child(5) .card-icon {
+          background: linear-gradient(135deg, var(--color-primary) 0%, rgba(99, 102, 241, 0.15) 100%);
+          color: var(--color-primary);
+        }
+
+        /* Enhanced icon hover animation with rotation and scale */
+        .signal-card:hover .card-icon {
+          transform: scale(1.2) rotate(8deg);
+          box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
+          filter: brightness(1.1);
+        }
+
+        /* ===== CARD TEXT ===== */
+        .card-title {
+          font-size: 1.5rem;
+          font-weight: 700;
+          margin-bottom: 0.5rem;
+          color: var(--color-text-dark);
+          transition: all 0.3s ease;
+          position: relative;
+          z-index: 2;
+          letter-spacing: -0.01em;
+        }
+
+        .signal-card:hover .card-title {
+          color: var(--color-primary);
+          transform: translateY(-2px);
+        }
+
+        .card-description {
+          font-size: 0.95rem;
+          color: var(--color-text-light);
+          transition: all 0.3s ease;
+          position: relative;
+          z-index: 2;
+          line-height: 1.5;
+        }
+
+        .signal-card:hover .card-description {
+          color: var(--color-text-dark);
+        }
+
+        /* ===== FOOTER ===== */
+        footer {
+          text-align: center;
+          padding: 2rem;
+          color: var(--color-text-light);
+          font-size: 0.9rem;
+          border-top: 1px solid var(--color-border);
+          margin-top: 4rem;
+          animation: fadeInUp 0.8s ease-out 0.6s both;
+        }
+
+        /* ===== ANIMATIONS ===== */
+        @keyframes fadeInDown {
+          from {
+            opacity: 0;
+            transform: translateY(-30px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        @keyframes fadeInUp {
+          from {
+            opacity: 0;
+            transform: translateY(30px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        @keyframes float {
+          0%,
+          100% {
+            transform: translateY(0px);
+          }
+          50% {
+            transform: translateY(20px);
+          }
+        }
+
+        @keyframes pulse {
+          0%,
+          100% {
+            opacity: 1;
+          }
+          50% {
+            opacity: 0.8;
+          }
+        }
+
+        /* ===== RESPONSIVE DESIGN ===== */
+        @media (max-width: 1024px) {
+          .signals-grid {
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+          }
+        }
+
+        @media (max-width: 768px) {
+          header h1 {
+            font-size: 2rem;
+          }
+
+          header p {
+            font-size: 1rem;
+          }
+
+          .signals-grid {
+            grid-template-columns: 1fr;
+            gap: 1.5rem;
+          }
+
+          .card-icon {
+            width: 70px;
+            height: 70px;
+          }
+
+          .card-title {
+            font-size: 1.25rem;
+          }
+
+          .card-description {
+            font-size: 0.9rem;
+          }
+        }
+
+        @media (max-width: 480px) {
+          .container {
+            padding: 2rem 1rem;
+          }
+
+          header {
+            padding: 2rem 1rem;
+          }
+
+          header h1 {
+            font-size: 1.5rem;
+          }
+
+          header p {
+            font-size: 0.9rem;
+          }
+
+          .card-icon {
+            width: 60px;
+            height: 60px;
+          }
+
+          .card-title {
+            font-size: 1.1rem;
+          }
         }
     </style>
 </head>
-<body class="min-h-screen flex items-center justify-center p-4">
-    <div class="container max-w-6xl mx-auto">
-        <!-- Header -->
-        <header class="text-center mb-12">
-            <h1 class="text-5xl font-extrabold tracking-tight" style="color: var(--color-primary);">
-                Digital Signal Processing Viewer
-            </h1>
-            <p class="mt-4 text-xl text-gray-300 font-light">
-                Explore, visualize, and generate core signals.
-            </p>
-        </header>
-
-        <!-- Signal Cards Grid (The original 4 cards) -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            
-            <!-- ECG Card -->
-            <a href="/ecg" class="card-link block rounded-xl p-6 bg-[var(--color-card)] text-white hover:bg-[var(--color-primary)] hover:text-[var(--color-dark)]">
-                <div class="flex flex-col items-center">
-                    <!-- Heartbeat Icon SVG -->
-                    <div class="card-icon p-3 rounded-full mb-4">
-                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path></svg>
-                    </div>
-                    <h2 class="text-xl font-semibold uppercase tracking-wide">ECG</h2>
-                    <p class="text-sm mt-1 text-gray-400 group-hover:text-[var(--color-dark)]">Electrocardiogram</p>
-                </div>
-            </a>
-
-            <!-- EEG Card -->
-            <a href="/eeg" class="card-link block rounded-xl p-6 bg-[var(--color-card)] text-white hover:bg-[var(--color-primary)] hover:text-[var(--color-dark)]">
-                <div class="flex flex-col items-center">
-                    <!-- Brain Waves Icon SVG -->
-                    <div class="card-icon p-3 rounded-full mb-4">
-                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l-2 2L4 5m0 0l3-3m-3 3l3-3m1 20h14a2 2 0 002-2V7a2 2 0 00-2-2H9a2 2 0 00-2 2v12a2 2 0 002 2zm1-16l2 2 4-4"></path></svg>
-                    </div>
-                    <h2 class="text-xl font-semibold uppercase tracking-wide">EEG</h2>
-                    <p class="text-sm mt-1 text-gray-400 group-hover:text-[var(--color-dark)]">Electroencephalogram</p>
-                </div>
-            </a>
-            
-            <!-- RADAR Card -->
-            <a href="/radar" class="card-link block rounded-xl p-6 bg-[var(--color-card)] text-white hover:bg-[var(--color-primary)] hover:text-[var(--color-dark)]">
-                <div class="flex flex-col items-center">
-                    <!-- Radar Dish Icon SVG -->
-                    <div class="card-icon p-3 rounded-full mb-4">
-                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-3.097-.356M21 12a9 9 0 00-9-9c-2.7 0-5.18 1.15-6.85 3m13.7 3c.753 1.168 1.2 2.5 1.2 3.86a8.88 8.88 0 01-1.2 3.86m-7.7-7.7A2.5 2.5 0 0012 8.5c-1.38 0-2.5 1.12-2.5 2.5s1.12 2.5 2.5 2.5 2.5-1.12 2.5-2.5"></path></svg>
-                    </div>
-                    <h2 class="text-xl font-semibold uppercase tracking-wide">RADAR</h2>
-                    <p class="text-sm mt-1 text-gray-400 group-hover:text-[var(--color-dark)]">Radio Detection & Ranging</p>
-                </div>
-            </a>
-
-            <!-- DOPPLER Card -->
-            <a href="/doppler" class="card-link block rounded-xl p-6 bg-[var(--color-card)] text-white hover:bg-[var(--color-primary)] hover:text-[var(--color-dark)]">
-                <div class="flex flex-col items-center">
-                    <!-- Sound Waves Icon SVG -->
-                    <div class="card-icon p-3 rounded-full mb-4">
-                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.464-9.536a8 8 0 010 11.312M12 20v-4m0-4h.01M12 4v4m0 4h.01"></path></svg>
-                    </div>
-                    <h2 class="text-xl font-semibold uppercase tracking-wide">DOPPLER</h2>
-                    <p class="text-sm mt-1 text-gray-400 group-hover:text-[var(--color-dark)]">Frequency Shift Simulation</p>
-                </div>
-            </a>
-
+<body>
+    <header>
+        <div class="header-content">
+            <h1>Digital Signal Processing Viewer</h1>
+            <p>Explore, visualize, and generate core signals with modern analytics</p>
         </div>
+        <div class="header-decoration"></div>
+    </header>
 
-        <!-- VOICE SAMPLING & RECOGNITION SECTION (WIDER AND CENTERED) -->
-        <div class="mt-12 pt-8 border-t border-gray-700/50">
-            <h2 class="text-3xl font-bold text-center mb-6 text-white" style="color: var(--color-primary);">
-                Voice Processing Suite
-            </h2>
-            <div class="flex justify-center px-4 sm:px-0">
-                <!-- VOICE Card - Made wider (max-w-2xl) and centered -->
-                <a href="/voice" class="card-link block rounded-xl p-8 bg-[var(--color-card)] text-white hover:bg-[var(--color-primary)] hover:text-[var(--color-dark)] w-full lg:max-w-2xl">
-                    <div class="voice-card-content">
-                        <!-- Microphone Icon SVG -->
-                        <div class="card-icon p-3 rounded-full flex-shrink-0">
-                            <svg class="w-12 h-12 md:w-16 md:h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7v0a7 7 0 01-7-7v0m14 0h1a1 1 0 011 1v3a4 4 0 01-4 4H7a4 4 0 01-4-4v-3a1 1 0 011-1h1m11 0V9a7 7 0 00-7-7v0a7 7 0 00-7 7v2m7 5v0h0m0 0h.01"></path></svg>
-                        </div>
-                        <div class="text-left flex-grow">
-                            <h2 class="text-2xl md:text-3xl font-extrabold uppercase tracking-widest">VOICE</h2>
-                            <p class="text-lg mt-1 text-gray-400 group-hover:text-[var(--color-dark)]">
-                                Record, Analyze, and Process Audio Signals for Speech Recognition.
-                            </p>
-                        </div>
-                    </div>
-                </a>
-            </div>
+    <div class="container">
+        <!-- Signal Cards Grid - Now includes Voice -->
+        <div class="signals-grid">
+            <a href="/ecg" class="signal-card">
+                <div class="card-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 12h18M3 6h5l4 12 4-12h5M12 3v18"/>
+                    </svg>
+                </div>
+                <h2 class="card-title">ECG</h2>
+                <p class="card-description">Electrocardiogram Analysis</p>
+            </a>
+
+            <a href="/eeg" class="signal-card">
+                <div class="card-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M2 12h20M6 6l2 4 2-8 2 4 2-4 2 8 2-4 2 4"/>
+                        <circle cx="12" cy="12" r="10"/>
+                    </svg>
+                </div>
+                <h2 class="card-title">EEG</h2>
+                <p class="card-description">Brain Wave Monitoring</p>
+            </a>
+
+            <a href="/radar" class="signal-card">
+                <div class="card-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="2"/>
+                        <circle cx="12" cy="12" r="6"/>
+                        <circle cx="12" cy="12" r="10"/>
+                        <path d="M12 2v20M2 12h20"/>
+                    </svg>
+                </div>
+                <h2 class="card-title">RADAR</h2>
+                <p class="card-description">Detection & Ranging</p>
+            </a>
+
+            <a href="/doppler" class="signal-card">
+                <div class="card-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2v20M2 12h20"/>
+                        <path d="M6 6l12 12M18 6l-12 12"/>
+                        <circle cx="12" cy="12" r="3"/>
+                    </svg>
+                </div>
+                <h2 class="card-title">DOPPLER</h2>
+                <p class="card-description">Frequency Shift Analysis</p>
+            </a>
+
+            <a href="/voice" class="signal-card">
+                <div class="card-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 1v22M6 5c-1.657 0-3 1.343-3 3v8c0 1.657 1.343 3 3 3h12c1.657 0 3-1.343 3-3V8c0-1.657-1.343-3-3-3"/>
+                        <path d="M9 18v3h6v-3"/>
+                    </svg>
+                </div>
+                <h2 class="card-title">VOICE</h2>
+                <p class="card-description">Audio Signal Processing</p>
+            </a>
         </div>
-        
-        <!-- Footer / Credits -->
-        <footer class="text-center mt-16 text-gray-500 text-sm">
-            <p>&copy; 2025 Signal Viewer | Built with Flask & DSP</p>
-        </footer>
     </div>
+
+    <footer>
+        <p>&copy; 2025 Signal Viewer | Advanced Digital Signal Processing Platform</p>
+    </footer>
 </body>
 </html>

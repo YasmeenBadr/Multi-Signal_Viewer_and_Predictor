@@ -1,379 +1,448 @@
-from flask import Blueprint, request, jsonify, render_template, current_app
-from .resampling import decimate_with_aliasing, resample_signal
+# eeg_refactored.py
+"""
+EEG Signal Processing and Disease Prediction Module
 
-import mne
-import numpy as np
-from scipy.signal import butter, lfilter, filtfilt 
+Provides real-time EEG visualization, multi-disease prediction (Epilepsy, 
+Alzheimer's, Sleep Disorders, Parkinson's), and signal analysis.
+"""
+
 import os
-import sys
-import torch
-import pandas as pd
-from pathlib import Path
+import logging
 from typing import Tuple, Dict, List, Optional
 
-bp = Blueprint("eeg", __name__, template_folder="../templates")
+import numpy as np
+import torch
+import torch.nn as nn
+from scipy.signal import butter, filtfilt, welch
 
-# --- GLOBAL STATE (To hold the loaded data) ---
-class EEGData:
-    def __init__(self):
-        self.raw = None
-        self.fs = 160
-        self.n_times = 0
-        self.ch_names = []
-        self.current_index = 0
+from flask import Blueprint, request, jsonify, render_template
 
-eeg_data = EEGData()
-INITIAL_OFFSET_SAMPLES = 0  # Will be calculated after file load
-CHUNK_SAMPLES = 16          # Default, will be recalculated
+# Import MNE for EEG file loading
+try:
+    import mne
+except ImportError:
+    mne = None
 
-# --- SERVER-SIDE XOR STATE ---
-# Maintains rolling buffers and previous window per channel for XOR mode
-_XOR_BUFFERS: Dict[int, List[float]] = {}
-_XOR_PREV_WINDOWS: Dict[int, List[float]] = {}
+# Import shared utilities
+from shared_utils import (
+    RollingBuffer, normalize_signal,
+    format_prediction_response, format_streaming_response,
+    validate_channels
+)
+from .resampling import decimate_with_aliasing, resample_signal
 
-# Define EEG Frequency Bands (Kept for band power calc)
-BANDS = {
-    'Delta': (0.5, 4), 'Theta': (4, 8), 'Alpha': (8, 13), 
-    'Beta': (13, 30), 'Gamma': (30, 50)
+
+# ============================================================================
+# CONFIGURATION
+# ============================================================================
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s"
+)
+logger = logging.getLogger("eeg")
+
+# Device configuration
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+# EEG frequency bands
+FREQUENCY_BANDS = {
+    'Delta': (0.5, 4),
+    'Theta': (4, 8),
+    'Alpha': (8, 13),
+    'Beta': (13, 30),
+    'Gamma': (30, 50)
 }
 
-# --- HELPER FUNCTIONS (butter_bandpass and calculate_band_power remain the same) ---
+# Streaming parameters
+BASE_CHUNK_SAMPLES = 16
+INITIAL_OFFSET_SAMPLES = 0  # Will be set after file load
+BAND_POWER_SCALING = 10000000000000.0  # Scaling factor for visualization
 
-def butter_bandpass(lowcut, highcut, fs, order=2): 
-    # ... (Your existing butter_bandpass function) ...
+
+# ============================================================================
+# GLOBAL STATE
+# ============================================================================
+
+class EEGState:
+    """Centralized state management for EEG streaming."""
+    
+    def __init__(self):
+        # MNE raw object
+        self.raw = None
+        
+        # Signal properties
+        self.fs = 160  # Sampling frequency
+        self.n_times = 0  # Total samples
+        self.ch_names = []  # Channel names
+        
+        # Streaming state
+        self.current_index = 0  # Current playback position
+        self.initial_offset = 0  # Skip initial samples
+        
+        # XOR mode state (server-side)
+        self.xor_buffers = {}  # Rolling buffers per channel
+        self.xor_prev_windows = {}  # Previous window per channel
+        
+        # File loaded flag
+        self.loaded = False
+    
+    def reset_streaming_state(self):
+        """Reset streaming-related state."""
+        self.current_index = self.initial_offset
+        self.xor_buffers = {}
+        self.xor_prev_windows = {}
+    
+    def reset_all(self):
+        """Reset all state."""
+        self.__init__()
+
+
+# Global state instance
+state = EEGState()
+
+
+# ============================================================================
+# SIGNAL PROCESSING UTILITIES
+# ============================================================================
+
+def apply_bandpass_filter(data: np.ndarray, lowcut: float, highcut: float, 
+                         fs: float, order: int = 2) -> np.ndarray:
+    """
+    Apply Butterworth bandpass filter to signal.
+    
+    Args:
+        data: Input signal
+        lowcut: Low cutoff frequency
+        highcut: High cutoff frequency
+        fs: Sampling frequency
+        order: Filter order
+    
+    Returns:
+        Filtered signal
+    """
     nyq = 0.5 * fs
     low = lowcut / nyq
     high = highcut / nyq
     
+    # Handle edge cases
     if lowcut == 0.5 and highcut == 4:
+        # Delta band - lowpass only
         b, a = butter(order, high, btype='lowpass')
     elif lowcut > 0 and highcut < nyq:
+        # Bandpass
         b, a = butter(order, [low, high], btype='bandpass')
     else:
-        return None, None 
-        
-    return b, a
-
-def calculate_band_power(data, fs):
-    # ... (Your existing calculate_band_power function) ...
-    band_powers = {}
-    SCALING_FACTOR = 10000000000000.0 
+        return data  # Can't filter
     
-    for band, (low, high) in BANDS.items():
-        if high <= low or low >= fs/2:
-            band_powers[band] = 0.0
-            continue
-            
-        b, a = butter_bandpass(low, high, fs, order=2) 
-        
-        if b is None or a is None:
-            band_powers[band] = 0.0
-            continue
-        
-        try:
-            filtered_data = filtfilt(b, a, data.astype(float))
-            power_value = np.mean(filtered_data**2)
-            scaled_power = (power_value if np.isfinite(power_value) else 0.0) * SCALING_FACTOR
-            band_powers[band] = scaled_power
-        except Exception as e:
-            print(f"Error calculating band power for {band}: {e}", file=sys.stderr)
-            band_powers[band] = 0.0
+    try:
+        filtered = filtfilt(b, a, data.astype(float))
+        return filtered
+    except Exception as e:
+        logger.debug(f"Filter failed: {e}")
+        return data
 
+
+def calculate_band_power(data: np.ndarray, fs: float) -> Dict[str, float]:
+    """
+    Calculate power in each frequency band.
+    
+    Args:
+        data: Signal data
+        fs: Sampling frequency
+    
+    Returns:
+        Dictionary of band powers
+    """
+    band_powers = {}
+    
+    for band_name, (low, high) in FREQUENCY_BANDS.items():
+        # Validate frequency range
+        if high <= low or low >= fs / 2:
+            band_powers[band_name] = 0.0
+            continue
+        
+        # Apply bandpass filter
+        filtered = apply_bandpass_filter(data, low, high, fs, order=2)
+        
+        # Calculate power
+        power = np.mean(filtered ** 2)
+        
+        # Scale for visualization
+        scaled_power = power * BAND_POWER_SCALING if np.isfinite(power) else 0.0
+        band_powers[band_name] = scaled_power
+    
     return band_powers
 
 
-# --- PREDICTION MODELS INTEGRATION ---
+def calculate_xor_difference_eeg(current_buffer: List[float], 
+                                 previous_window: List[float],
+                                 chunk_size: int) -> List[float]:
+    """
+    Calculate thresholded XOR difference for EEG signals.
+    
+    Args:
+        current_buffer: Current signal buffer
+        previous_window: Previous window for comparison
+        chunk_size: Size of analysis window
+    
+    Returns:
+        XOR difference signal
+    """
+    if len(current_buffer) < chunk_size:
+        return current_buffer
+    
+    if not previous_window or len(previous_window) != chunk_size:
+        return current_buffer
+    
+    # Get current window
+    current_window = current_buffer[-chunk_size:]
+    
+    # Calculate statistics for dynamic threshold
+    mean = np.mean(current_window)
+    std = np.std(current_window)
+    threshold = std * 0.1  # 10% of standard deviation
+    
+    # Compute thresholded difference
+    xor_result = []
+    for i in range(chunk_size):
+        curr_val = current_window[i]
+        prev_val = previous_window[i]
+        distance = abs(curr_val - prev_val)
+        
+        # Show difference if above threshold, else 0
+        xor_result.append(distance if distance > threshold else 0)
+    
+    return xor_result
+
+
+# ============================================================================
+# DISEASE PREDICTION MODELS
+# ============================================================================
+
+class SimpleDiseasePredictor(nn.Module):
+    """Simple neural network for disease prediction."""
+    
+    def __init__(self, input_size: int = 1024):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(input_size, 512),
+            nn.ReLU(),
+            nn.Dropout(0.3),
+            nn.Linear(512, 256),
+            nn.ReLU(),
+            nn.Dropout(0.3),
+            nn.Linear(256, 2)
+        )
+    
+    def forward(self, x):
+        return self.net(x)
+
 
 class EpilepsyPredictor:
-    """Epilepsy prediction using EEGPT model"""
+    """Epilepsy detection from EEG patterns."""
     
-    def __init__(self, model_path: str = None, device: str = 'auto'):
+    def __init__(self, model_path: Optional[str] = None, device: str = 'auto'):
         self.device = self._get_device(device)
         self.model_path = model_path
         self.model = None
         self.class_names = ['Normal', 'Epilepsy']
-        self.balance_factor = 0.3
-        
+    
     def _get_device(self, device: str) -> torch.device:
         if device == 'auto':
             device = 'cuda' if torch.cuda.is_available() else 'cpu'
         return torch.device(device)
     
     def _load_model(self):
-        """Load the epilepsy prediction model"""
+        """Load model if available."""
         if self.model is not None:
             return
-            
-        # Try to find model file
-        if self.model_path is None:
-            # Look for epilepsy model in common locations
-            possible_paths = [
-                "G:/ali/EEG/EEGPT_Model/finetuned_models/EEGPT-Epilepsy-Synthetic-epoch=01-val_acc=0.67.ckpt",
-                "finetuned_models/EEGPT-Epilepsy-Synthetic-epoch=01-val_acc=0.67.ckpt",
-                "models/epilepsy_model.pt",
-                "models/epilepsy_model.ckpt"
-            ]
-            for path in possible_paths:
-                if os.path.exists(path):
-                    self.model_path = path
-                    break
         
+        # Try to find model
         if self.model_path and os.path.exists(self.model_path):
             try:
-                # Load model checkpoint
+                self.model = SimpleDiseasePredictor().to(self.device)
                 checkpoint = torch.load(self.model_path, map_location=self.device)
-                # Initialize model (simplified version for demo)
-                self.model = torch.nn.Sequential(
-                    torch.nn.Linear(1024, 512),
-                    torch.nn.ReLU(),
-                    torch.nn.Dropout(0.3),
-                    torch.nn.Linear(512, 256),
-                    torch.nn.ReLU(),
-                    torch.nn.Dropout(0.3),
-                    torch.nn.Linear(256, 2)
-                )
-                if 'state_dict' in checkpoint:
-                    self.model.load_state_dict(checkpoint['state_dict'])
-                else:
-                    self.model.load_state_dict(checkpoint)
+                state_dict = checkpoint.get('state_dict', checkpoint)
+                self.model.load_state_dict(state_dict, strict=False)
                 self.model.eval()
-                self.model.to(self.device)
-                print(f"Epilepsy model loaded from: {self.model_path}")
+                logger.info(f"Loaded epilepsy model from {self.model_path}")
             except Exception as e:
-                print(f"Error loading epilepsy model: {e}")
+                logger.warning(f"Failed to load epilepsy model: {e}")
                 self.model = None
-        else:
-            print("Epilepsy model not found, using dummy model")
-            self.model = None
     
     def predict(self, eeg_data: np.ndarray) -> Tuple[int, float, str]:
-        """Predict epilepsy from EEG data using pattern analysis"""
+        """
+        Predict epilepsy from EEG data.
+        
+        Args:
+            eeg_data: EEG signal data
+        
+        Returns:
+            Tuple of (predicted_class, confidence, class_name)
+        """
         self._load_model()
         
+        # Use pattern analysis if model not available
         if self.model is None:
-            # Analyze EEG patterns for epilepsy detection
             epilepsy_score = self._analyze_epilepsy_patterns(eeg_data)
             
-            if epilepsy_score > 0.7:  # High epilepsy probability
-                predicted_class = 1
-                confidence = epilepsy_score
-                class_name = "Epilepsy"
-            else:  # Normal
-                predicted_class = 0
-                confidence = 1 - epilepsy_score
-                class_name = "Normal"
-            return predicted_class, confidence, class_name
+            if epilepsy_score > 0.7:
+                return 1, epilepsy_score, "Epilepsy"
+            else:
+                return 0, 1 - epilepsy_score, "Normal"
         
+        # Use model prediction
         try:
-            # Preprocess EEG data to match the model's expected input
+            # Preprocess
             if eeg_data.ndim == 2:
                 eeg_data = eeg_data.flatten()
             
+            # Resize to model input
             if len(eeg_data) > 1024:
                 eeg_data = eeg_data[:1024]
             elif len(eeg_data) < 1024:
                 eeg_data = np.pad(eeg_data, (0, 1024 - len(eeg_data)))
             
-            # Normalize the data
-            eeg_data = (eeg_data - np.mean(eeg_data)) / (np.std(eeg_data) + 1e-8)
+            # Normalize
+            eeg_data = normalize_signal(eeg_data, method='zscore')
             
+            # Predict
             tensor = torch.from_numpy(eeg_data.astype(np.float32)).unsqueeze(0).to(self.device)
-            
             with torch.no_grad():
                 logits = self.model(tensor)
                 probs = torch.softmax(logits, dim=1)[0].cpu().numpy()
-                epilepsy_prob = float(probs[1])  # Probability of epilepsy
                 
-                # Use threshold of 0.5 for classification
-                predicted_class = 1 if epilepsy_prob > 0.5 else 0
-                confidence = max(epilepsy_prob, 1 - epilepsy_prob)
+                predicted_class = 1 if probs[1] > 0.5 else 0
+                confidence = max(probs[0], probs[1])
                 class_name = self.class_names[predicted_class]
                 
                 return predicted_class, confidence, class_name
-                
+        
         except Exception as e:
-            print(f"Error in epilepsy prediction: {e}")
-            # Return realistic fallback based on actual label pattern
+            logger.error(f"Epilepsy prediction error: {e}")
             return 0, 0.7, "Normal"
     
     def _analyze_epilepsy_patterns(self, eeg_data: np.ndarray) -> float:
-        """Analyze EEG patterns characteristic of epilepsy"""
+        """Analyze EEG for epilepsy-specific patterns."""
         try:
-            # Calculate statistical features
-            mean_amp = np.mean(np.abs(eeg_data))
+            # Statistical features
             std_amp = np.std(eeg_data)
-            max_amp = np.max(np.abs(eeg_data))
             
-            # Detect spikes (sudden amplitude changes) - more sensitive
+            # Spike detection
             diff = np.diff(eeg_data)
-            spike_threshold = std_amp * 2  # Lower threshold for better detection
+            spike_threshold = std_amp * 2
             spikes = np.sum(np.abs(diff) > spike_threshold)
             spike_ratio = spikes / len(diff) if len(diff) > 0 else 0
             
-            # Detect sharp waves and spikes (epilepsy-specific)
-            sharp_waves = np.sum(np.abs(diff) > std_amp * 1.5)
-            sharp_wave_ratio = sharp_waves / len(diff) if len(diff) > 0 else 0
+            # Sharp waves
+            sharp_threshold = std_amp * 1.5
+            sharp_waves = np.sum(np.abs(diff) > sharp_threshold)
+            sharp_ratio = sharp_waves / len(diff) if len(diff) > 0 else 0
             
-            # Detect high-frequency activity (seizure-like)
-            from scipy.signal import welch
+            # High-frequency activity (seizure-like)
             freqs, psd = welch(eeg_data, fs=160, nperseg=min(256, len(eeg_data)//4))
-            seizure_freq_power = np.sum(psd[(freqs >= 20) & (freqs <= 40)])  # Broader range
+            seizure_power = np.sum(psd[(freqs >= 20) & (freqs <= 40)])
             total_power = np.sum(psd)
-            seizure_freq_ratio = seizure_freq_power / total_power if total_power > 0 else 0
+            seizure_ratio = seizure_power / total_power if total_power > 0 else 0
             
-            # Detect amplitude asymmetry (epilepsy characteristic)
+            # Amplitude asymmetry
+            mean_amp = np.mean(np.abs(eeg_data))
             amplitude_asymmetry = np.std(np.abs(eeg_data)) / (mean_amp + 1e-6)
             
-            # Epilepsy score - much more conservative
-            epilepsy_score = min(1.0, (
-                spike_ratio * 1.5 +           # Lower weight on spikes
-                sharp_wave_ratio * 1.2 +      # Sharp waves
-                seizure_freq_ratio * 1.2 +    # Seizure frequencies
-                min(amplitude_asymmetry * 0.1, 0.2)  # Amplitude asymmetry
+            # Calculate score
+            score = min(1.0, (
+                spike_ratio * 1.5 +
+                sharp_ratio * 1.2 +
+                seizure_ratio * 1.2 +
+                min(amplitude_asymmetry * 0.1, 0.2)
             ))
             
-            # Only boost score if multiple strong indicators are present
-            if spike_ratio > 0.05 and sharp_wave_ratio > 0.05:
-                epilepsy_score = min(1.0, epilepsy_score * 1.3)
+            # Boost if multiple indicators
+            if spike_ratio > 0.05 and sharp_ratio > 0.05:
+                score = min(1.0, score * 1.3)
             
-            return epilepsy_score
-            
-        except Exception as e:
-            return 0.1  # Lower default score
+            return score
+        
+        except Exception:
+            return 0.1
 
 
 class AlzheimerPredictor:
-    """Alzheimer's disease prediction using EEGPT model"""
+    """Alzheimer's disease detection from EEG patterns."""
     
-    def __init__(self, model_path: str = None, device: str = 'auto'):
-        self.device = self._get_device(device)
+    def __init__(self, model_path: Optional[str] = None, device: str = 'auto'):
+        self.device = torch.device('cuda' if torch.cuda.is_available() and device == 'auto' else 'cpu')
         self.model_path = model_path
         self.model = None
         self.class_names = ['Normal', 'Alzheimer']
-        self.optimal_threshold = 0.5
-        
-    def _get_device(self, device: str) -> torch.device:
-        if device == 'auto':
-            device = 'cuda' if torch.cuda.is_available() else 'cpu'
-        return torch.device(device)
     
     def _load_model(self):
-        """Load the Alzheimer prediction model"""
+        """Load model if available."""
         if self.model is not None:
             return
-            
-        if self.model_path is None:
-            possible_paths = [
-                "G:/ali/EEG/EEGPT_Model/finetuned_models/EEGPT-Alzheimer-Improved-epoch=01-val_acc=0.51-v3.ckpt",
-                "finetuned_models/EEGPT-Alzheimer-Improved-epoch=01-val_acc=0.51-v3.ckpt",
-                "models/alzheimer_model.pt",
-                "models/alzheimer_model.ckpt"
-            ]
-            for path in possible_paths:
-                if os.path.exists(path):
-                    self.model_path = path
-                    break
         
         if self.model_path and os.path.exists(self.model_path):
             try:
-                # Load the actual EEGPT model checkpoint
+                self.model = SimpleDiseasePredictor().to(self.device)
                 checkpoint = torch.load(self.model_path, map_location=self.device)
-                
-                # Try to load the actual model architecture from the checkpoint
-                if 'state_dict' in checkpoint:
-                    # This is a Lightning checkpoint, extract the model
-                    state_dict = checkpoint['state_dict']
-                    # Create a simplified model that matches the checkpoint structure
-                    self.model = torch.nn.Sequential(
-                        torch.nn.Linear(1024, 512),
-                        torch.nn.ReLU(),
-                        torch.nn.Dropout(0.3),
-                        torch.nn.Linear(512, 256),
-                        torch.nn.ReLU(),
-                        torch.nn.Dropout(0.3),
-                        torch.nn.Linear(256, 2)
-                    )
-                    # Try to load compatible weights
-                    try:
-                        self.model.load_state_dict(state_dict, strict=False)
-                    except:
-                        print("Could not load exact state dict, using model with random weights")
-                else:
-                    # Direct model checkpoint
-                    self.model = checkpoint
-                
+                state_dict = checkpoint.get('state_dict', checkpoint)
+                self.model.load_state_dict(state_dict, strict=False)
                 self.model.eval()
-                self.model.to(self.device)
-                print(f"Alzheimer model loaded from: {self.model_path}")
+                logger.info(f"Loaded Alzheimer model from {self.model_path}")
             except Exception as e:
-                print(f"Error loading Alzheimer model: {e}")
+                logger.warning(f"Failed to load Alzheimer model: {e}")
                 self.model = None
-        else:
-            print("Alzheimer model not found, using dummy model")
-            self.model = None
     
     def predict(self, eeg_data: np.ndarray) -> Tuple[int, float, str]:
-        """Predict Alzheimer's from EEG data using pattern analysis"""
+        """Predict Alzheimer's from EEG data."""
         self._load_model()
         
         if self.model is None:
-            # Analyze EEG patterns for Alzheimer's detection
             alzheimer_score = self._analyze_alzheimer_patterns(eeg_data)
             
-            if alzheimer_score > 0.2:  # Very low Alzheimer's probability threshold
-                predicted_class = 1
-                confidence = alzheimer_score
-                class_name = "Alzheimer"
-            else:  # Normal
-                predicted_class = 0
-                confidence = alzheimer_score  # Use the actual score, not 1-score
-                class_name = "Normal"
-            return predicted_class, confidence, class_name
+            if alzheimer_score > 0.2:
+                return 1, alzheimer_score, "Alzheimer"
+            else:
+                return 0, alzheimer_score, "Normal"
         
+        # Model-based prediction (similar structure as epilepsy)
         try:
-            # Preprocess EEG data to match the model's expected input
             if eeg_data.ndim == 2:
                 eeg_data = eeg_data.flatten()
             
-            # Ensure correct input size (1024 samples)
             if len(eeg_data) > 1024:
                 eeg_data = eeg_data[:1024]
             elif len(eeg_data) < 1024:
                 eeg_data = np.pad(eeg_data, (0, 1024 - len(eeg_data)))
             
-            # Normalize the data
-            eeg_data = (eeg_data - np.mean(eeg_data)) / (np.std(eeg_data) + 1e-8)
-            
+            eeg_data = normalize_signal(eeg_data, method='zscore')
             tensor = torch.from_numpy(eeg_data.astype(np.float32)).unsqueeze(0).to(self.device)
             
             with torch.no_grad():
                 logits = self.model(tensor)
                 probs = torch.softmax(logits, dim=1)[0].cpu().numpy()
-                alzheimer_prob = float(probs[1])  # Probability of Alzheimer's
                 
-                # Use the actual threshold from the model training
-                predicted_class = 1 if alzheimer_prob > self.optimal_threshold else 0
-                confidence = max(alzheimer_prob, 1 - alzheimer_prob)
+                predicted_class = 1 if probs[1] > 0.5 else 0
+                confidence = max(probs[0], probs[1])
                 class_name = self.class_names[predicted_class]
-                return predicted_class, confidence, class_name
                 
+                return predicted_class, confidence, class_name
+        
         except Exception as e:
-            print(f"Error in Alzheimer prediction: {e}")
-            # Return realistic fallback based on actual label pattern
+            logger.error(f"Alzheimer prediction error: {e}")
             return 0, 0.75, "Normal"
     
     def _analyze_alzheimer_patterns(self, eeg_data: np.ndarray) -> float:
-        """Analyze EEG patterns characteristic of Alzheimer's disease"""
+        """Analyze EEG for Alzheimer's patterns."""
         try:
-            # Check for flat or corrupted data
+            # Check for flat data
             if np.std(eeg_data) < 1e-6:
-                return 0.05  # Very low score for flat data
+                return 0.05
             
-            # Calculate frequency band powers
-            from scipy.signal import welch
+            # Frequency analysis
             freqs, psd = welch(eeg_data, fs=160, nperseg=min(256, len(eeg_data)//4))
             
-            # Define frequency bands
             delta_power = np.sum(psd[(freqs >= 0.5) & (freqs <= 4)])
             theta_power = np.sum(psd[(freqs >= 4) & (freqs <= 8)])
             alpha_power = np.sum(psd[(freqs >= 8) & (freqs <= 13)])
@@ -382,124 +451,83 @@ class AlzheimerPredictor:
             total_power = delta_power + theta_power + alpha_power + beta_power
             
             if total_power > 0:
-                # Alzheimer's: reduced alpha, increased theta
                 alpha_ratio = alpha_power / total_power
                 theta_ratio = theta_power / total_power
                 delta_ratio = delta_power / total_power
-                beta_ratio = beta_power / total_power
                 
-                # Calculate irregularity (entropy-like measure)
+                # Entropy
                 psd_norm = psd / np.sum(psd) if np.sum(psd) > 0 else psd
                 entropy = -np.sum(psd_norm * np.log(psd_norm + 1e-10))
                 
-                # Check for epilepsy-like patterns - if present, reduce Alzheimer score
+                # Check for epilepsy-like patterns
                 diff = np.diff(eeg_data)
                 std_amp = np.std(eeg_data)
                 spikes = np.sum(np.abs(diff) > std_amp * 2)
                 spike_ratio = spikes / len(diff) if len(diff) > 0 else 0
                 
-                # Alzheimer's score - very sensitive for Alzheimer detection
-                alzheimer_score = min(1.0, (
-                    (1 - alpha_ratio) * 3.0 +  # Much higher weight on reduced alpha
-                    theta_ratio * 2.0 +       # Much higher theta weight
-                    delta_ratio * 1.0 +       # Higher delta weight
-                    (entropy / 8) * 0.5       # Much higher irregularity weight
+                # Alzheimer score
+                score = min(1.0, (
+                    (1 - alpha_ratio) * 3.0 +
+                    theta_ratio * 2.0 +
+                    delta_ratio * 1.0 +
+                    (entropy / 8) * 0.5
                 ))
                 
-                # Reduce score if epilepsy-like patterns are present
-                if spike_ratio > 0.1:  # If spikes detected, likely epilepsy not Alzheimer
-                    alzheimer_score = alzheimer_score * 0.3
+                # Reduce if epilepsy patterns present
+                if spike_ratio > 0.1:
+                    score *= 0.3
                 
-                # Boost score if cognitive decline patterns are present
-                if alpha_ratio < 0.3 and theta_ratio > 0.2:  # Cognitive decline indicators
-                    alzheimer_score = min(1.0, alzheimer_score * 1.5)
-                    
-            else:
-                alzheimer_score = 0.1
+                # Boost for cognitive decline patterns
+                if alpha_ratio < 0.3 and theta_ratio > 0.2:
+                    score = min(1.0, score * 1.5)
                 
-            return alzheimer_score
+                return score
             
-        except Exception as e:
-            return 0.1  # Lower default score
+            return 0.1
+        
+        except Exception:
+            return 0.1
 
 
 class SleepDisorderPredictor:
-    """Sleep disorder prediction using EEGPT model"""
+    """Sleep disorder detection from EEG patterns."""
     
-    def __init__(self, model_path: str = None, device: str = 'auto'):
-        self.device = self._get_device(device)
+    def __init__(self, model_path: Optional[str] = None, device: str = 'auto'):
+        self.device = torch.device('cuda' if torch.cuda.is_available() and device == 'auto' else 'cpu')
         self.model_path = model_path
         self.model = None
         self.class_names = ['Normal', 'Sleep Disorder']
-        
-    def _get_device(self, device: str) -> torch.device:
-        if device == 'auto':
-            device = 'cuda' if torch.cuda.is_available() else 'cpu'
-        return torch.device(device)
     
     def _load_model(self):
-        """Load the sleep disorder prediction model"""
         if self.model is not None:
             return
-            
-        if self.model_path is None:
-            possible_paths = [
-                "G:/ali/EEG/EEGPT_Model/finetuned_models/EEGPT-SleepTelemetry-epoch=02-val_acc=0.70-v1.ckpt",
-                "finetuned_models/EEGPT-SleepTelemetry-epoch=02-val_acc=0.70-v1.ckpt",
-                "models/sleep_disorder_model.pt",
-                "models/sleep_disorder_model.ckpt"
-            ]
-            for path in possible_paths:
-                if os.path.exists(path):
-                    self.model_path = path
-                    break
         
         if self.model_path and os.path.exists(self.model_path):
             try:
+                self.model = SimpleDiseasePredictor().to(self.device)
                 checkpoint = torch.load(self.model_path, map_location=self.device)
-                self.model = torch.nn.Sequential(
-                    torch.nn.Linear(1024, 512),
-                    torch.nn.ReLU(),
-                    torch.nn.Dropout(0.3),
-                    torch.nn.Linear(512, 256),
-                    torch.nn.ReLU(),
-                    torch.nn.Dropout(0.3),
-                    torch.nn.Linear(256, 2)
-                )
-                if 'state_dict' in checkpoint:
-                    self.model.load_state_dict(checkpoint['state_dict'])
-                else:
-                    self.model.load_state_dict(checkpoint)
+                state_dict = checkpoint.get('state_dict', checkpoint)
+                self.model.load_state_dict(state_dict, strict=False)
                 self.model.eval()
-                self.model.to(self.device)
-                print(f"Sleep disorder model loaded from: {self.model_path}")
+                logger.info(f"Loaded sleep disorder model")
             except Exception as e:
-                print(f"Error loading sleep disorder model: {e}")
+                logger.warning(f"Failed to load sleep disorder model: {e}")
                 self.model = None
-        else:
-            print("Sleep disorder model not found, using dummy model")
-            self.model = None
     
     def predict(self, eeg_data: np.ndarray) -> Tuple[int, float, str]:
-        """Predict sleep disorder from EEG data using pattern analysis"""
+        """Predict sleep disorder from EEG data."""
         self._load_model()
         
         if self.model is None:
-            # Analyze EEG patterns for sleep disorder detection
-            sleep_disorder_score = self._analyze_sleep_disorder_patterns(eeg_data)
+            score = self._analyze_sleep_patterns(eeg_data)
             
-            if sleep_disorder_score > 0.95:  # Extremely high sleep disorder probability
-                predicted_class = 1
-                confidence = sleep_disorder_score
-                class_name = "Sleep Disorder"
-            else:  # Normal
-                predicted_class = 0
-                confidence = 1 - sleep_disorder_score
-                class_name = "Normal"
-            return predicted_class, confidence, class_name
+            if score > 0.95:
+                return 1, score, "Sleep Disorder"
+            else:
+                return 0, 1 - score, "Normal"
         
+        # Model-based prediction
         try:
-            # Preprocess EEG data to match the model's expected input
             if eeg_data.ndim == 2:
                 eeg_data = eeg_data.flatten()
             
@@ -508,9 +536,7 @@ class SleepDisorderPredictor:
             elif len(eeg_data) < 1024:
                 eeg_data = np.pad(eeg_data, (0, 1024 - len(eeg_data)))
             
-            # Normalize the data
-            eeg_data = (eeg_data - np.mean(eeg_data)) / (np.std(eeg_data) + 1e-8)
-            
+            eeg_data = normalize_signal(eeg_data, method='zscore')
             tensor = torch.from_numpy(eeg_data.astype(np.float32)).unsqueeze(0).to(self.device)
             
             with torch.no_grad():
@@ -519,25 +545,21 @@ class SleepDisorderPredictor:
                 predicted_class = int(np.argmax(probs))
                 confidence = float(probs[predicted_class])
                 class_name = self.class_names[predicted_class]
-                return predicted_class, confidence, class_name
                 
+                return predicted_class, confidence, class_name
+        
         except Exception as e:
-            print(f"Error in sleep disorder prediction: {e}")
-            # Return realistic fallback based on actual label pattern
+            logger.error(f"Sleep disorder prediction error: {e}")
             return 1, 0.65, "Sleep Disorder"
     
-    def _analyze_sleep_disorder_patterns(self, eeg_data: np.ndarray) -> float:
-        """Analyze EEG patterns characteristic of sleep disorders"""
+    def _analyze_sleep_patterns(self, eeg_data: np.ndarray) -> float:
+        """Analyze EEG for sleep disorder patterns."""
         try:
-            # Check for flat or corrupted data
             if np.std(eeg_data) < 1e-6:
-                return 0.05  # Very low score for flat data
+                return 0.05
             
-            # Calculate frequency band powers
-            from scipy.signal import welch
             freqs, psd = welch(eeg_data, fs=160, nperseg=min(256, len(eeg_data)//4))
             
-            # Define frequency bands
             delta_power = np.sum(psd[(freqs >= 0.5) & (freqs <= 4)])
             theta_power = np.sum(psd[(freqs >= 4) & (freqs <= 8)])
             alpha_power = np.sum(psd[(freqs >= 8) & (freqs <= 13)])
@@ -546,132 +568,89 @@ class SleepDisorderPredictor:
             total_power = delta_power + theta_power + alpha_power + beta_power
             
             if total_power > 0:
-                # Sleep disorders: abnormal sleep patterns, reduced sleep spindles
                 delta_ratio = delta_power / total_power
-                theta_ratio = theta_power / total_power
-                alpha_ratio = alpha_power / total_power
-                beta_ratio = beta_power / total_power
                 
-                # Detect sleep spindles (11-15 Hz) - reduced in sleep disorders
+                # Sleep spindles (reduced in sleep disorders)
                 spindle_power = np.sum(psd[(freqs >= 11) & (freqs <= 15)])
                 spindle_ratio = spindle_power / total_power
                 
-                # Detect K-complexes (sleep disorder characteristic)
+                # K-complexes
                 k_complex_power = np.sum(psd[(freqs >= 0.5) & (freqs <= 2)])
                 k_complex_ratio = k_complex_power / total_power
                 
-                # Calculate irregularity (but not as high as epilepsy)
+                # Entropy
                 psd_norm = psd / np.sum(psd) if np.sum(psd) > 0 else psd
                 entropy = -np.sum(psd_norm * np.log(psd_norm + 1e-10))
                 
-                # Check for epilepsy-like patterns (spikes) - if present, reduce sleep disorder score
+                # Check for spikes (epilepsy-like)
                 diff = np.diff(eeg_data)
                 std_amp = np.std(eeg_data)
                 spikes = np.sum(np.abs(diff) > std_amp * 2)
                 spike_ratio = spikes / len(diff) if len(diff) > 0 else 0
                 
-                # Sleep disorder score - ultra conservative
-                sleep_disorder_score = min(1.0, (
-                    (1 - spindle_ratio) * 0.5 +  # Ultra low weight on reduced sleep spindles
-                    delta_ratio * 0.3 +          # Ultra low slow wave activity weight
-                    k_complex_ratio * 0.4 +      # Ultra low K-complexes weight
-                    (entropy / 25) * 0.05        # Ultra low irregularity weight
+                # Score (very conservative)
+                score = min(1.0, (
+                    (1 - spindle_ratio) * 0.5 +
+                    delta_ratio * 0.3 +
+                    k_complex_ratio * 0.4 +
+                    (entropy / 25) * 0.05
                 ))
                 
-                # Reduce score if epilepsy-like patterns are present
-                if spike_ratio > 0.01:  # If spikes detected, likely epilepsy not sleep disorder
-                    sleep_disorder_score = sleep_disorder_score * 0.1
+                # Reduce if epilepsy patterns
+                if spike_ratio > 0.01:
+                    score *= 0.1
                 
-                # Only boost score if extremely strong sleep disorder patterns are present
-                if spindle_ratio < 0.005 and delta_ratio > 0.8:  # Ultra strong sleep disorder indicators
-                    sleep_disorder_score = min(1.0, sleep_disorder_score * 1.1)
-                    
-            else:
-                sleep_disorder_score = 0.1
+                # Boost for strong indicators
+                if spindle_ratio < 0.005 and delta_ratio > 0.8:
+                    score = min(1.0, score * 1.1)
                 
-            return sleep_disorder_score
+                return score
             
-        except Exception as e:
-            return 0.1  # Lower default score
+            return 0.1
+        
+        except Exception:
+            return 0.1
 
 
 class ParkinsonPredictor:
-    """Parkinson's disease prediction using EEGPT model"""
+    """Parkinson's disease detection from EEG patterns."""
     
-    def __init__(self, model_path: str = None, device: str = 'auto'):
-        self.device = self._get_device(device)
+    def __init__(self, model_path: Optional[str] = None, device: str = 'auto'):
+        self.device = torch.device('cuda' if torch.cuda.is_available() and device == 'auto' else 'cpu')
         self.model_path = model_path
         self.model = None
         self.class_names = ['Healthy', 'Parkinson']
-        
-    def _get_device(self, device: str) -> torch.device:
-        if device == 'auto':
-            device = 'cuda' if torch.cuda.is_available() else 'cpu'
-        return torch.device(device)
     
     def _load_model(self):
-        """Load the Parkinson prediction model"""
         if self.model is not None:
             return
-            
-        if self.model_path is None:
-            possible_paths = [
-                "G:/ali/EEG/EEGPT_Model/finetuned_models/EEGPT-Parkinson-epoch=epoch=00-val_acc=val_acc=0.66.ckpt",
-                "finetuned_models/EEGPT-Parkinson-epoch=epoch=00-val_acc=val_acc=0.66.ckpt",
-                "models/parkinson_model.pt",
-                "models/parkinson_model.ckpt"
-            ]
-            for path in possible_paths:
-                if os.path.exists(path):
-                    self.model_path = path
-                    break
         
         if self.model_path and os.path.exists(self.model_path):
             try:
+                self.model = SimpleDiseasePredictor().to(self.device)
                 checkpoint = torch.load(self.model_path, map_location=self.device)
-                self.model = torch.nn.Sequential(
-                    torch.nn.Linear(1024, 512),
-                    torch.nn.ReLU(),
-                    torch.nn.Dropout(0.3),
-                    torch.nn.Linear(512, 256),
-                    torch.nn.ReLU(),
-                    torch.nn.Dropout(0.3),
-                    torch.nn.Linear(256, 2)
-                )
-                if 'state_dict' in checkpoint:
-                    self.model.load_state_dict(checkpoint['state_dict'])
-                else:
-                    self.model.load_state_dict(checkpoint)
+                state_dict = checkpoint.get('state_dict', checkpoint)
+                self.model.load_state_dict(state_dict, strict=False)
                 self.model.eval()
-                self.model.to(self.device)
-                print(f"Parkinson model loaded from: {self.model_path}")
+                logger.info(f"Loaded Parkinson model")
             except Exception as e:
-                print(f"Error loading Parkinson model: {e}")
+                logger.warning(f"Failed to load Parkinson model: {e}")
                 self.model = None
-        else:
-            print("Parkinson model not found, using dummy model")
-            self.model = None
     
     def predict(self, eeg_data: np.ndarray) -> Tuple[int, float, str]:
-        """Predict Parkinson's from EEG data using pattern analysis"""
+        """Predict Parkinson's from EEG data."""
         self._load_model()
         
         if self.model is None:
-            # Analyze EEG patterns for Parkinson's detection
-            parkinson_score = self._analyze_parkinson_patterns(eeg_data)
+            score = self._analyze_parkinson_patterns(eeg_data)
             
-            if parkinson_score > 0.95:  # Extremely high Parkinson's probability
-                predicted_class = 1
-                confidence = parkinson_score
-                class_name = "Parkinson"
-            else:  # Healthy
-                predicted_class = 0
-                confidence = 1 - parkinson_score
-                class_name = "Healthy"
-            return predicted_class, confidence, class_name
+            if score > 0.95:
+                return 1, score, "Parkinson"
+            else:
+                return 0, 1 - score, "Healthy"
         
+        # Model-based prediction
         try:
-            # Preprocess EEG data to match the model's expected input
             if eeg_data.ndim == 2:
                 eeg_data = eeg_data.flatten()
             
@@ -680,9 +659,7 @@ class ParkinsonPredictor:
             elif len(eeg_data) < 1024:
                 eeg_data = np.pad(eeg_data, (0, 1024 - len(eeg_data)))
             
-            # Normalize the data
-            eeg_data = (eeg_data - np.mean(eeg_data)) / (np.std(eeg_data) + 1e-8)
-            
+            eeg_data = normalize_signal(eeg_data, method='zscore')
             tensor = torch.from_numpy(eeg_data.astype(np.float32)).unsqueeze(0).to(self.device)
             
             with torch.no_grad():
@@ -691,21 +668,18 @@ class ParkinsonPredictor:
                 predicted_class = int(np.argmax(probs))
                 confidence = float(probs[predicted_class])
                 class_name = self.class_names[predicted_class]
-                return predicted_class, confidence, class_name
                 
+                return predicted_class, confidence, class_name
+        
         except Exception as e:
-            print(f"Error in Parkinson prediction: {e}")
-            # Return realistic fallback
+            logger.error(f"Parkinson prediction error: {e}")
             return 0, 0.70, "Healthy"
     
     def _analyze_parkinson_patterns(self, eeg_data: np.ndarray) -> float:
-        """Analyze EEG patterns characteristic of Parkinson's disease"""
+        """Analyze EEG for Parkinson's patterns."""
         try:
-            # Calculate frequency band powers
-            from scipy.signal import welch
             freqs, psd = welch(eeg_data, fs=160, nperseg=min(256, len(eeg_data)//4))
             
-            # Define frequency bands
             delta_power = np.sum(psd[(freqs >= 0.5) & (freqs <= 4)])
             theta_power = np.sum(psd[(freqs >= 4) & (freqs <= 8)])
             alpha_power = np.sum(psd[(freqs >= 8) & (freqs <= 13)])
@@ -714,55 +688,51 @@ class ParkinsonPredictor:
             total_power = delta_power + theta_power + alpha_power + beta_power
             
             if total_power > 0:
-                # Parkinson's: reduced beta, increased theta, tremor-related activity
                 beta_ratio = beta_power / total_power
                 theta_ratio = theta_power / total_power
-                alpha_ratio = alpha_power / total_power
-                delta_ratio = delta_power / total_power
                 
-                # Detect tremor-related activity (4-6 Hz) - specific to Parkinson's
+                # Tremor-related activity (4-6 Hz)
                 tremor_power = np.sum(psd[(freqs >= 4) & (freqs <= 6)])
                 tremor_ratio = tremor_power / total_power
                 
-                # Detect beta suppression (13-30 Hz) - characteristic of Parkinson's
+                # Beta suppression
                 beta_suppression = 1 - beta_ratio
                 
-                # Calculate irregularity
+                # Entropy
                 psd_norm = psd / np.sum(psd) if np.sum(psd) > 0 else psd
                 entropy = -np.sum(psd_norm * np.log(psd_norm + 1e-10))
                 
-                # Check for epilepsy-like patterns - if present, reduce Parkinson score
+                # Check for spikes
                 diff = np.diff(eeg_data)
                 std_amp = np.std(eeg_data)
                 spikes = np.sum(np.abs(diff) > std_amp * 2)
                 spike_ratio = spikes / len(diff) if len(diff) > 0 else 0
                 
-                # Parkinson's score - extremely conservative
-                parkinson_score = min(1.0, (
-                    beta_suppression * 0.5 +   # Much lower weight on beta suppression
-                    tremor_ratio * 0.3 +       # Much lower tremor weight
-                    theta_ratio * 0.2 +        # Much lower theta weight
-                    (entropy / 20) * 0.1       # Much lower irregularity weight
+                # Score (very conservative)
+                score = min(1.0, (
+                    beta_suppression * 0.5 +
+                    tremor_ratio * 0.3 +
+                    theta_ratio * 0.2 +
+                    (entropy / 20) * 0.1
                 ))
                 
-                # Reduce score if epilepsy-like patterns are present
-                if spike_ratio > 0.01:  # If spikes detected, likely epilepsy not Parkinson
-                    parkinson_score = parkinson_score * 0.1
+                # Reduce if epilepsy patterns
+                if spike_ratio > 0.01:
+                    score *= 0.1
                 
-                # Only boost score if very strong motor-related patterns are present
-                if beta_ratio < 0.15 and tremor_ratio > 0.2:  # Very strong motor symptom indicators
-                    parkinson_score = min(1.0, parkinson_score * 1.4)
-                    
-            else:
-                parkinson_score = 0.1
+                # Boost for strong motor indicators
+                if beta_ratio < 0.15 and tremor_ratio > 0.2:
+                    score = min(1.0, score * 1.4)
                 
-            return parkinson_score
+                return score
             
-        except Exception as e:
-            return 0.1  # Lower default score
+            return 0.1
+        
+        except Exception:
+            return 0.1
 
 
-# Initialize prediction models
+# Initialize predictors
 epilepsy_predictor = EpilepsyPredictor()
 alzheimer_predictor = AlzheimerPredictor()
 sleep_disorder_predictor = SleepDisorderPredictor()
@@ -770,128 +740,70 @@ parkinson_predictor = ParkinsonPredictor()
 
 
 def run_all_predictions(eeg_data: np.ndarray) -> Dict[str, Dict]:
-    """Run all prediction models on EEG data with ranking system"""
+    """
+    Run all disease predictions and return results.
+    
+    Args:
+        eeg_data: EEG signal data
+    
+    Returns:
+        Dictionary of prediction results for each disease
+    """
     results = {}
     
     try:
-        # Get all predictions
+        # Get predictions
         ep_class, ep_conf, ep_name = epilepsy_predictor.predict(eeg_data)
         alz_class, alz_conf, alz_name = alzheimer_predictor.predict(eeg_data)
         sleep_class, sleep_conf, sleep_name = sleep_disorder_predictor.predict(eeg_data)
         park_class, park_conf, park_name = parkinson_predictor.predict(eeg_data)
         
-        # Create prediction scores for ranking - only consider positive predictions
-        prediction_scores = {}
+        # Rank predictions (only consider positive detections)
+        scores = {}
         if ep_class == 1:
-            prediction_scores['epilepsy'] = ep_conf
+            scores['epilepsy'] = ep_conf
         if alz_class == 1:
-            prediction_scores['alzheimer'] = alz_conf
+            scores['alzheimer'] = alz_conf
         if sleep_class == 1:
-            prediction_scores['sleep_disorder'] = sleep_conf
+            scores['sleep_disorder'] = sleep_conf
         if park_class == 1:
-            prediction_scores['parkinson'] = park_conf
+            scores['parkinson'] = park_conf
         
-        # Only show positive predictions if confidence is high enough
-        confidence_threshold = 0.6  # Moderate threshold for balanced detection
+        # Find highest scoring condition
+        confidence_threshold = 0.6
         
-        # Find the highest scoring condition among positive predictions
-        if prediction_scores:
-            max_score = max(prediction_scores.values())
-            max_condition = max(prediction_scores, key=prediction_scores.get)
+        if scores:
+            max_condition = max(scores, key=scores.get)
+            max_score = scores[max_condition]
         else:
-            max_score = 0
             max_condition = None
+            max_score = 0
         
-        # Show only the highest scoring condition if it exceeds threshold
-        # This prevents multiple conditions from being detected simultaneously
+        # Show only highest scoring condition above threshold
         if max_condition and max_score > confidence_threshold:
-            # Only show the highest scoring condition
-            if max_condition == 'epilepsy':
-                results['epilepsy'] = {
-                    'predicted_class': ep_class,
-                    'confidence': ep_conf,
-                    'class_name': ep_name
-                }
-                results['alzheimer'] = {
-                    'predicted_class': 0,
-                    'confidence': 1 - alz_conf,
-                    'class_name': 'Normal'
-                }
-                results['sleep_disorder'] = {
-                    'predicted_class': 0,
-                    'confidence': 1 - sleep_conf,
-                    'class_name': 'Normal'
-                }
-                results['parkinson'] = {
-                    'predicted_class': 0,
-                    'confidence': 1 - park_conf,
-                    'class_name': 'Healthy'
-                }
-            elif max_condition == 'alzheimer':
-                results['epilepsy'] = {
-                    'predicted_class': 0,
-                    'confidence': 1 - ep_conf,
-                    'class_name': 'Normal'
-                }
-                results['alzheimer'] = {
-                    'predicted_class': alz_class,
-                    'confidence': alz_conf,
-                    'class_name': alz_name
-                }
-                results['sleep_disorder'] = {
-                    'predicted_class': 0,
-                    'confidence': 1 - sleep_conf,
-                    'class_name': 'Normal'
-                }
-                results['parkinson'] = {
-                    'predicted_class': 0,
-                    'confidence': 1 - park_conf,
-                    'class_name': 'Healthy'
-                }
-            elif max_condition == 'sleep_disorder':
-                results['epilepsy'] = {
-                    'predicted_class': 0,
-                    'confidence': 1 - ep_conf,
-                    'class_name': 'Normal'
-                }
-                results['alzheimer'] = {
-                    'predicted_class': 0,
-                    'confidence': 1 - alz_conf,
-                    'class_name': 'Normal'
-                }
-                results['sleep_disorder'] = {
-                    'predicted_class': sleep_class,
-                    'confidence': sleep_conf,
-                    'class_name': sleep_name
-                }
-                results['parkinson'] = {
-                    'predicted_class': 0,
-                    'confidence': 1 - park_conf,
-                    'class_name': 'Healthy'
-                }
-            elif max_condition == 'parkinson':
-                results['epilepsy'] = {
-                    'predicted_class': 0,
-                    'confidence': 1 - ep_conf,
-                    'class_name': 'Normal'
-                }
-                results['alzheimer'] = {
-                    'predicted_class': 0,
-                    'confidence': 1 - alz_conf,
-                    'class_name': 'Normal'
-                }
-                results['sleep_disorder'] = {
-                    'predicted_class': 0,
-                    'confidence': 1 - sleep_conf,
-                    'class_name': 'Normal'
-                }
-                results['parkinson'] = {
-                    'predicted_class': park_class,
-                    'confidence': park_conf,
-                    'class_name': park_name
-                }
+            # Set only the detected condition as positive
+            results['epilepsy'] = {
+                'predicted_class': 1 if max_condition == 'epilepsy' else 0,
+                'confidence': ep_conf if max_condition == 'epilepsy' else 1 - ep_conf,
+                'class_name': ep_name if max_condition == 'epilepsy' else 'Normal'
+            }
+            results['alzheimer'] = {
+                'predicted_class': 1 if max_condition == 'alzheimer' else 0,
+                'confidence': alz_conf if max_condition == 'alzheimer' else 1 - alz_conf,
+                'class_name': alz_name if max_condition == 'alzheimer' else 'Normal'
+            }
+            results['sleep_disorder'] = {
+                'predicted_class': 1 if max_condition == 'sleep_disorder' else 0,
+                'confidence': sleep_conf if max_condition == 'sleep_disorder' else 1 - sleep_conf,
+                'class_name': sleep_name if max_condition == 'sleep_disorder' else 'Normal'
+            }
+            results['parkinson'] = {
+                'predicted_class': 1 if max_condition == 'parkinson' else 0,
+                'confidence': park_conf if max_condition == 'parkinson' else 1 - park_conf,
+                'class_name': park_name if max_condition == 'parkinson' else 'Healthy'
+            }
         else:
-            # No condition detected above threshold
+            # All normal
             results['epilepsy'] = {
                 'predicted_class': 0,
                 'confidence': 1 - ep_conf,
@@ -912,10 +824,10 @@ def run_all_predictions(eeg_data: np.ndarray) -> Dict[str, Dict]:
                 'confidence': 1 - park_conf,
                 'class_name': 'Healthy'
             }
-        
+    
     except Exception as e:
-        print(f"Error in prediction pipeline: {e}")
-        # Return default results
+        logger.error(f"Prediction pipeline error: {e}")
+        # Return defaults
         results = {
             'epilepsy': {'predicted_class': 0, 'confidence': 0.5, 'class_name': 'Normal'},
             'alzheimer': {'predicted_class': 0, 'confidence': 0.5, 'class_name': 'Normal'},
@@ -926,235 +838,310 @@ def run_all_predictions(eeg_data: np.ndarray) -> Dict[str, Dict]:
     return results
 
 
-# --- NEW UPLOAD ROUTE ---
-@bp.route("/upload", methods=["POST"])
-def upload_file():
-    global INITIAL_OFFSET_SAMPLES, CHUNK_SAMPLES
+# ============================================================================
+# FILE LOADING
+# ============================================================================
+
+def load_eeg_file(filepath: str) -> bool:
+    """
+    Load EEG file (EDF or FIF format).
     
-    if 'file' not in request.files:
-        return jsonify({"success": False, "message": "No file part"}), 400
-
-    file = request.files['file']
-    if file.filename == '':
-        return jsonify({"success": False, "message": "No selected file"}), 400
-
-    if file:
-        # Save the file temporarily
-        filename = file.filename
-        # Use a safe path, e.g., 'uploads' directory
-        upload_dir = 'uploads'
-        os.makedirs(upload_dir, exist_ok=True)
-        filepath = os.path.join(upload_dir, filename)
+    Args:
+        filepath: Path to EEG file
+    
+    Returns:
+        True if successful, False otherwise
+    """
+    if mne is None:
+        logger.error("MNE not available for EEG loading")
+        return False
+    
+    try:
+        # Determine file type
+        ext = filepath.lower().split('.')[-1]
         
-        # NOTE: For a real app, you should check file extension and secure filenames
-        try:
-            file.save(filepath)
-            
-            # Load the EEG file with MNE (support both EDF and FIF)
-            if filename.lower().endswith('.edf'):
-                eeg_data.raw = mne.io.read_raw_edf(filepath, preload=True, verbose=False)
-            elif filename.lower().endswith('.fif') or filename.lower().endswith('.fif.gz'):
-                eeg_data.raw = mne.io.read_raw_fif(filepath, preload=True, verbose=False)
-            else:
-                return jsonify({"success": False, "message": "Unsupported file format. Please use .edf or .fif files."}), 400
-            eeg_data.fs = int(eeg_data.raw.info["sfreq"])
-            eeg_data.n_times = eeg_data.raw.n_times
-            eeg_data.ch_names = eeg_data.raw.ch_names
-            
-            # Recalculate streaming parameters
-            INITIAL_OFFSET_SAMPLES = eeg_data.fs * 10
-            eeg_data.current_index = INITIAL_OFFSET_SAMPLES if eeg_data.n_times > INITIAL_OFFSET_SAMPLES else 0 
-            CHUNK_SAMPLES = int(eeg_data.fs / 10) # 16 samples per update for 100ms interval
-
-            print(f"File loaded. Channels: {len(eeg_data.ch_names)}, fs: {eeg_data.fs} Hz")
-            
-            # Optionally delete the file if you don't need it anymore, 
-            # but keep it for continuous streaming.
-            
-            # Map channel indices to names for the frontend
-            ch_info = {i: name for i, name in enumerate(eeg_data.ch_names)}
-            
-            return jsonify({
-                "success": True, 
-                "message": f"File {filename} loaded successfully.",
-                "channels": ch_info,
-                "fs": eeg_data.fs
-            })
-            
-        except Exception as e:
-            error_msg = f"Error processing file: {e}"
-            print(f"FATAL ERROR: {error_msg}")
-            return jsonify({"success": False, "message": error_msg}), 500
+        if ext == 'edf':
+            state.raw = mne.io.read_raw_edf(filepath, preload=True, verbose=False)
+        elif ext in ['fif', 'gz']:
+            state.raw = mne.io.read_raw_fif(filepath, preload=True, verbose=False)
+        else:
+            logger.error(f"Unsupported file format: {ext}")
+            return False
+        
+        # Update state
+        state.fs = int(state.raw.info["sfreq"])
+        state.n_times = state.raw.n_times
+        state.ch_names = state.raw.ch_names
+        
+        # Calculate initial offset
+        state.initial_offset = state.fs * 10  # Skip first 10 seconds
+        state.current_index = min(state.initial_offset, state.n_times)
+        
+        state.loaded = True
+        
+        logger.info(f"Loaded EEG file: {filepath}")
+        logger.info(f"Channels: {len(state.ch_names)}, FS: {state.fs} Hz, Duration: {state.n_times / state.fs:.2f}s")
+        
+        return True
+    
+    except Exception as e:
+        logger.exception(f"Failed to load EEG file: {e}")
+        return False
 
 
-# --- FLASK ROUTES (update needs to use the global state) ---
+# ============================================================================
+# FLASK BLUEPRINT
+# ============================================================================
+
+bp = Blueprint("eeg", __name__, template_folder="../templates")
+
 
 @bp.route("/", methods=["GET"])
 def eeg_home():
-    # Pass a default empty list or load a default file if needed
-    # For now, we'll just render the template
+    """Render EEG viewer page."""
     return render_template("eeg.html")
+
+
+@bp.route("/upload", methods=["POST"])
+def upload_file():
+    """Upload EEG file."""
+    if 'file' not in request.files:
+        return jsonify({"success": False, "message": "No file part"}), 400
+    
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"success": False, "message": "No selected file"}), 400
+    
+    # Save file
+    upload_dir = 'uploads'
+    os.makedirs(upload_dir, exist_ok=True)
+    filepath = os.path.join(upload_dir, file.filename)
+    
+    try:
+        file.save(filepath)
+        
+        # Load EEG file
+        if load_eeg_file(filepath):
+            # Map channels
+            ch_info = {i: name for i, name in enumerate(state.ch_names)}
+            
+            return jsonify({
+                "success": True,
+                "message": f"File {file.filename} loaded successfully.",
+                "channels": ch_info,
+                "fs": state.fs
+            })
+        else:
+            return jsonify({
+                "success": False,
+                "message": "Failed to load EEG file. Check format (EDF or FIF)."
+            }), 500
+    
+    except Exception as e:
+        logger.exception(f"Upload error: {e}")
+        return jsonify({
+            "success": False,
+            "message": f"Error: {str(e)}"
+        }), 500
+
 
 @bp.route("/update", methods=["POST"])
 def update():
-    if eeg_data.raw is None:
-        return jsonify({"n_samples": 0, "signals": {}, "band_power": {}, "message": "No file loaded."})
-        
-    # Make sure to use the eeg_data global object
-    global CHUNK_SAMPLES
-    
-    data = request.get_json()
-    channels = data.get("channels", [])
-    mode = data.get("mode", "time")
-    width = float(data.get("width", 5))
-    
-    samples_to_send = CHUNK_SAMPLES 
-
-    start = eeg_data.current_index
-    stop = start + samples_to_send
-    
-    # Handle wrap-around for looping
-    if stop > eeg_data.n_times:
-        stop = eeg_data.n_times
-        samples_to_send = stop - start
-        eeg_data.current_index = INITIAL_OFFSET_SAMPLES if eeg_data.n_times > INITIAL_OFFSET_SAMPLES else 0 
-    else:
-        eeg_data.current_index = stop
-
-    if samples_to_send <= 0:
-        eeg_data.current_index = INITIAL_OFFSET_SAMPLES if eeg_data.n_times > INITIAL_OFFSET_SAMPLES else 0 
-        return jsonify({"n_samples": 0, "signals": {}, "band_power": {}})
-
-    # Get data for ALL selected channels
-    picked = eeg_data.raw.get_data(picks=channels, start=start, stop=stop)
-
-    # NEW LOGIC: Calculate and AVERAGE band power across all selected channels
-    band_power_data = {}
-    if picked.shape[0] > 0:
-        # Check if "cycle" mode is *requested* by the frontend (optional optimization)
-        # Since we don't have the mode here, we compute if it's a single channel,
-        # but the frontend's main use for band power is "cycle" mode.
-        # Since the 'cycle' mode only selects one channel, we can optimize by only running the calc if 1 channel is selected.
-        # But for robustness, the code returns averaged band power if multiple channels are selected.
-        
-        all_channel_powers = [calculate_band_power(picked[i], eeg_data.fs) for i in range(picked.shape[0])]
-        
-        if all_channel_powers:
-            for band in BANDS.keys():
-                avg_power = np.mean([cp.get(band, 0.0) for cp in all_channel_powers])
-                band_power_data[band] = float(avg_power)
-    
-    # Build response
-    signals = {str(ch): picked[i].tolist() for i, ch in enumerate(channels)}
-
-    response = {
-        "n_samples": picked.shape[1],
-        "signals": signals,
-        "band_power": band_power_data
-    }
-
-    # Server-side XOR computation for single-channel XOR mode
-    try:
-        if mode == "xor" and len(channels) == 1 and picked.shape[0] == 1:
-            ch = int(channels[0])
-            new_samples = signals[str(ch)]
-
-            # Initialize buffers if not present
-            if ch not in _XOR_BUFFERS:
-                _XOR_BUFFERS[ch] = []
-            if ch not in _XOR_PREV_WINDOWS:
-                _XOR_PREV_WINDOWS[ch] = []
-
-            # Rolling buffer to maintain last window seconds of data
-            chunk_size = max(1, int(width * eeg_data.fs))
-
-            buf = _XOR_BUFFERS[ch]
-            buf.extend(new_samples)
-            if len(buf) > chunk_size:
-                del buf[0:len(buf) - chunk_size]
-
-            xor_series = buf.copy()
-            if len(buf) == chunk_size:
-                prev_window = _XOR_PREV_WINDOWS.get(ch, [])
-                if len(prev_window) == chunk_size:
-                    # Binary XOR based on mid-level threshold, comparing current window
-                    # with reversed previous window (to mimic forward vs reverse pairing)
-                    combined = np.array(buf + prev_window, dtype=float)
-                    y_min = float(np.min(combined)) if combined.size > 0 else 0.0
-                    y_max = float(np.max(combined)) if combined.size > 0 else 1.0
-                    y_range = max(1e-9, y_max - y_min)
-                    threshold = (y_max + y_min) / 2.0
-
-                    mapped_high = y_min - 0.1 * y_range + 0.85 * (1.2 * y_range)
-                    mapped_low = y_min - 0.1 * y_range + 0.15 * (1.2 * y_range)
-
-                    xor_series = []
-                    for i in range(chunk_size):
-                        cur_val = buf[i]
-                        prev_val = prev_window[chunk_size - 1 - i]
-                        cur_bit = 1 if cur_val > threshold else 0
-                        prev_bit = 1 if prev_val > threshold else 0
-                        bit = cur_bit ^ prev_bit
-                        xor_series.append(mapped_high if bit == 1 else mapped_low)
-
-                # Update previous window after computing
-                _XOR_PREV_WINDOWS[ch] = buf[-chunk_size:].copy()
-
-            response["xor"] = xor_series
-    except Exception as xor_err:
-        print(f"XOR computation error: {xor_err}")
-
-    return jsonify(response)
-
-
-# --- PREDICTION ROUTE ---
-@bp.route("/predict", methods=["POST"])
-def predict_diseases():
-    """Run disease predictions on current EEG data"""
-    if eeg_data.raw is None:
-        return jsonify({"success": False, "message": "No file loaded."}), 400
+    """Stream EEG data update."""
+    if state.raw is None:
+        return jsonify({
+            "n_samples": 0,
+            "signals": {},
+            "band_power": {},
+            "message": "No file loaded."
+        })
     
     try:
         data = request.get_json()
-        channels = data.get("channels", [])
+        
+        # Parse parameters
+        channels = validate_channels(
+            data.get("channels", []),
+            max_channels=len(state.ch_names)
+        )
+        
+        if not channels:
+            return jsonify({
+                "n_samples": 0,
+                "signals": {},
+                "band_power": {}
+            })
+        
+        mode = data.get("mode", "time")
+        width = float(data.get("width", 5))
+        downsample_factor = data.get("downsample_factor", 1)
+        
+        # Calculate chunk size
+        chunk_samples = BASE_CHUNK_SAMPLES
+        
+        # Get data chunk
+        start = state.current_index
+        stop = start + chunk_samples
+        
+        # Handle wrap-around
+        if stop > state.n_times:
+            stop = state.n_times
+            chunk_samples = stop - start
+            state.current_index = state.initial_offset
+        else:
+            state.current_index = stop
+        
+        if chunk_samples <= 0:
+            state.current_index = state.initial_offset
+            return jsonify({
+                "n_samples": 0,
+                "signals": {},
+                "band_power": {}
+            })
+        
+        # Get data for selected channels
+        picked = state.raw.get_data(picks=channels, start=start, stop=stop)
+        
+        # Apply downsampling if requested
+        if downsample_factor > 1:
+            picked_downsampled = []
+            for ch_idx in range(picked.shape[0]):
+                downsampled = decimate_with_aliasing(
+                    picked[ch_idx],
+                    native_fs=state.fs,
+                    target_fs=max(1, state.fs // downsample_factor)
+                )
+                picked_downsampled.append(downsampled)
+            picked = np.array(picked_downsampled)
+        
+        # Calculate band power (average across all selected channels)
+        band_power_data = {}
+        if picked.shape[0] > 0:
+            all_powers = [
+                calculate_band_power(picked[i], state.fs)
+                for i in range(picked.shape[0])
+            ]
+            
+            for band in FREQUENCY_BANDS.keys():
+                avg_power = np.mean([p.get(band, 0.0) for p in all_powers])
+                band_power_data[band] = float(avg_power)
+        
+        # Build signals dictionary
+        signals = {
+            str(ch): picked[i].tolist()
+            for i, ch in enumerate(channels)
+        }
+        
+        response = {
+            "n_samples": picked.shape[1],
+            "signals": signals,
+            "band_power": band_power_data
+        }
+        
+        # Server-side XOR computation
+        if mode == "xor" and len(channels) == 1 and picked.shape[0] == 1:
+            ch = int(channels[0])
+            new_samples = signals[str(ch)]
+            
+            # Initialize buffers
+            if ch not in state.xor_buffers:
+                state.xor_buffers[ch] = []
+            if ch not in state.xor_prev_windows:
+                state.xor_prev_windows[ch] = []
+            
+            # Rolling buffer
+            chunk_size = max(1, int(width * state.fs))
+            
+            buf = state.xor_buffers[ch]
+            buf.extend(new_samples)
+            if len(buf) > chunk_size:
+                del buf[0:len(buf) - chunk_size]
+            
+            # Calculate XOR
+            xor_result = calculate_xor_difference_eeg(
+                buf,
+                state.xor_prev_windows.get(ch, []),
+                chunk_size
+            )
+            
+            # Update previous window
+            if len(buf) == chunk_size:
+                state.xor_prev_windows[ch] = buf[-chunk_size:].copy()
+            
+            response["xor"] = xor_result
+        
+        return jsonify(response)
+    
+    except Exception as e:
+        logger.exception("Update failed")
+        return jsonify({
+            "n_samples": 0,
+            "signals": {},
+            "band_power": {},
+            "error": str(e)
+        }), 500
+
+
+@bp.route("/predict", methods=["POST"])
+def predict_diseases():
+    """Run disease predictions on current EEG data."""
+    if state.raw is None:
+        return jsonify({
+            "success": False,
+            "message": "No file loaded."
+        }), 400
+    
+    try:
+        data = request.get_json()
+        channels = validate_channels(
+            data.get("channels", []),
+            max_channels=len(state.ch_names)
+        )
         downsample_factor = data.get("downsample_factor", 1)
         
         if not channels:
-            return jsonify({"success": False, "message": "No channels selected."}), 400
+            return jsonify({
+                "success": False,
+                "message": "No channels selected."
+            }), 400
         
-        # Get current EEG data from the first selected channel
-        start = eeg_data.current_index
-        stop = start + CHUNK_SAMPLES
+        # Get current data
+        start = state.current_index
+        stop = start + BASE_CHUNK_SAMPLES
         
-        if stop > eeg_data.n_times:
-            stop = eeg_data.n_times
+        if stop > state.n_times:
+            stop = state.n_times
         
         if stop <= start:
-            return jsonify({"success": False, "message": "No data available for prediction."}), 400
+            return jsonify({
+                "success": False,
+                "message": "No data available."
+            }), 400
         
-        # Get data for the first selected channel
-        picked = eeg_data.raw.get_data(picks=[channels[0]], start=start, stop=stop)
+        # Get data for first selected channel
+        picked = state.raw.get_data(picks=[channels[0]], start=start, stop=stop)
         
         if picked.shape[0] == 0 or picked.shape[1] == 0:
-            return jsonify({"success": False, "message": "No valid data for prediction."}), 400
+            return jsonify({
+                "success": False,
+                "message": "No valid data."
+            }), 400
         
-        # Use the first channel's data for prediction
-        eeg_data_for_prediction = picked[0]  # Shape: (samples,)
+        eeg_data_for_prediction = picked[0]
         
-        # Apply downsampling using shared resampling utility (aliasing decimation)
+        # Apply downsampling if requested
         if downsample_factor > 1:
-            native_fs = int(eeg_data.raw.info.get('sfreq', 160))
-            target_fs = max(1, int(round(native_fs / float(downsample_factor))))
+            target_fs = max(1, int(round(state.fs / float(downsample_factor))))
             eeg_data_for_prediction = decimate_with_aliasing(
                 eeg_data_for_prediction,
-                native_fs=native_fs,
+                native_fs=state.fs,
                 target_fs=target_fs,
                 pos_native=start,
                 phase_state=None
             )
-            print(f"Applied {downsample_factor}x downsampling (native {native_fs} -> {target_fs} Hz). New length: {len(eeg_data_for_prediction)}")
+            logger.info(f"Applied {downsample_factor}x downsampling ({state.fs} -> {target_fs} Hz)")
         
-        # Run all predictions
+        # Run predictions
         prediction_results = run_all_predictions(eeg_data_for_prediction)
         
         return jsonify({
@@ -1164,8 +1151,10 @@ def predict_diseases():
             "data_length": len(eeg_data_for_prediction),
             "downsample_factor": downsample_factor
         })
-        
+    
     except Exception as e:
-        error_msg = f"Error in prediction: {e}"
-        print(f"PREDICTION ERROR: {error_msg}")
-        return jsonify({"success": False, "message": error_msg}), 500
+        logger.exception("Prediction failed")
+        return jsonify({
+            "success": False,
+            "message": str(e)
+        }), 500

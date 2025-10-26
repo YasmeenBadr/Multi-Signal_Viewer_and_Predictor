@@ -1,6 +1,6 @@
-from flask import Flask, render_template
+from flask import Flask, render_template, send_from_directory
 # Added 'voice' to the imports to reflect the new module/blueprint
-from signals import eeg, ecg, radar, doppler , sar, voice 
+from signals import eeg, ecg, radar, doppler , sar, voice
 
 app = Flask(__name__)
 
@@ -32,5 +32,12 @@ app.register_blueprint(sar.bp, url_prefix="/sar")
 # VOICE routes - New registration for the Voice Processing Suite link
 app.register_blueprint(voice.bp, url_prefix="/voice")
 
+# Serve static files
+@app.route('/static/<path:filename>')
+def serve_static(filename):
+    return send_from_directory('static', filename)
+
+if __name__ == "__main__":
+    app.run(debug=True)
 if __name__ == "__main__":
     app.run(debug=True)

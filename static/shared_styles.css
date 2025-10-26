@@ -1,0 +1,269 @@
+/* Updated to bright, modern color scheme */
+:root {
+  --color-primary: #6366f1;
+  --color-secondary: #ec4899;
+  --color-accent: #f59e0b;
+  --color-success: #10b981;
+  --color-light-bg: #f8fafc;
+  --color-card-bg: #ffffff;
+  --color-text-dark: #1e293b;
+  --color-text-light: #64748b;
+  --color-border: #e2e8f0;
+  --color-hover: #f1f5f9;
+}
+
+body {
+  background: linear-gradient(135deg, var(--color-light-bg) 0%, #f1f5f9 100%) !important;
+  color: var(--color-text-dark) !important;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+/* Enhanced plot container styling */
+.plot-wrapper {
+  min-height: 300px;
+  background: var(--color-light-bg) !important;
+}
+
+.plot-container {
+  background: var(--color-card-bg);
+  padding: 1.5rem;
+  border-radius: 12px;
+  margin-bottom: 1.5rem;
+  min-height: 550px;
+  border: 1px solid var(--color-border);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
+  transition: all 0.3s ease;
+}
+
+.plot-container:hover {
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.1);
+}
+
+/* Sidebar styling with animations */
+.sidebar {
+  background: var(--color-card-bg);
+  padding: 1.5rem;
+  border-radius: 12px;
+  max-height: 95vh;
+  overflow-y: auto;
+  border: 1px solid var(--color-border);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
+}
+
+#bandPowerContainer {
+  height: 600px;
+  background: var(--color-light-bg) !important;
+  border-radius: 12px;
+  border: 1px solid var(--color-border);
+}
+
+/* Enhanced button styling with animations */
+.btn-primary {
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-secondary) 100%);
+  border: none;
+  font-weight: 600;
+  color: white;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+  cursor: pointer;
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(99, 102, 241, 0.4);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+}
+
+.btn-secondary {
+  background: var(--color-hover);
+  border: 2px solid var(--color-border);
+  color: var(--color-text-dark);
+  font-weight: 600;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.btn-secondary:hover {
+  background: var(--color-card-bg);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
+}
+
+/* Drop zone styling */
+#dropZone {
+  border: 2px dashed var(--color-primary);
+  padding: 1.5rem;
+  border-radius: 8px;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.05) 0%, rgba(236, 72, 153, 0.05) 100%);
+  color: var(--color-text-dark);
+  text-align: center;
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+#dropZone:hover {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(236, 72, 153, 0.1) 100%);
+  border-color: var(--color-secondary);
+}
+
+#pickFiles {
+  color: var(--color-primary);
+  text-decoration: underline;
+  cursor: pointer;
+  font-weight: 600;
+  transition: color 0.3s ease;
+}
+
+#pickFiles:hover {
+  color: var(--color-secondary);
+}
+
+/* Form control styling */
+input.form-control,
+select.form-select {
+  background: var(--color-light-bg);
+  color: var(--color-text-dark);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 0.75rem;
+  transition: all 0.3s ease;
+}
+
+input.form-control:focus,
+select.form-select:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+  background: var(--color-card-bg);
+}
+
+label.form-label {
+  color: var(--color-text-dark);
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.form-check-label {
+  color: var(--color-text-dark);
+  font-weight: 500;
+}
+
+.form-check-input:checked {
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.form-text {
+  color: var(--color-text-light);
+}
+
+/* Heading styling */
+h1 {
+  color: var(--color-primary);
+  text-align: center;
+  font-weight: 800;
+  margin-bottom: 1.5rem;
+  font-size: 2.5rem;
+}
+
+h2 {
+  color: var(--color-primary);
+  font-weight: 700;
+  margin-bottom: 1rem;
+}
+
+/* Prediction box styling */
+.prediction-box {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.05) 0%, rgba(236, 72, 153, 0.05) 100%);
+  padding: 1.5rem;
+  border-radius: 8px;
+  text-align: center;
+  border: 1px solid var(--color-border);
+  transition: all 0.3s ease;
+}
+
+.prediction-box:hover {
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.1);
+}
+
+.prediction-result {
+  font-weight: 700;
+  color: var(--color-primary);
+  font-size: 1.25rem;
+}
+
+.disease-name {
+  color: var(--color-secondary);
+  font-weight: 600;
+  margin-top: 0.5rem;
+}
+
+/* Scrollbar styling */
+.channel-list::-webkit-scrollbar {
+  width: 8px;
+}
+.channel-list::-webkit-scrollbar-track {
+  background: var(--color-light-bg);
+}
+.channel-list::-webkit-scrollbar-thumb {
+  background-color: var(--color-border);
+  border-radius: 4px;
+}
+.channel-list::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-primary);
+}
+
+/* Utility classes */
+.hidden {
+  display: none !important;
+}
+.disabled-input {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+/* Light theme overrides */
+.bg-primary-bg {
+  background: var(--color-light-bg) !important;
+}
+.bg-secondary-bg {
+  background: var(--color-card-bg) !important;
+}
+.text-text-light {
+  color: var(--color-text-dark) !important;
+}
+.text-gray-300 {
+  color: var(--color-text-dark) !important;
+}
+.text-gray-400 {
+  color: var(--color-text-light) !important;
+}
+.text-accent {
+  color: var(--color-primary) !important;
+}
+.border-gray-600 {
+  border-color: var(--color-border) !important;
+}
+.border-gray-700 {
+  border-color: var(--color-border) !important;
+}
+
+input,
+select,
+textarea {
+  background: var(--color-light-bg) !important;
+  color: var(--color-text-dark) !important;
+  border-color: var(--color-border) !important;
+}
+
+label {
+  color: var(--color-text-dark) !important;
+}
