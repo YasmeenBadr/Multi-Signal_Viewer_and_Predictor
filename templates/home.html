@@ -3,472 +3,558 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Signal Processing Dashboard</title>
-    <!-- Embedding styles directly in HTML to ensure they load properly -->
+    <title>SignalFlow | Advanced Signal Processing</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        /* Professional Signal Processing Dashboard Styles */
-
-        /* Color Scheme - Bright and Professional */
+        /* Modern Signal Processing Dashboard */
         :root {
-          --color-primary: #6366f1;
-          --color-secondary: #ec4899;
-          --color-accent: #f59e0b;
-          --color-success: #10b981;
-          --color-light-bg: #f8fafc;
-          --color-card-bg: #ffffff;
-          --color-text-dark: #1e293b;
-          --color-text-light: #64748b;
-          --color-border: #e2e8f0;
+            --primary: #6366F1;
+            --primary-light: #818CF8;
+            --primary-dark: #4F46E5;
+            --secondary: #10B981;
+            --accent: #F59E0B;
+            --danger: #EF4444;
+            --dark: #1F2937;
+            --dark-light: #374151;
+            --light: #F9FAFB;
+            --gray: #9CA3AF;
+            --gray-light: #E5E7EB;
+            --card-bg: rgba(255, 255, 255, 0.85);
+            --card-border: rgba(255, 255, 255, 0.2);
+            --glass-bg: rgba(255, 255, 255, 0.1);
+            --glass-border: rgba(255, 255, 255, 0.2);
+            --shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+            --shadow-lg: 0 20px 40px rgba(0, 0, 0, 0.1);
         }
 
         * {
-          margin: 0;
-          padding: 0;
-          box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
         }
 
         body {
-          font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-          background: linear-gradient(135deg, var(--color-light-bg) 0%, #f1f5f9 100%);
-          color: var(--color-text-dark);
-          min-height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: var(--dark);
+            min-height: 100vh;
+            line-height: 1.6;
+            overflow-x: hidden;
         }
 
-        /* ===== HEADER SECTION ===== */
+        /* Header */
         header {
-          position: relative;
-          padding: 4rem 2rem 3rem;
-          background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-secondary) 100%);
-          color: white;
-          overflow: hidden;
+            padding: 1.5rem 2rem;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--glass-border);
         }
 
-        .header-content {
-          position: relative;
-          z-index: 2;
-          text-align: center;
-          animation: fadeInDown 0.8s ease-out;
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-weight: 700;
+            font-size: 1.5rem;
+            color: white;
         }
 
-        header h1 {
-          font-size: 3rem;
-          font-weight: 800;
-          margin-bottom: 0.5rem;
-          letter-spacing: -0.02em;
+        .logo i {
+            color: var(--accent);
         }
 
-        header p {
-          font-size: 1.25rem;
-          opacity: 0.95;
-          font-weight: 500;
+        /* Hero Section */
+        .hero {
+            padding: 4rem 2rem;
+            text-align: center;
+            max-width: 900px;
+            margin: 0 auto;
+            color: white;
         }
 
-        /* Enhanced header decorative elements with floating animations */
-        .header-decoration {
-          position: absolute;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          z-index: 1;
-          overflow: hidden;
+        .hero h1 {
+            font-size: 3.5rem;
+            font-weight: 800;
+            margin-bottom: 1.5rem;
+            line-height: 1.2;
         }
 
-        .header-decoration::before {
-          content: "";
-          position: absolute;
-          top: -50%;
-          right: -10%;
-          width: 500px;
-          height: 500px;
-          background: radial-gradient(circle, rgba(255, 255, 255, 0.15) 0%, transparent 70%);
-          border-radius: 50%;
-          animation: float 6s ease-in-out infinite;
+        .hero p {
+            font-size: 1.25rem;
+            margin-bottom: 2.5rem;
+            opacity: 0.9;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
         }
 
-        .header-decoration::after {
-          content: "";
-          position: absolute;
-          bottom: -30%;
-          left: -5%;
-          width: 400px;
-          height: 400px;
-          background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 0%, transparent 70%);
-          border-radius: 50%;
-          animation: float 8s ease-in-out infinite reverse;
-        }
-
-        /* ===== CONTAINER & GRID ===== */
+        /* Main Content */
         .container {
-          max-width: 1400px;
-          margin: 0 auto;
-          padding: 3rem 2rem;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
         }
 
-        /* Updated grid to 5 columns for integrated voice card */
-        .signals-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-          gap: 2rem;
-          margin-bottom: 4rem;
+        .section-title {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 2rem;
+            color: white;
+            text-align: center;
         }
 
-        /* ===== SIGNAL CARDS ===== */
-        .signal-card {
-          background: var(--color-card-bg);
-          border-radius: 16px;
-          padding: 2rem;
-          border: 2px solid var(--color-border);
-          text-align: center;
-          cursor: pointer;
-          transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-          position: relative;
-          overflow: hidden;
-          box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
-          text-decoration: none;
-          color: inherit;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          animation: fadeInUp 0.6s ease-out;
+        /* Cards Grid */
+        .cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-bottom: 4rem;
         }
 
-        /* Staggered animation for each card */
-        .signal-card:nth-child(1) {
-          animation-delay: 0.1s;
-        }
-        .signal-card:nth-child(2) {
-          animation-delay: 0.2s;
-        }
-        .signal-card:nth-child(3) {
-          animation-delay: 0.3s;
-        }
-        .signal-card:nth-child(4) {
-          animation-delay: 0.4s;
-        }
-        .signal-card:nth-child(5) {
-          animation-delay: 0.5s;
-        }
-
-        /* Shine effect on hover */
-        .signal-card::before {
-          content: "";
-          position: absolute;
-          top: 0;
-          left: -100%;
-          width: 100%;
-          height: 100%;
-          background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
-          transition: left 0.6s ease;
-          z-index: 1;
+        .card {
+            background: var(--card-bg);
+            border-radius: 20px;
+            padding: 2rem;
+            box-shadow: var(--shadow);
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            border: 1px solid var(--card-border);
+            backdrop-filter: blur(10px);
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            position: relative;
+            overflow: hidden;
+            text-decoration: none;
+            color: inherit;
         }
 
-        .signal-card:hover::before {
-          left: 100%;
+        .card:hover {
+            transform: translateY(-10px);
+            box-shadow: var(--shadow-lg);
         }
 
-        /* Enhanced hover effects with more sophisticated animations */
-        .signal-card:hover {
-          transform: translateY(-16px) scale(1.03);
-          box-shadow: 0 24px 48px rgba(0, 0, 0, 0.12);
-          border-color: var(--color-primary);
-        }
-
-        .signal-card:nth-child(1):hover {
-          background: linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(236, 72, 153, 0.08) 100%);
-        }
-
-        .signal-card:nth-child(2):hover {
-          background: linear-gradient(135deg, rgba(236, 72, 153, 0.08) 0%, rgba(245, 158, 11, 0.08) 100%);
-        }
-
-        .signal-card:nth-child(3):hover {
-          background: linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(16, 185, 129, 0.08) 100%);
-        }
-
-        .signal-card:nth-child(4):hover {
-          background: linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(99, 102, 241, 0.08) 100%);
-        }
-
-        .signal-card:nth-child(5):hover {
-          background: linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(245, 158, 11, 0.08) 100%);
-        }
-
-        /* ===== CARD ICONS ===== */
-        /* Professional SVG icons with stroke styling */
         .card-icon {
-          width: 80px;
-          height: 80px;
-          border-radius: 50%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          margin-bottom: 1.5rem;
-          transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-          position: relative;
-          z-index: 2;
+            width: 70px;
+            height: 70px;
+            border-radius: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 1.5rem;
+            font-size: 1.75rem;
+            color: white;
         }
 
-        .card-icon svg {
-          width: 100%;
-          height: 100%;
-          stroke-linecap: round;
-          stroke-linejoin: round;
+        .card-1 .card-icon {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
         }
 
-        .signal-card:nth-child(1) .card-icon {
-          background: linear-gradient(135deg, var(--color-primary) 0%, rgba(99, 102, 241, 0.15) 100%);
-          color: var(--color-primary);
+        .card-2 .card-icon {
+            background: linear-gradient(135deg, var(--secondary) 0%, #34D399 100%);
         }
 
-        .signal-card:nth-child(2) .card-icon {
-          background: linear-gradient(135deg, var(--color-secondary) 0%, rgba(236, 72, 153, 0.15) 100%);
-          color: var(--color-secondary);
+        .card-3 .card-icon {
+            background: linear-gradient(135deg, var(--accent) 0%, #FBBF24 100%);
         }
 
-        .signal-card:nth-child(3) .card-icon {
-          background: linear-gradient(135deg, var(--color-accent) 0%, rgba(245, 158, 11, 0.15) 100%);
-          color: var(--color-accent);
+        .card-4 .card-icon {
+            background: linear-gradient(135deg, var(--danger) 0%, #F87171 100%);
         }
 
-        .signal-card:nth-child(4) .card-icon {
-          background: linear-gradient(135deg, var(--color-success) 0%, rgba(16, 185, 129, 0.15) 100%);
-          color: var(--color-success);
+        .card-5 .card-icon {
+            background: linear-gradient(135deg, #8B5CF6 0%, #A78BFA 100%);
         }
 
-        .signal-card:nth-child(5) .card-icon {
-          background: linear-gradient(135deg, var(--color-primary) 0%, rgba(99, 102, 241, 0.15) 100%);
-          color: var(--color-primary);
-        }
-
-        /* Enhanced icon hover animation with rotation and scale */
-        .signal-card:hover .card-icon {
-          transform: scale(1.2) rotate(8deg);
-          box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
-          filter: brightness(1.1);
-        }
-
-        /* ===== CARD TEXT ===== */
         .card-title {
-          font-size: 1.5rem;
-          font-weight: 700;
-          margin-bottom: 0.5rem;
-          color: var(--color-text-dark);
-          transition: all 0.3s ease;
-          position: relative;
-          z-index: 2;
-          letter-spacing: -0.01em;
-        }
-
-        .signal-card:hover .card-title {
-          color: var(--color-primary);
-          transform: translateY(-2px);
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            color: var(--dark);
         }
 
         .card-description {
-          font-size: 0.95rem;
-          color: var(--color-text-light);
-          transition: all 0.3s ease;
-          position: relative;
-          z-index: 2;
-          line-height: 1.5;
+            color: var(--dark-light);
+            margin-bottom: 1.5rem;
+            flex-grow: 1;
         }
 
-        .signal-card:hover .card-description {
-          color: var(--color-text-dark);
+        .card-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: auto;
         }
 
-        /* ===== FOOTER ===== */
+        .card-badge {
+            background: var(--gray-light);
+            color: var(--dark);
+            padding: 0.25rem 0.75rem;
+            border-radius: 50px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .card-link {
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.3s ease;
+        }
+
+        .card-link:hover {
+            gap: 0.75rem;
+        }
+
+        /* Features Section */
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-bottom: 4rem;
+        }
+
+        .feature {
+            background: var(--glass-bg);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 2rem;
+            border: 1px solid var(--glass-border);
+            color: white;
+            transition: all 0.3s ease;
+        }
+
+        .feature:hover {
+            transform: translateY(-5px);
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .feature-icon {
+            font-size: 2.5rem;
+            margin-bottom: 1.5rem;
+            color: var(--accent);
+        }
+
+        .feature-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+
+        .feature-description {
+            opacity: 0.9;
+            line-height: 1.6;
+        }
+
+        /* Footer */
         footer {
-          text-align: center;
-          padding: 2rem;
-          color: var(--color-text-light);
-          font-size: 0.9rem;
-          border-top: 1px solid var(--color-border);
-          margin-top: 4rem;
-          animation: fadeInUp 0.8s ease-out 0.6s both;
+            background: rgba(0, 0, 0, 0.2);
+            color: white;
+            padding: 3rem 2rem;
+            margin-top: 4rem;
         }
 
-        /* ===== ANIMATIONS ===== */
-        @keyframes fadeInDown {
-          from {
-            opacity: 0;
-            transform: translateY(-30px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-
-        @keyframes fadeInUp {
-          from {
-            opacity: 0;
-            transform: translateY(30px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-
-        @keyframes float {
-          0%,
-          100% {
-            transform: translateY(0px);
-          }
-          50% {
-            transform: translateY(20px);
-          }
-        }
-
-        @keyframes pulse {
-          0%,
-          100% {
-            opacity: 1;
-          }
-          50% {
-            opacity: 0.8;
-          }
-        }
-
-        /* ===== RESPONSIVE DESIGN ===== */
-        @media (max-width: 1024px) {
-          .signals-grid {
+        .footer-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
             grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-          }
+            gap: 3rem;
+        }
+
+        .footer-column h3 {
+            font-size: 1.25rem;
+            margin-bottom: 1.5rem;
+            position: relative;
+            padding-bottom: 0.5rem;
+        }
+
+        .footer-column h3::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 40px;
+            height: 2px;
+            background: var(--accent);
+        }
+
+        .footer-links {
+            list-style: none;
+        }
+
+        .footer-links li {
+            margin-bottom: 0.75rem;
+        }
+
+        .footer-links a {
+            color: rgba(255, 255, 255, 0.8);
+            text-decoration: none;
+            transition: all 0.3s ease;
+        }
+
+        .footer-links a:hover {
+            color: white;
+            padding-left: 5px;
+        }
+
+        .social-links {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+
+        .social-links a {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            transition: all 0.3s ease;
+        }
+
+        .social-links a:hover {
+            background: var(--primary);
+            transform: translateY(-3px);
+        }
+
+        .copyright {
+            text-align: center;
+            padding-top: 3rem;
+            margin-top: 3rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 0.9rem;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 1024px) {
+            .hero h1 {
+                font-size: 2.75rem;
+            }
         }
 
         @media (max-width: 768px) {
-          header h1 {
-            font-size: 2rem;
-          }
-
-          header p {
-            font-size: 1rem;
-          }
-
-          .signals-grid {
-            grid-template-columns: 1fr;
-            gap: 1.5rem;
-          }
-
-          .card-icon {
-            width: 70px;
-            height: 70px;
-          }
-
-          .card-title {
-            font-size: 1.25rem;
-          }
-
-          .card-description {
-            font-size: 0.9rem;
-          }
+            .hero {
+                padding: 3rem 1rem;
+            }
+            
+            .hero h1 {
+                font-size: 2.25rem;
+            }
+            
+            .container {
+                padding: 1rem;
+            }
         }
 
         @media (max-width: 480px) {
-          .container {
-            padding: 2rem 1rem;
-          }
-
-          header {
-            padding: 2rem 1rem;
-          }
-
-          header h1 {
-            font-size: 1.5rem;
-          }
-
-          header p {
-            font-size: 0.9rem;
-          }
-
-          .card-icon {
-            width: 60px;
-            height: 60px;
-          }
-
-          .card-title {
-            font-size: 1.1rem;
-          }
+            .hero h1 {
+                font-size: 1.75rem;
+            }
+            
+            .hero p {
+                font-size: 1rem;
+            }
+            
+            .cards-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .card {
+                padding: 1.5rem;
+            }
+            
+            .section-title {
+                font-size: 1.5rem;
+            }
         }
     </style>
 </head>
 <body>
+    <!-- Header -->
     <header>
-        <div class="header-content">
-            <h1>Digital Signal Processing Viewer</h1>
-            <p>Explore, visualize, and generate core signals with modern analytics</p>
+        <div class="logo">
+            <i class="fas fa-wave-square"></i>
+            <span>SignalFlow</span>
         </div>
-        <div class="header-decoration"></div>
     </header>
 
+    <!-- Hero Section -->
+    <section class="hero">
+        <h1>Advanced Signal Processing Platform</h1>
+        <p>Transform raw signals into actionable insights with our cutting-edge processing tools and visualization capabilities.</p>
+    </section>
+
+    <!-- Main Content -->
     <div class="container">
-        <!-- Signal Cards Grid - Now includes Voice -->
-        <div class="signals-grid">
-            <a href="/ecg" class="signal-card">
+        <h2 class="section-title">Signal Processing Modules</h2>
+        
+        <!-- Cards Grid -->
+        <div class="cards-grid">
+            <a href="/ecg" class="card card-1">
                 <div class="card-icon">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M3 12h18M3 6h5l4 12 4-12h5M12 3v18"/>
-                    </svg>
+                    <i class="fas fa-heartbeat"></i>
                 </div>
-                <h2 class="card-title">ECG</h2>
-                <p class="card-description">Electrocardiogram Analysis</p>
+                <h3 class="card-title">ECG Analysis</h3>
+                <p class="card-description">Advanced electrocardiogram signal processing with real-time anomaly detection and heart rate variability analysis.</p>
+                <div class="card-footer">
+                    <span class="card-badge">Medical</span>
+                    <div class="card-link">Explore <i class="fas fa-arrow-right"></i></div>
+                </div>
             </a>
 
-            <a href="/eeg" class="signal-card">
+            <a href="/eeg" class="card card-2">
                 <div class="card-icon">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M2 12h20M6 6l2 4 2-8 2 4 2-4 2 8 2-4 2 4"/>
-                        <circle cx="12" cy="12" r="10"/>
-                    </svg>
+                    <i class="fas fa-brain"></i>
                 </div>
-                <h2 class="card-title">EEG</h2>
-                <p class="card-description">Brain Wave Monitoring</p>
+                <h3 class="card-title">EEG Monitoring</h3>
+                <p class="card-description">Comprehensive brain wave analysis with multi-channel processing and cognitive state classification.</p>
+                <div class="card-footer">
+                    <span class="card-badge">Neurology</span>
+                    <div class="card-link">Explore <i class="fas fa-arrow-right"></i></div>
+                </div>
             </a>
 
-            <a href="/radar" class="signal-card">
+            <a href="/radar" class="card card-3">
                 <div class="card-icon">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="2"/>
-                        <circle cx="12" cy="12" r="6"/>
-                        <circle cx="12" cy="12" r="10"/>
-                        <path d="M12 2v20M2 12h20"/>
-                    </svg>
+                    <i class="fas fa-satellite-dish"></i>
                 </div>
-                <h2 class="card-title">RADAR</h2>
-                <p class="card-description">Detection & Ranging</p>
+                <h3 class="card-title">RADAR Processing</h3>
+                <p class="card-description">High-resolution radar signal analysis with object detection, tracking, and Doppler effect calculations.</p>
+                <div class="card-footer">
+                    <span class="card-badge">Defense</span>
+                    <div class="card-link">Explore <i class="fas fa-arrow-right"></i></div>
+                </div>
             </a>
 
-            <a href="/doppler" class="signal-card">
+            <a href="/doppler" class="card card-4">
                 <div class="card-icon">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M12 2v20M2 12h20"/>
-                        <path d="M6 6l12 12M18 6l-12 12"/>
-                        <circle cx="12" cy="12" r="3"/>
-                    </svg>
+                    <i class="fas fa-waveform"></i>
                 </div>
-                <h2 class="card-title">DOPPLER</h2>
-                <p class="card-description">Frequency Shift Analysis</p>
+                <h3 class="card-title">Doppler Analysis</h3>
+                <p class="card-description">Frequency shift detection and velocity calculation for moving objects in various mediums.</p>
+                <div class="card-footer">
+                    <span class="card-badge">Physics</span>
+                    <div class="card-link">Explore <i class="fas fa-arrow-right"></i></div>
+                </div>
             </a>
 
-            <a href="/voice" class="signal-card">
+            <a href="/voice" class="card card-5">
                 <div class="card-icon">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M12 1v22M6 5c-1.657 0-3 1.343-3 3v8c0 1.657 1.343 3 3 3h12c1.657 0 3-1.343 3-3V8c0-1.657-1.343-3-3-3"/>
-                        <path d="M9 18v3h6v-3"/>
-                    </svg>
+                    <i class="fas fa-microphone"></i>
                 </div>
-                <h2 class="card-title">VOICE</h2>
-                <p class="card-description">Audio Signal Processing</p>
+                <h3 class="card-title">Voice Processing</h3>
+                <p class="card-description">Advanced audio signal analysis with speech recognition, noise reduction, and voice pattern identification.</p>
+                <div class="card-footer">
+                    <span class="card-badge">Audio</span>
+                    <div class="card-link">Explore <i class="fas fa-arrow-right"></i></div>
+                </div>
             </a>
+        </div>
+
+        <h2 class="section-title">Platform Features</h2>
+        
+        <!-- Features Section -->
+        <div class="features">
+            <div class="feature">
+                <div class="feature-icon">
+                    <i class="fas fa-bolt"></i>
+                </div>
+                <h3 class="feature-title">Real-time Processing</h3>
+                <p class="feature-description">Process signals in real-time with minimal latency and high throughput for time-sensitive applications.</p>
+            </div>
+
+            <div class="feature">
+                <div class="feature-icon">
+                    <i class="fas fa-chart-line"></i>
+                </div>
+                <h3 class="feature-title">Advanced Analytics</h3>
+                <p class="feature-description">Leverage machine learning algorithms for pattern recognition, anomaly detection, and predictive analysis.</p>
+            </div>
+
+            <div class="feature">
+                <div class="feature-icon">
+                    <i class="fas fa-palette"></i>
+                </div>
+                <h3 class="feature-title">Interactive Visualizations</h3>
+                <p class="feature-description">Create stunning, interactive visualizations to explore and understand complex signal patterns.</p>
+            </div>
         </div>
     </div>
 
+    <!-- Footer -->
     <footer>
-        <p>&copy; 2025 Signal Viewer | Advanced Digital Signal Processing Platform</p>
+        <div class="footer-content">
+            <div class="footer-column">
+                <h3>SignalFlow</h3>
+                <p>Advanced signal processing platform for researchers, engineers, and data scientists.</p>
+                <div class="social-links">
+                    <a href="#"><i class="fab fa-twitter"></i></a>
+                    <a href="#"><i class="fab fa-linkedin"></i></a>
+                    <a href="#"><i class="fab fa-github"></i></a>
+                    <a href="#"><i class="fab fa-youtube"></i></a>
+                </div>
+            </div>
+            <div class="footer-column">
+                <h3>Products</h3>
+                <ul class="footer-links">
+                    <li><a href="/ecg">ECG Analyzer</a></li>
+                    <li><a href="/eeg">EEG Monitor</a></li>
+                    <li><a href="/radar">RADAR Processor</a></li>
+                    <li><a href="/doppler">Doppler Tool</a></li>
+                    <li><a href="/voice">Voice Lab</a></li>
+                </ul>
+            </div>
+            <div class="footer-column">
+                <h3>Resources</h3>
+                <ul class="footer-links">
+                    <li><a href="#">Documentation</a></li>
+                    <li><a href="#">Tutorials</a></li>
+                    <li><a href="#">API Reference</a></li>
+                    <li><a href="#">Community</a></li>
+                    <li><a href="#">Support</a></li>
+                </ul>
+            </div>
+            <div class="footer-column">
+                <h3>Company</h3>
+                <ul class="footer-links">
+                    <li><a href="#">About Us</a></li>
+                    <li><a href="#">Careers</a></li>
+                    <li><a href="#">Blog</a></li>
+                    <li><a href="#">Contact</a></li>
+                    <li><a href="#">Privacy Policy</a></li>
+                </ul>
+            </div>
+        </div>
+        <div class="copyright">
+            &copy; 2023 SignalFlow. All rights reserved.
+        </div>
     </footer>
+
+    <script>
+        // Add some interactive elements
+        document.addEventListener('DOMContentLoaded', function() {
+            // Add hover effect to cards
+            const cards = document.querySelectorAll('.card');
+            cards.forEach(card => {
+                card.addEventListener('mouseenter', function() {
+                    this.style.transform = 'translateY(-10px)';
+                });
+                
+                card.addEventListener('mouseleave', function() {
+                    this.style.transform = 'translateY(0)';
+                });
+            });
+        });
+    </script>
 </body>
 </html>
