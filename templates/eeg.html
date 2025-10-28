@@ -7,135 +7,10 @@
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <link rel="stylesheet" href="/static/shared_styles.css"/>
     <script src="/static/js/signal_shared.js"></script>
-    <style>
-        :root {
-          --primary: #6366f1;
-          --secondary: #ec4899;
-          --accent: #f59e0b;
-          --success: #10b981;
-          --light-bg: #f8fafc;
-          --card-bg: #ffffff;
-          --text-dark: #1e293b;
-          --text-light: #64748b;
-          --border: #e2e8f0;
-        }
-
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-
-        body {
-          background: linear-gradient(135deg, var(--light-bg) 0%, #f1f5f9 100%);
-          color: var(--text-dark);
-          font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-          overflow-x: hidden;
-        }
-
-        .header {
-          background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
-          color: white;
-          padding: 1.5rem 2rem;
-          box-shadow: 0 8px 24px rgba(99, 102, 241, 0.2);
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          animation: slideDown 0.6s ease-out;
-        }
-
-        .header h1 { font-size: 1.75rem; font-weight: 800; margin: 0; color: #ffffff; text-shadow: 0 1px 2px rgba(0,0,0,0.25); }
-
-        .status-indicator { display: none !important; }
-        .status-dot { display: none !important; }
-        .status-dot.inactive { display: none !important; }
-
-        /* Header navigation buttons */
-        .header .nav { display: flex; gap: 0.5rem; }
-        .header .nav .btn-secondary {
-          background: rgba(255,255,255,0.15);
-          color: #ffffff;
-          border: 2px solid rgba(255,255,255,0.25);
-          padding: 0.5rem 0.9rem;
-          border-radius: 10px;
-          transition: all 0.2s ease;
-        }
-        .header .nav .btn-secondary:hover {
-          background: rgba(255,255,255,0.25);
-          transform: translateY(-1px);
-          border-color: rgba(255,255,255,0.35);
-        }
-        .header .nav .btn-secondary.active {
-          background: linear-gradient(135deg, var(--accent) 0%, var(--secondary) 100%);
-          color: #ffffff;
-          border-color: transparent;
-          box-shadow: 0 6px 16px rgba(236,72,153,0.35);
-          transform: translateY(-1px);
-        }
-
-        .main-container { display: grid; grid-template-columns: 280px 1fr 320px; gap: 1.5rem; padding: 1.5rem 2rem; max-width: 1600px; margin: 0 auto; min-height: calc(100vh - 80px); }
-
-        .sidebar { background: var(--card-bg); border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 4px 12px rgba(0,0,0,0.07); overflow-y: auto; max-height: calc(100vh - 120px); animation: slideUp 0.6s ease-out 0.1s both; }
-        .sidebar-section { padding: 1.25rem; border-bottom: 1px solid var(--border); transition: all 0.3s ease; }
-        .sidebar-section:last-child { border-bottom: none; }
-        .sidebar-section h3 { font-size: 0.9rem; font-weight: 700; color: var(--primary); margin-bottom: 1rem; text-transform: uppercase; letter-spacing: 0.5px; }
-
-        .form-group { margin-bottom: 1rem; }
-        .form-group:last-child { margin-bottom: 0; }
-        label { display: block; font-size: 0.85rem; font-weight: 600; color: var(--text-dark); margin-bottom: 0.5rem; }
-        input[type="number"], input[type="file"], select { width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 8px; background: var(--light-bg); color: var(--text-dark); font-size: 0.9rem; transition: all 0.3s ease; }
-        input[type="number"]:focus, select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(99,102,241,0.1); background: var(--card-bg); }
-
-        #dropZone { border: 2px dashed var(--primary); padding: 1.5rem; border-radius: 8px; background: linear-gradient(135deg, rgba(99,102,241,0.05) 0%, rgba(236,72,153,0.05) 100%); text-align: center; cursor: pointer; transition: all 0.3s ease; font-size: 0.85rem; color: var(--text-dark); }
-        #dropZone:hover { background: linear-gradient(135deg, rgba(99,102,241,0.1) 0%, rgba(236,72,153,0.1) 100%); border-color: var(--secondary); transform: scale(1.02); }
-        #pickFiles { color: var(--primary); font-weight: 600; cursor: pointer; text-decoration: underline; transition: all 0.3s ease; }
-        #pickFiles:hover { color: var(--secondary); }
-        #channelList { max-height: 180px; overflow-y: auto; padding: 0.5rem 0; }
-        .form-check { margin-bottom: 0.5rem; }
-        .form-check-input { width: 18px; height: 18px; margin-right: 0.5rem; cursor: pointer; accent-color: var(--primary); }
-        .form-check-label { font-size: 0.9rem; color: var(--text-dark); cursor: pointer; font-weight: 500; }
-
-        .btn-group { display: flex; gap: 0.75rem; margin-top: 1rem; }
-        button { flex: 1; padding: 0.75rem; border: none; border-radius: 8px; font-weight: 600; font-size: 0.9rem; cursor: pointer; transition: all 0.3s cubic-bezier(0.34,1.56,0.64,1); }
-        .btn-primary { background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%); color: white; box-shadow: 0 4px 12px rgba(99,102,241,0.3); }
-        .btn-primary:hover { transform: translateY(-3px); box-shadow: 0 8px 20px rgba(99,102,241,0.4); }
-        .btn-secondary { background: var(--light-bg); color: var(--text-dark); border: 2px solid var(--border); }
-        .btn-secondary:hover { border-color: var(--primary); color: var(--primary); transform: translateY(-2px); }
-
-        .content-area { display: flex; flex-direction: column; gap: 1.5rem; animation: slideUp 0.6s ease-out 0.2s both; }
-        .plot-card { background: var(--card-bg); border-radius: 12px; border: 1px solid var(--border); padding: 1.5rem; box-shadow: 0 4px 12px rgba(0,0,0,0.07); transition: all 0.4s cubic-bezier(0.34,1.56,0.64,1); }
-        .plot-card:hover { transform: translateY(-4px); box-shadow: 0 12px 24px rgba(99,102,241,0.15); border-color: var(--primary); }
-        .plot-card h3 { font-size: 0.95rem; font-weight: 700; color: var(--primary); margin-bottom: 1rem; text-transform: uppercase; letter-spacing: 0.5px; }
-        .plot-container { width: 100%; height: 500px; border-radius: 8px; overflow: hidden; }
-        .plots-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
-        .plots-grid .plot-card { grid-column: span 1; }
-        .plots-grid .plot-card .plot-container { height: 350px; }
-
-        .info-panel { background: var(--card-bg); border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 4px 12px rgba(0,0,0,0.07); padding: 1.5rem; max-height: calc(100vh - 120px); overflow-y: auto; animation: slideUp 0.6s ease-out 0.3s both; }
-        .info-section { margin-bottom: 1.5rem; padding-bottom: 1.5rem; border-bottom: 1px solid var(--border); }
-        .info-section:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
-        .info-section h4 { font-size: 0.85rem; font-weight: 700; color: var(--primary); margin-bottom: 1rem; text-transform: uppercase; letter-spacing: 0.5px; }
-        .prediction-box { background: linear-gradient(135deg, rgba(99,102,241,0.05) 0%, rgba(236,72,153,0.05) 100%); padding: 1.25rem; border-radius: 8px; border: 1px solid var(--border); text-align: center; transition: all 0.4s cubic-bezier(0.34,1.56,0.64,1); }
-        .prediction-box:hover { transform: translateY(-4px) scale(1.01); box-shadow: 0 8px 20px rgba(99,102,241,0.15); border-color: var(--primary); }
-        .stat-item { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 0; font-size: 0.9rem; }
-        .stat-label { color: var(--text-light); font-weight: 500; }
-        .stat-value { color: var(--primary); font-weight: 700; }
-
-        @keyframes slideDown { from { opacity: 0; transform: translateY(-20px);} to { opacity: 1; transform: translateY(0);} }
-        @keyframes slideUp { from { opacity: 0; transform: translateY(20px);} to { opacity: 1; transform: translateY(0);} }
-        @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:.6;} }
-
-        @media (max-width: 1400px) { .main-container { grid-template-columns: 250px 1fr 280px; gap: 1rem; padding: 1rem; } }
-        @media (max-width: 1024px) {
-          .main-container { grid-template-columns: 1fr; gap: 1.5rem; }
-          .sidebar { max-height: auto; }
-          .info-panel { max-height: auto; }
-          .plots-grid { grid-template-columns: 1fr; }
-        }
-
-        ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-track { background: var(--light-bg); }
-        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: var(--primary); }
-    </style>
+   
 </head>
 <body>
+<!-- Header: Title + Mode Switch Buttons -->
 <div class="header">
     <h1>EEG Viewer</h1>
     
@@ -146,8 +21,11 @@
     </div>
 </div>
 
+<!-- Main 3-column grid: [Sidebar | Content (plots) | Info Panel] -->
 <div class="main-container">
+    <!-- Left Column: Sidebar Controls -->
     <div class="sidebar" id="controlPanel">
+        <!-- Sidebar Section: File Upload -->
         <div class="sidebar-section">
             <h3>📁 File Upload</h3>
             <div class="form-group">
@@ -164,16 +42,7 @@
                     <div id="channelInstructions" class="form-text" style="display:none;">Channels load after file upload.</div>
                     <div id="channelList">Channels load after file upload.</div>
                 </div>
-                <div id="montageSelectorContainer" style="margin-top:0.75rem;">
-                    <label class="form-label" for="montageSelector">Quick Channel Set (Montage)</label>
-                    <select id="montageSelector" class="form-select">
-                        <option value="none">Custom Channel Selection</option>
-                        <option value="standard">Full 10-20 Channels</option>
-                        <option value="frontal">Cognition & Attention (Frontal Lobe)</option>
-                        <option value="occipital">Visual Processing (Occipital Lobe)</option>
-                        <option value="all">Select ALL Raw Channels</option>
-                    </select>
-                </div>
+              
             </div>
         </div>
 
@@ -227,15 +96,15 @@
         </div>
     </div>
 
+    <!-- Middle Column: Content Area with primary plot container -->
     <div class="content-area" id="mainPlotWrapper">
         <div class="plot-card">
             <h3>Primary Signal</h3>
             <div id="plot"></div>
         </div>
-        <!-- Hidden placeholder to keep JS stable; UI for Band Power and Signal Statistics removed -->
-        <div id="bandPowerPlot" style="display:none;"></div>
     </div>
 
+    <!-- Right Column: Info Panel (Prediction + Statistics) -->
     <div class="info-panel">
         <div class="info-section">
             <h4>Prediction</h4>
@@ -258,9 +127,21 @@
             <div class="stat-item"><span class="stat-label">Window</span><span class="stat-value" id="windowSize">5s</span></div>
         </div>
     </div>
+
+</div>
+
     
     <script>
-        // --- GLOBAL VARIABLES ---
+        /*
+        Important Functions:
+            - handleFileUpload(file): POST file to /eeg/upload, hydrate fs + channels.
+            - startContinueButton click handler: validates selection, builds plots, starts loop.
+            - getIntervalDelay(): converts speed multiplier to interval ms.
+            - resetStreamingInterval(): reapplies interval with updated delay.
+            - pauseStreaming()/stopStreaming(): manage interval + UI states without data loss.
+            - applyMontage()/renderChannelCheckboxes(): channel UI and selection helpers.
+        */
+        // --- GLOBAL VARIABLES --- to manage states 
         let isStreaming = false; 
         let isPaused = false; 
         let intervalId;
@@ -272,7 +153,7 @@
         let globalTime = 0; 
         let currentYRange = 500000; 
         const colors = ["#FF5733","#33FF57","#3357FF","#F3FF33","#FF33EC","#33FFF6","#FF8F33","#8F33FF","#33FF99","#FF3333"];
-        // Light theme layout to match ECG
+
         const plotLayout = {
             paper_bgcolor: '#ffffff',
             plot_bgcolor: '#ffffff',
@@ -282,22 +163,17 @@
             margin: { t: 40, r: 10, b: 40, l: 50 }
         };
         
-        let streamSpeedMultiplier = 1.0; 
-        const BASE_INTERVAL_MS = 100; 
+        let streamSpeedMultiplier = 1.0; //default value
+        const BASE_INTERVAL_MS = 100; //streaming is updated eachh 100ms
         
         // --- POLAR MODE VARIABLE ---
         let isCumulativePolar = false;
         // Shared resampling alias
         const resampleWithAliasing = SignalShared.resampleWithAliasing;
-        
-        // --- BAND POWER CONSTANTS ---
-        const BAND_NAMES = ['Delta', 'Theta', 'Alpha', 'Beta', 'Gamma']; 
-        const BAND_COLORS = ['#FF5733', '#33FF57', '#3357FF', '#F3FF33', '#FF33EC'];
-        
-        // --- STABILITY IMPROVEMENT VARIABLES ---
-        let bandPowerSMABuffer = []; 
+    // --- STABILITY IMPROVEMENT VARIABLES ---
+      
         const SMA_WINDOW_SIZE = 5;    
-        let bandPowerYRange = 500000; 
+        
         // ---------------------------------------
         
         // --- DOM ELEMENTS ---
@@ -311,12 +187,11 @@
         const speedMultiplierInput = document.getElementById('speedMultiplier');
         // Plot containers
         const plotDiv = document.getElementById('plot');
-        const bandPowerPlotDiv = document.getElementById('bandPowerPlot');
+    
         // Channel section
         const channelListDiv = document.getElementById('channelList');
         const channelForm = document.getElementById('channelForm');
-        const montageSelector = document.getElementById('montageSelector');
-        const montageSelectorContainer = document.getElementById('montageSelectorContainer');
+
         const channelInstructions = document.getElementById('channelInstructions');
         const channelSelectionContainer = document.getElementById('channelSelectionContainer');
         // Mode selection
@@ -337,122 +212,152 @@
         // Prediction elements
         const predictButton = document.getElementById('predictButton');
         const predictionResults = document.getElementById('predictionResults');
-        
-        // COLLAPSE ELEMENTS
+         // COLLAPSE ELEMENTS
         const controlPanel = document.getElementById('controlPanel');
         const mainPlotWrapper = document.getElementById('mainPlotWrapper');
         const controlPanelContent = document.getElementById('controlPanelContent');
-        const collapseButton = document.getElementById('collapseButton');
-        const collapseIcon = document.getElementById('collapseIcon');
-        let isSidebarCollapsed = false;
-
-        let channelNameMap = {}; 
+     let channelNameMap = {}; 
         let channelIndexToOriginalName = {}; 
         let allAvailableChannels = {}; 
-
-        
-        // UPDATED MONTAGE DEFINITION
-        const montages = {
-            'standard': ['FP1', 'FP2', 'F3', 'F4', 'C3', 'C4', 'P3', 'P4', 'O1', 'O2', 'FZ', 'CZ', 'PZ'], 
-            'frontal': ['FP1', 'FP2', 'F3', 'F4', 'F7', 'F8', 'FZ'],
-            'occipital': ['P3', 'P4', 'O1', 'O2', 'OZ'],
-            'all': [] // 'all' uses all channels available in the file
-        };
-
-        // --- SIDEBAR COLLAPSE LOGIC ---
-        function resizePlots() {
-            // Collect all Plotly IDs
-            const plotIds = [];
-            if (graphModeSelector.value === 'time') {
-                // If using stacked time plots, get all individual IDs
-                selected.forEach(chIndex => plotIds.push(`plot-ch-${chIndex}`));
-            } else {
-                plotIds.push('single-plot');
+      /*Stops the data update loop by clearing the setInterval() timer.
+      Resets state flags (isStreaming, isPaused).*/
+function stopStreaming() {
+            if (intervalId) {
+                clearInterval(intervalId);
+                intervalId = null;
             }
-            plotIds.push('bandPowerPlot'); 
-            
-            // Relayout/resizing for all active plots
+            isStreaming = false;
+            isPaused = false;
+            /*Updates the UI to show:
+              0 channels active
+            Status = “Idle”*/
+            const chCountEl = document.getElementById('channelCount');
+            if (chCountEl) chCountEl.textContent = '0';
+            const st = document.getElementById('streamStatus');
+            if (st) st.textContent = 'Idle';
+            isCumulativePolar = false;
+            /*3shan ahna 8ayrna fel states f b3dha lazem n call function
+            el bt enable / disable l buttons acc to new states*/
+            updateButtonStates();
+            //Completely removes all Plotly traces, layouts, and event handlers from the plot area.
+            Plotly.purge(plotDiv.id);
+            plotDiv.innerHTML = `
+        <div style="width:100%;height:100%;">
+            <div class="text-center p-10 text-xl text-gray-500">
+               
+            </div>
+        </div>`;
+           }
+
+        function pauseStreaming() {
+            if (intervalId) {
+                clearInterval(intervalId);
+                intervalId = null;
+            }
+            /*Updates the UI to show:
+             Status = “paused”*/
+            isPaused = true;
+            updateButtonStates();
+            const st = document.getElementById('streamStatus');
+            if (st) st.textContent = 'Paused';
+            /*Depending on the graph mode:
+              If showing multiple time-domain plots → one per channel.
+              Otherwise (e.g. frequency or polar mode) → a single plot ID.*/
+            const mode = graphModeSelector.value;
+            const plotIds = (mode === 'time') ? selected.map(chIndex => `plot-ch-${chIndex}`) : ['single-plot'];
             plotIds.forEach(id => {
                 try {
                     let node = Plotly.d3.select(`#${id}`).node();
                     if (node && node.layout) {
-                        // Plotly's relayout(autosize) forces a redraw to the new container size
-                        Plotly.relayout(id, { autosize: true });
+                        let currentTitle = node.layout.title.text.replace(/ \(PAUSED\)/g, '').replace(/ \(STOPPED\)/g, '').replace(/ \(Time: [\d\.]+s\)/, '');
+                        Plotly.relayout(id, { title: currentTitle + ' (PAUSED)' });
                     }
-                } catch(e) { /* ignore if plot isn't initialized */ }
+                } catch (e) {}
             });
         }
 
-        function toggleSidebar() {
-            isSidebarCollapsed = !isSidebarCollapsed;
-
-            if (isSidebarCollapsed) {
-                // Collapse Sidebar (Control Panel)
-                controlPanel.classList.remove('md:w-1/4', 'p-6');
-                // w-14 is 3.5rem. Use it for the collapsed fixed width on medium screens and up
-                controlPanel.classList.add('md:w-14', 'p-2'); 
-                
-                // Hide content
-                controlPanelContent.classList.add('hidden', 'opacity-0');
-                
-                // Rotate icon to point towards the plot (left)
-                collapseIcon.classList.remove('rotate-0');
-                collapseIcon.classList.add('rotate-180');
-                
-                // Expand Main Plot Area
-                mainPlotWrapper.classList.remove('md:w-3/4');
-                // w-[calc(100%-3.5rem)] for the remaining space
-                mainPlotWrapper.classList.add('md:w-[calc(100%-3.5rem)]'); 
-                
-            } else {
-                // Expand Sidebar (Control Panel)
-                controlPanel.classList.remove('md:w-14', 'p-2');
-                controlPanel.classList.add('md:w-1/4', 'p-6');
-                
-                // Show content
-                controlPanelContent.classList.remove('hidden', 'opacity-0');
-                
-                // Reset icon rotation
-                collapseIcon.classList.remove('rotate-180');
-                collapseIcon.classList.add('rotate-0');
-                
-                // Shrink Main Plot Area
-                mainPlotWrapper.classList.remove('md:w-[calc(100%-3.5rem)]');
-                mainPlotWrapper.classList.add('md:w-3/4');
-            }
-            
-            // Call Plotly resize after CSS transition is complete (300ms)
-            window.requestAnimationFrame(() => {
-                setTimeout(resizePlots, 300); 
+        // Continue streaming and update button states
+        function continueStreaming() {
+            //Only runs if the system is already in a paused streaming state.
+            if (!isStreaming || !isPaused) return;
+            //Clears the pause flag and updates the UI status label.
+            isPaused = false;
+            const st = document.getElementById('streamStatus');
+            if (st) st.textContent = 'Running';
+            // Periodic update loop: call backend and dispatch updates
+            intervalId = setInterval(async () => {
+                try{
+                    const out = await SignalShared.fetchAndDispatch({
+                        updateUrl: '/eeg/update',
+                        payload: { channels: selected, width, mode: graphModeSelector.value },
+                        ids: { timePrefix: 'plot-ch-', singleId: 'single-plot' },
+                        state: { fs, nativeFs, width, isCumulativePolar },
+                        selected,
+                        buffers: channelDataBuffers,
+                        names: channelIndexToOriginalName,
+                        colors,
+                     globalTime
+                    });
+                    /*If the backend says “stop” → it stops streaming complete
+                    Otherwise, it updates globalTime (the running clock).
+                    If an error occurs and it’s not paused → it safely stops.*/
+                    if (out && out.stop) { stopStreaming(); return; }
+                    if (out && typeof out.globalTime === 'number') globalTime = out.globalTime;
+                } catch(e){ if (!isPaused) stopStreaming(); }
+            }, getIntervalDelay());
+            updateButtonStates();
+            const mode = graphModeSelector.value;
+            //Same idea as in pauseStreaming(), but now removes “(PAUSED)” from titles.
+            const plotIds = (mode === 'time') ? selected.map(chIndex => `plot-ch-${chIndex}`) : ['single-plot'];
+            plotIds.forEach(id => {
+                try {
+                    let node = Plotly.d3.select(`#${id}`).node();
+                    if (node && node.layout) {
+                        let currentTitle = node.layout.title.text.replace(/ \(PAUSED\)/g, '').replace(/ \(STOPPED\)/g, '').replace(/ \(Time: [\d\.]+s\)/, '');
+                        Plotly.relayout(id, { title: currentTitle });
+                    }
+                } catch (e) {}
             });
         }
-        
-        // --- SPEED CONTROL FUNCTIONS ---
+  // --- SPEED CONTROL FUNCTIONS ---
+        // Compute timer delay based on the speed multiplier (min 20ms)
+        //converts speed multiplier to milliseconds delay.
         function getIntervalDelay() {
             const spEl = document.getElementById('speedMultiplier');
             streamSpeedMultiplier = parseFloat(spEl && spEl.value) || 1.0;
+            // BASE_INTERVAL_MS was set to 100ms earlier
+            //Math.floor() ensures it’s an integer number of milliseconds.
+            //Math.max(20, …) ensures the delay never goes below 20 ms, so the loop 
+            //doesn’t become too fast and overload the browser.
             return Math.max(20, Math.floor(BASE_INTERVAL_MS / streamSpeedMultiplier)); 
         }
 
+        // Restart the streaming interval when speed changes (if streaming)
         function resetStreamingInterval() {
+            //1. Only run if streaming is active (and not paused)
             if (isStreaming && !isPaused) {
+                //Stop any existing update timer
                 if (intervalId) {
                     clearInterval(intervalId);
                 }
+                //2. Start a new timer with the updated delay
                 intervalId = setInterval(async () => {
                     try{
                         const out = await SignalShared.fetchAndDispatch({
                             updateUrl: '/eeg/update',
                             payload: { channels: selected, width, mode: graphModeSelector.value },
-                            ids: { timePrefix: 'plot-ch-', singleId: 'single-plot', bandId: 'bandPowerPlot' },
+                            ids: { timePrefix: 'plot-ch-', singleId: 'single-plot', bandId: 'band-power' },
                             state: { fs, nativeFs, width, isCumulativePolar },
                             selected,
                             buffers: channelDataBuffers,
                             names: channelIndexToOriginalName,
                             colors,
-                            bandPower: { smaBuffer: bandPowerSMABuffer, yRangeState: { value: bandPowerYRange }, bandNames: BAND_NAMES, bandColors: BAND_COLORS, smaWindow: SMA_WINDOW_SIZE },
+                          
                             globalTime
                         });
+                        /*If the backend response (out) contains a stop flag → stop streaming entirely.
+                          If it contains a globalTime value (timestamp), update the local
+                          globalTime variable to stay in sync with the backend clock.*/
                         if (out && out.stop) { stopStreaming(); return; }
                         if (out && typeof out.globalTime === 'number') globalTime = out.globalTime;
                     } catch(e){ if (!isPaused) stopStreaming(); }
@@ -468,13 +373,20 @@
         widthInput.addEventListener('change', () => {
              width = parseFloat(widthInput.value);
         });
+        /*newFs → new frequency value from a slider input).
+         Math.max(1, …) → ensures the sampling rate never drops below 1 Hz.*/
         function updateFs(newFs) {
-            fs = Math.max(1, parseInt(newFs || fs, 10));
+            fs = Math.max(1,newFs);
+            // Reflect in slider and label
             if (fsValue) fsValue.textContent = `${fs} Hz`;
             // Reflect in Statistics panel
             const sr = document.getElementById('sampleRate');
             if (sr) sr.textContent = `${fs} Hz`;
         }
+        /*When the sampling-rate slider (fsSlider) moves, it calls updateFs() with 
+        the new value.
+        This continuously updates the fs variable and on-screen display
+         in real-time as the slider moves.*/
         fsSlider.addEventListener('input', (e) => {
             updateFs(e.target.value);
         });
@@ -487,6 +399,7 @@
         widthInput.addEventListener('change', () => { width = parseFloat(widthInput.value)||width; updateWindowStat(); });
 
         // --- Button State Management ---
+        // Enable/disable buttons based on isStreaming/isPaused and channel selection
         function updateButtonStates() {
             startContinueButton.disabled = false;
             startContinueButton.classList.remove('opacity-50', 'cursor-not-allowed');
@@ -522,26 +435,15 @@
         }
 
         // --- DYNAMIC CHANNEL LIST RENDERING ---
-        function cleanChannelName(name) {
-            // Cleans and upper-cases the name for matching against standard montages
-            return name.trim().toUpperCase().split(/[-_/\s().]/)[0].replace(/[^A-Z0-9]/g, '');
-        }
-
         function renderChannelCheckboxes(channelsToShow) {
-            channelListDiv.innerHTML = ''; 
-            
+            channelListDiv.innerHTML = '';
             const sortedIndices = Object.keys(channelsToShow).sort((a, b) => parseInt(a) - parseInt(b));
-
-            if (sortedIndices.length === 0 && Object.keys(allAvailableChannels).length > 0) {
-                 channelListDiv.innerHTML = '<p class="text-center text-red-400">No channels found for this montage!</p>';
-                 return;
-            }
-
             if (sortedIndices.length === 0) {
                 channelListDiv.innerHTML = '<p class="text-center text-gray-500">Channels load after file upload.</p>';
+                const chCountEl = document.getElementById('channelCount');
+                if (chCountEl) chCountEl.textContent = '0';
                 return;
             }
-
             sortedIndices.forEach(index => {
                 const name = channelsToShow[index];
                 const div = document.createElement('div');
@@ -551,56 +453,18 @@
                                  <label class="ml-2 text-sm" for="ch${index}">${name} (${parseInt(index) + 1})</label>`;
                 channelListDiv.appendChild(div);
             });
-            // Reset channel count display to current selections (likely 0)
             const chCountEl = document.getElementById('channelCount');
             if (chCountEl) {
                 const count = document.querySelectorAll('#channelList input[name=channels]:checked').length;
                 chCountEl.textContent = String(count);
             }
         }
-        
-        function applyMontage(montageKey) {
-            const channelsToShow = {};
-            let selectedMontageNames = [];
 
-            if (montageKey === 'none' || montageKey === 'all') {
-                Object.assign(channelsToShow, allAvailableChannels);
-            } else {
-                selectedMontageNames = montages[montageKey] || [];
-            }
-            
-            if (selectedMontageNames.length > 0) {
-                selectedMontageNames.forEach(standardName => {
-                    const cleanedName = cleanChannelName(standardName);
-                    const index = channelNameMap[cleanedName];
-                    if (index !== undefined) {
-                        channelsToShow[index] = channelIndexToOriginalName[index];
-                    }
-                });
-            }
-
-            renderChannelCheckboxes(channelsToShow);
-            
-            document.querySelectorAll("input[name=channels]").forEach(cb => {
-                cb.disabled = false;
-                if (montageKey === 'all') {
-                    cb.checked = true;
-                } else {
-                    cb.checked = false;
-                }
-            });
-            // Update channel count after montage application
-            const chCountEl = document.getElementById('channelCount');
-            if (chCountEl) {
-                const count = document.querySelectorAll("#channelList input[name=channels]:checked").length;
-                chCountEl.textContent = String(count);
-            }
-        }
-        
+        // Toggle UI hints/controls based on selected graph mode
         function toggleChannelListDisplay() {
             const currentMode = graphModeSelector.value;
             
-            montageSelectorContainer.classList.remove('hidden');
+           
             channelSelectionContainer.classList.remove('disabled-input');
             channelInstructions.classList.add('hidden'); 
             // Hide both polar mode containers by default
@@ -616,13 +480,10 @@
                 // Show polar mode controls in main plot area
                 mainPolarModeContainer.style.display = '';
             }
-            montageSelector.value = 'none';
-            applyMontage('none');
+
         }
 
-        montageSelector.addEventListener('change', (e) => {
-            applyMontage(e.target.value);
-        });
+      
         
         graphModeSelector.addEventListener('change', () => {
             toggleChannelListDisplay(); 
@@ -660,6 +521,7 @@
         }
 
         // --- FILE UPLOAD HANDLERS ---
+        // Handle EDF/FIF upload -> POST /eeg/upload and hydrate UI state
         function handleFileUpload(file) {
             if (!file || !['edf', 'fif', 'gz'].includes(file.name.split('.').pop().toLowerCase())) {
                 alert("Please select a valid EDF or FIF file.");
@@ -669,8 +531,7 @@
             document.getElementById('fileNameDisplay').textContent = `Uploading: ${file.name}...`;
             stopStreaming(); 
             channelForm.classList.add('hidden'); 
-            updateButtonStates(); 
-
+            
             const formData = new FormData();
             formData.append('file', file);
 
@@ -678,59 +539,54 @@
             .then(result => {
                 if (result.success) {
                     fs = result.fs;
-                    // Configure FS slider bounds and current value to match the file
                     if (fsSlider) {
                         fsSlider.max = String(fs);
                         fsSlider.value = String(fs);
                     }
                     updateFs(fs);
-                    
+                    nativeFs = fs;
+
                     channelNameMap = {};
-                    channelIndexToOriginalName = {};
                     allAvailableChannels = {};
-                    
+
                     Object.entries(result.channels).forEach(([index, name]) => {
-                        const cleanedName = cleanChannelName(name); 
-                        channelNameMap[cleanedName] = index; 
-                        channelIndexToOriginalName[index] = name; 
-                        allAvailableChannels[index] = name; 
-                    });
+                        allAvailableChannels[index] = name;
                     
+                    });
+                    // Populate the channel list now that we have channels
+                    renderChannelCheckboxes(allAvailableChannels);
+
                     document.getElementById('fileNameDisplay').textContent = `File Loaded: ${file.name} (FS: ${fs} Hz, ${Object.keys(result.channels).length} Ch)`;
                     channelForm.classList.remove('hidden');
-                    
-                    graphModeSelector.value = 'time'; 
-                    montageSelector.value = 'none';
-                    toggleChannelListDisplay(); 
+
+                    graphModeSelector.value = 'time';
+                   
+                    toggleChannelListDisplay();
                     updateModeButtonsActive();
-                    
-                    Plotly.purge(plotDiv.id); 
-                    plotDiv.innerHTML = '<div style="width:100%;height:100%;"><div class="text-center p-10 text-xl text-gray-500">Select channels and click \'Start Streaming\'.</div></div>';
-                    
-                    Plotly.purge(bandPowerPlotDiv.id); 
-                    bandPowerPlotDiv.innerHTML = '<div style="width:100%;height:100%;"><div class="text-center p-10 text-sm text-gray-500">Start streaming to view average band power.</div></div>'; 
-                    
-                    updateButtonStates(); 
-                    // Update statistics panel immediately
+
+                    Plotly.purge(plotDiv.id);
+                    plotDiv.innerHTML = '';
+
+                    updateButtonStates();
                     const sr = document.getElementById('sampleRate');
                     if (sr) sr.textContent = `${fs} Hz`;
                     const st = document.getElementById('streamStatus');
                     if (st) st.textContent = 'Idle';
                     const chCountEl = document.getElementById('channelCount');
                     if (chCountEl) chCountEl.textContent = '0';
-                    updateWindowStat();
-
+                    const win = document.getElementById('windowSize');
+                    if (win) win.textContent = `${width}s`;
                 } else {
                     document.getElementById('fileNameDisplay').textContent = `Error: ${result.message}`;
                     alert(`File upload failed: ${result.message}`);
                 }
             })
             .catch(error => {
-                console.error("Upload error:", error);
+                console.error('Upload error:', error);
                 document.getElementById('fileNameDisplay').textContent = `Upload failed: ${error.message}`;
             });
         }
-        
+
         // --- Drag and Drop via shared helper ---
         const dropZone = document.getElementById('dropZone');
         const edfFileInput = document.getElementById('edfFile');
@@ -741,138 +597,47 @@
         });
 
 
-        // --- STREAMING CONTROLS ---
-
-        function stopStreaming() {
-            if (intervalId) {
-                clearInterval(intervalId);
-                intervalId = null;
-            }
-            isStreaming = false;
-            isPaused = false;
-            const chCountEl = document.getElementById('channelCount');
-            if (chCountEl) chCountEl.textContent = '0';
-            const st = document.getElementById('streamStatus');
-            if (st) st.textContent = 'Idle';
-            bandPowerSMABuffer = []; 
-            bandPowerYRange = 500000; 
-            isCumulativePolar = false; // Reset polar mode flag
-            updateButtonStates();
-            
-            Plotly.purge(plotDiv.id);
-            plotDiv.innerHTML = '<div style="width:100%;height:100%;"><div class="text-center p-10 text-xl text-gray-500">Select channels and click \'Start Streaming\'.</div></div>';
-            Plotly.purge(bandPowerPlotDiv.id); 
-            bandPowerPlotDiv.innerHTML = '<div style="width:100%;height:100%;"><div class="text-center p-10 text-sm text-gray-500">Start streaming to view average band power.</div></div>'; 
-            
-        }
-
-        function pauseStreaming() {
-            if (intervalId) {
-                clearInterval(intervalId);
-                intervalId = null;
-            }
-            isPaused = true;
-            updateButtonStates();
-            const st = document.getElementById('streamStatus');
-            if (st) st.textContent = 'Paused';
-            
-            const mode = graphModeSelector.value;
-            const plotIds = (mode === "time") 
-                            ? selected.map(chIndex => `plot-ch-${chIndex}`) 
-                            : ['single-plot'];
-            plotIds.push('bandPowerPlot'); 
-
-            plotIds.forEach(id => {
-                try {
-                    let node = Plotly.d3.select(`#${id}`).node();
-                    if (node && node.layout) {
-                        let currentTitle = node.layout.title.text.replace(/ \(PAUSED\)/g, '').replace(/ \(STOPPED\)/g, '').replace(/ \(Time: [\d\.]+s\)/, '');
-                        Plotly.relayout(id, { title: currentTitle + " (PAUSED)" });
-                    }
-                } catch (e) { /* Ignore error if plot isn't initialized */ }
-            });
-        }
-
-        function continueStreaming() {
-            if (!isStreaming || !isPaused) return;
-
-            isPaused = false;
-            const st = document.getElementById('streamStatus');
-            if (st) st.textContent = 'Running';
-            intervalId = setInterval(async () => {
-                try{
-                    const out = await SignalShared.fetchAndDispatch({
-                        updateUrl: '/eeg/update',
-                        payload: { channels: selected, width, mode: graphModeSelector.value },
-                        ids: { timePrefix: 'plot-ch-', singleId: 'single-plot', bandId: 'bandPowerPlot' },
-                        state: { fs, nativeFs, width, isCumulativePolar },
-                        selected,
-                        buffers: channelDataBuffers,
-                        names: channelIndexToOriginalName,
-                        colors,
-                        bandPower: { smaBuffer: bandPowerSMABuffer, yRangeState: { value: bandPowerYRange }, bandNames: BAND_NAMES, bandColors: BAND_COLORS, smaWindow: SMA_WINDOW_SIZE },
-                        globalTime
-                    });
-                    if (out && out.stop) { stopStreaming(); return; }
-                    if (out && typeof out.globalTime === 'number') globalTime = out.globalTime;
-                } catch(e){ if (!isPaused) stopStreaming(); }
-            }, getIntervalDelay()); 
-            updateButtonStates();
-            
-            const mode = graphModeSelector.value;
-            const plotIds = (mode === "time") 
-                            ? selected.map(chIndex => `plot-ch-${chIndex}`) 
-                            : ['single-plot'];
-            plotIds.push('bandPowerPlot'); 
-
-            plotIds.forEach(id => {
-                try {
-                    let node = Plotly.d3.select(`#${id}`).node();
-                    if (node && node.layout) {
-                        let currentTitle = node.layout.title.text.replace(/ \(PAUSED\)/g, '').replace(/ \(STOPPED\)/g, '').replace(/ \(Time: [\d\.]+s\)/, '');
-                        Plotly.relayout(id, { title: currentTitle });
-                    }
-                } catch (e) { /* Ignore error if plot isn't initialized */ }
-            });
-        }
-
-
         // --- START/CONTINUE STREAMING LOGIC ---
+        // Start/Continue button: validates selection, builds plots, starts interval
         document.getElementById("startContinueButton").addEventListener("click", (e) => {
-            
+           /*If the system is currently paused, just resume it by calling your existing
+continueStreaming()*/
             if (isPaused) {
                 continueStreaming();
                 return;
             }
-            
+            //. Ignore clicks if already streaming
             if (isStreaming) {
                 return;
             }
-
+//Now we know streaming is off — so we prepare everything for a new session.
             // --- INITIAL STARTUP LOGIC ---
             
-            // CAPTURE CUMULATIVE STATE and COLORMAP
+            // CAPTURE (ui settings) CUMULATIVE STATE and COLORMAP
             // Use the mainCumulativePolarCheckbox if visible, else fallback
             isCumulativePolar = (mainPolarModeContainer && mainPolarModeContainer.style.display !== 'none')
                 ? mainCumulativePolarCheckbox.checked
                 : (cumulativePolarCheckbox ? cumulativePolarCheckbox.checked : false);
             const selectedColormap = colormapSelector.value;
-
+        /*Collects all checked channels (<input name="channels"> checkboxes) into an array of channel indices.
+            Reads the plot window width (widthInput).
+             Reads the graph display mode (graphModeSelector) — could be "time", "polar", or "recurrence".*/
             let rawSelected = Array.from(document.querySelectorAll("#channelList input[name=channels]:checked")).map(ch => parseInt(ch.value));
             
             width = parseFloat(widthInput.value); 
             mode = graphModeSelector.value;
             
             // --- MODE-SPECIFIC CHANNEL ENFORCEMENT ---
+            //If no channels are selected → show an error message inside the plot area and stop.
             if (rawSelected.length === 0) {
                 Plotly.purge(plotDiv.id);
                 plotDiv.innerHTML = '<div style="width:100%;height:100%;"><div class="text-center p-10 text-xl text-red-400">Please select at least one channel to start streaming.</div></div>';
                 updateButtonStates(); 
                 return;
             }
-
+//for reccurence, force to select 2 channels
             if (mode === "recurrence") {
-                if (rawSelected.length < 2) {
+                if (rawSelected.length != 2) {
                     Plotly.purge(plotDiv.id);
                     plotDiv.innerHTML = '<div style="width:100%;height:100%;"><div class="text-center p-10 text-xl text-red-400">Recurrence Graph requires at least **TWO** channels (ChX and ChY).</div></div>';
                     updateButtonStates(); 
@@ -885,31 +650,32 @@
             // --- END MODE-SPECIFIC CHANNEL ENFORCEMENT ---
 
             // Reset buffers and state for the new stream
+            /*Clears all old data buffers and sets up fresh empty arrays for each channel.
+                 Resets the global time counter and Y-axis range.
+                 Removes any old Plotly plots from the display area*/
             channelDataBuffers = {};
             selected.forEach(chIndex => channelDataBuffers[chIndex] = { data: [], time: [] }); 
             globalTime = 0;
-            currentYRange = 500000; 
-            bandPowerSMABuffer = []; 
-            bandPowerYRange = 500000; 
-            
+            currentYRange = 500000;
+
             // Clear the plot containers
             Plotly.purge(plotDiv.id);
-            Plotly.purge(bandPowerPlotDiv.id);
-            plotDiv.innerHTML = '';
-            bandPowerPlotDiv.innerHTML = '';
+           
             
             // --- Plotly Configuration based on Mode ---
 
             if (mode === "time") {
                 // Time graph plots go directly into the main #plot div.
                 const totalChannels = selected.length;
-                let plotHeight = '150px';
+                let plotHeight = '350px';
                 if (totalChannels > 0 && totalChannels <= 3) {
                     plotHeight = '350px';
                 }
-
+           //Create a Plotly div for each channel
                 selected.forEach((chIndex, i) => {
-                    const chName = channelIndexToOriginalName[chIndex.toString()];
+                    const chName = (channelIndexToOriginalName[String(chIndex)]
+                                    || allAvailableChannels[String(chIndex)]
+                                    || `Ch ${parseInt(chIndex,10)+1}`);
                     const plotId = `plot-ch-${chIndex}`;
 
                     const plotDivElement = document.createElement('div');
@@ -923,7 +689,11 @@
                     plotDivElement.style.padding = '0';
                     plotDivElement.style.height = plotHeight;
                     plotDiv.appendChild(plotDivElement);
+/*Empty arrays for x (time) and y (signal values) — they’ll be filled live during streaming.
 
+Each channel uses a unique color (from a pre-defined colors array).
+
+mode: 'lines' means a continuous waveform*/
                     const individualTrace = [{ x: [], y: [], mode: 'lines', line: { color: colors[i % colors.length] }, name: chName }];
                     const individualLayout = {
                         title: { text: '', font: { size: 11 } },
@@ -957,17 +727,7 @@
                     if (lastEl) lastEl.style.marginBottom = '0';
                 }
                 // Add subtle dividers between subplots for clarity
-                selected.forEach((chIndex, i) => {
-                    const el = document.getElementById(`plot-ch-${chIndex}`);
-                    if (!el) return;
-                    if (i < selected.length - 1) {
-                        el.style.borderBottom = '1px solid #e2e8f0';
-                        el.style.paddingBottom = '8px';
-                    } else {
-                        el.style.borderBottom = 'none';
-                        el.style.paddingBottom = '0';
-                    }
-                });
+                
             }
             else {
                 // polar and recurrence use a single plot in the #plot container
@@ -985,36 +745,17 @@
                 if (mode === 'polar') {
                     SignalShared.initPolarPlot(singlePlotId, selected, channelIndexToOriginalName, width, isCumulativePolar, colors, plotLayout);
                 } else if (mode === 'recurrence') {
-                    const chX = channelIndexToOriginalName[selected[0].toString()];
-                    const chY = channelIndexToOriginalName[selected[1].toString()];
+                    const chX = (channelIndexToOriginalName[String(selected[0])] 
+                                  || allAvailableChannels[String(selected[0])] 
+                                  || `Ch ${parseInt(selected[0],10)+1}`);
+                    const chY = (channelIndexToOriginalName[String(selected[1])] 
+                                  || allAvailableChannels[String(selected[1])] 
+                                  || `Ch ${parseInt(selected[1],10)+1}`);
                     SignalShared.initRecurrencePlot(singlePlotId, chX, chY, colormapSelector.value, plotLayout);
                 }
             }
             
-            // --- Band Power Plot Initialization (Runs for all modes) ---
-            const bandPowerTraces = [{
-                // Data is swapped for horizontal bar chart
-                x: Array(BAND_NAMES.length).fill(0), 
-                y: BAND_NAMES, 
-                type: 'bar',
-                orientation: 'h', // Set orientation to horizontal
-                marker: { color: BAND_COLORS }
-            }];
-            const bandPowerLayout = {
-                title: `Smoothed Average Power`,
-                paper_bgcolor: '#ffffff', plot_bgcolor: '#ffffff',
-                font: { color: '#1e293b', family: 'Inter' },
-                xaxis: { 
-                    title: 'Smoothed Average Power (x10^10)', color: '#1e293b', 
-                    gridcolor: '#e2e8f0', range: [0, bandPowerYRange] 
-                },
-                yaxis: { gridcolor: '#e2e8f0' },
-                margin: { t: 40, r: 10, b: 60, l: 40 }
-            };
-            
-            Plotly.newPlot('bandPowerPlot', bandPowerTraces, bandPowerLayout, { responsive: true, displayModeBar: false });
-
-
+        
             // Start the stream
             isStreaming = true;
             isPaused = false;
@@ -1029,13 +770,12 @@
                     const out = await SignalShared.fetchAndDispatch({
                         updateUrl: '/eeg/update',
                         payload: { channels: selected, width, mode: graphModeSelector.value },
-                        ids: { timePrefix: 'plot-ch-', singleId: 'single-plot', bandId: 'bandPowerPlot' },
+                        ids: { timePrefix: 'plot-ch-', singleId: 'single-plot', bandId: 'band-power' },
                         state: { fs, nativeFs, width, isCumulativePolar },
                         selected,
                         buffers: channelDataBuffers,
                         names: channelIndexToOriginalName,
                         colors,
-                        bandPower: { smaBuffer: bandPowerSMABuffer, yRangeState: { value: bandPowerYRange }, bandNames: BAND_NAMES, bandColors: BAND_COLORS, smaWindow: SMA_WINDOW_SIZE },
                         globalTime
                     });
                     if (out && out.stop) { stopStreaming(); return; }
@@ -1044,11 +784,12 @@
             }, getIntervalDelay()); 
             updateButtonStates();
             // Call resize once on start to ensure initial sizing is correct
-            setTimeout(resizePlots, 100); 
+            
 
         });
         
         // --- Helper functions for data buffering ---
+        // Legacy helper (kept for reference) for simple rolling windows
         function updateSignalBuffer(chIndex, newSignals) {
             const buffer = channelDataBuffers[chIndex].data;
             const maxPoints = width * fs;
@@ -1065,10 +806,7 @@
             }
             // If in cumulative polar mode, the buffer grows forever
         }
-
-        
-
-        // --- PREDICTION FUNCTIONALITY ---
+ // --- PREDICTION FUNCTIONALITY ---
         async function runPredictions() {
             const selectedChannels = Array.from(document.querySelectorAll("#channelList input[name=channels]:checked")).map(ch => parseInt(ch.value));
             
@@ -1197,11 +935,9 @@
         // Initialize button states on load
         document.addEventListener('DOMContentLoaded', () => {
             updateButtonStates();
-            if (document.getElementById('collapseButton')) {
-                document.getElementById('collapseButton').addEventListener('click', toggleSidebar);
-            }
+            
             // Resize plots on window resize
-            window.addEventListener('resize', () => { try { resizePlots(); } catch(_){} });
+            
             const pick = document.getElementById('pickFiles');
             const fileInput = document.getElementById('edfFile');
             if (pick && fileInput) { pick.addEventListener('click', (e)=>{ e.preventDefault(); fileInput.click(); }); }

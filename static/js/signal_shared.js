@@ -175,9 +175,7 @@
     }
 
     // Band power update (if present)
-    if (result.band_power && bandPower && bandPower.smaBuffer && bandPower.yRangeState){
-      SS.updateBandPowerPlot(ids.bandId, bandPower.bandNames || [], bandPower.smaBuffer, result.band_power, bandPower.smaWindow || 5, bandPower.yRangeState);
-    }
+    
 
     return { globalTime };
   };
@@ -233,15 +231,30 @@
   };
 
   // Simple aliasing decimator to fixed length
-  SS.resampleWithAliasing = function(arr, outLen){
+//bnakhod output length (outLen) w N (length of arr we want to resample)
+ SS.resampleWithAliasing = function(arr, outLen){
     const N = Array.isArray(arr) ? arr.length : 0;
     if (outLen <= 1 || N <= 1) return [N>0?arr[0]:0];
+    //hn3ml array for output b length l output length l ahna wakhdeno input ll function
     const out = new Array(outLen);
+/*step is how far to move along the input array for each output sample.
+For example, if:
+arr.length = 10
+outLen = 5
+then step = (10-1)/(5-1) = 9/4 = 2.25.
+That means for each output index i, the corresponding input index is approximately i * 2.25*/
     const step = (N - 1) / (outLen - 1);
     for (let i=0;i<outLen;i++){
       const idx = Math.floor(i * step);
       out[i] = arr[idx] ?? arr[N-1] ?? 0;
     }
+    /*For each output index i:
+Compute the input index: i * step, then floor it (so it picks the lower integer index).
+Fetch arr[idx] if it exists.
+If it’s undefined, fallback to arr[N - 1] (the last element).
+If that’s also undefined, fallback to 0.
+So it essentially copies values from positions 0, floor(step), floor(2*step), … in the input array.
+*/
     return out;
   };
 

@@ -45,19 +45,11 @@ logger = logging.getLogger("eeg")
 # Device configuration
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# EEG frequency bands
-FREQUENCY_BANDS = {
-    'Delta': (0.5, 4),
-    'Theta': (4, 8),
-    'Alpha': (8, 13),
-    'Beta': (13, 30),
-    'Gamma': (30, 50)
-}
+
 
 # Streaming parameters
 BASE_CHUNK_SAMPLES = 16
 INITIAL_OFFSET_SAMPLES = 0  # Will be set after file load
-BAND_POWER_SCALING = 10000000000000.0  # Scaling factor for visualization
 
 
 # ============================================================================
@@ -105,74 +97,6 @@ state = EEGState()
 # ============================================================================
 # SIGNAL PROCESSING UTILITIES
 # ============================================================================
-
-def apply_bandpass_filter(data: np.ndarray, lowcut: float, highcut: float, 
-                         fs: float, order: int = 2) -> np.ndarray:
-    """
-    Apply Butterworth bandpass filter to signal.
-    
-    Args:
-        data: Input signal
-        lowcut: Low cutoff frequency
-        highcut: High cutoff frequency
-        fs: Sampling frequency
-        order: Filter order
-    
-    Returns:
-        Filtered signal
-    """
-    nyq = 0.5 * fs
-    low = lowcut / nyq
-    high = highcut / nyq
-    
-    # Handle edge cases
-    if lowcut == 0.5 and highcut == 4:
-        # Delta band - lowpass only
-        b, a = butter(order, high, btype='lowpass')
-    elif lowcut > 0 and highcut < nyq:
-        # Bandpass
-        b, a = butter(order, [low, high], btype='bandpass')
-    else:
-        return data  # Can't filter
-    
-    try:
-        filtered = filtfilt(b, a, data.astype(float))
-        return filtered
-    except Exception as e:
-        logger.debug(f"Filter failed: {e}")
-        return data
-
-
-def calculate_band_power(data: np.ndarray, fs: float) -> Dict[str, float]:
-    """
-    Calculate power in each frequency band.
-    
-    Args:
-        data: Signal data
-        fs: Sampling frequency
-    
-    Returns:
-        Dictionary of band powers
-    """
-    band_powers = {}
-    
-    for band_name, (low, high) in FREQUENCY_BANDS.items():
-        # Validate frequency range
-        if high <= low or low >= fs / 2:
-            band_powers[band_name] = 0.0
-            continue
-        
-        # Apply bandpass filter
-        filtered = apply_bandpass_filter(data, low, high, fs, order=2)
-        
-        # Calculate power
-        power = np.mean(filtered ** 2)
-        
-        # Scale for visualization
-        scaled_power = power * BAND_POWER_SCALING if np.isfinite(power) else 0.0
-        band_powers[band_name] = scaled_power
-    
-    return band_powers
 
 
 def calculate_xor_difference_eeg(current_buffer: List[float], 
@@ -1096,7 +1020,7 @@ def update():
         return jsonify({
             "n_samples": 0,
             "signals": {},
-            "band_power": {},
+           
             "message": "No file loaded."
         })
     
@@ -1113,7 +1037,7 @@ def update():
             return jsonify({
                 "n_samples": 0,
                 "signals": {},
-                "band_power": {}
+                
             })
         
         mode = data.get("mode", "time")
@@ -1140,7 +1064,7 @@ def update():
             return jsonify({
                 "n_samples": 0,
                 "signals": {},
-                "band_power": {}
+               
             })
         
         # Get data for selected channels
@@ -1158,17 +1082,6 @@ def update():
                 picked_downsampled.append(downsampled)
             picked = np.array(picked_downsampled)
         
-        # Calculate band power (average across all selected channels)
-        band_power_data = {}
-        if picked.shape[0] > 0:
-            all_powers = [
-                calculate_band_power(picked[i], state.fs)
-                for i in range(picked.shape[0])
-            ]
-            
-            for band in FREQUENCY_BANDS.keys():
-                avg_power = np.mean([p.get(band, 0.0) for p in all_powers])
-                band_power_data[band] = float(avg_power)
         
         # Build signals dictionary
         signals = {
@@ -1179,7 +1092,7 @@ def update():
         response = {
             "n_samples": picked.shape[1] if picked.ndim == 2 else len(picked),
             "signals": signals,
-            "band_power": band_power_data
+            
         }
         
         # Server-side XOR computation
@@ -1220,7 +1133,7 @@ def update():
         return jsonify({
             "n_samples": 0,
             "signals": {},
-            "band_power": {},
+           
             "error": str(e)
         }), 500
 
