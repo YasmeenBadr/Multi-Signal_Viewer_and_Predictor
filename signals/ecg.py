@@ -1,3 +1,20 @@
+"""
+ECG backend services
+--------------------
+This module provides the server-side logic for the Real-Time ECG Viewer:
+- Loads ECG records (WFDB .hea/.dat) or generates a simulated 12-lead signal
+- Streams windowed signal chunks to the frontend with optional downsampling
+- Demonstrates deliberate downsampling-with-aliasing to show its effect
+- Computes and renders derived views: XOR, Polar, Recurrence (density image)
+- Runs lightweight 1D and 2D CNNs for demo predictions
+
+Key concepts in the pipeline:
+- Native sampling rate vs. current streaming sampling rate
+- Per-chunk decimation with persistent phase to simulate realistic aliasing
+- Rolling per-channel buffers sized to the 1D model sequence length
+- Background training of a toy 2D CNN from recurrence plots when diagnosis
+  text is available in .hea files
+"""
 # ecg.py
 import os
 import time
@@ -84,6 +101,8 @@ DEFAULT_TIME_WINDOW_S = 15.0
 # 1D model definition (SimpleECG)
 # -------------------------
 class SimpleECG(nn.Module):
+    """Tiny 1D CNN used to classify an ECG segment as Normal/Abnormal.
+    """
     def __init__(self, input_length=5000):
         super().__init__()
         self.input_length = input_length
@@ -131,6 +150,8 @@ model.eval()
 # 2D recurrence model
 # -------------------------
 class Simple2DCNN(nn.Module):
+    """Toy 2D CNN for classifying recurrence-density images.
+    """
     def __init__(self):
         super().__init__()
         self.net = nn.Sequential(
@@ -164,6 +185,15 @@ from torch.utils.data import TensorDataset, DataLoader
 # Utilities
 # -------------------------
 def build_recurrence_image(x, y, size=128):
+    """Build a normalized 2D density image from two signals x and y.
+
+    Steps
+    - Make x,y float32 and flatten
+    - Compute 2D histogram over dynamic ranges
+    - Log-scale counts to compress dynamic range
+    - Z-normalize to mean=0, std=1 for stable CNN input
+    Returns a size x size float32 array.
+    """
     try:
         x = np.asarray(x, dtype=np.float32).flatten()
         y = np.asarray(y, dtype=np.float32).flatten()
@@ -184,6 +214,12 @@ def build_recurrence_image(x, y, size=128):
         return np.zeros((size, size), dtype=np.float32)
 
 def extract_diagnosis_from_hea(record_base: Optional[str]):
+    """Best-effort extraction of diagnosis/free-text from a WFDB .hea file.
+
+    Given the base path to a record, tries to open the corresponding .hea and
+    look for keywords like diagnosis, reason, infarct, etc. Returns a lowercase
+    string such as 'healthy control' if found, else None.
+    """
     if not record_base:
         return None
     # EDITED: Corrected path assumption for uploaded files
@@ -213,6 +249,13 @@ def extract_diagnosis_from_hea(record_base: Optional[str]):
     return None
 
 def train_model2d_on_record(signals, chan_names, record_base, max_windows=200, window_s=2.0, epochs=6):
+    """Background training of the 2D CNN from recurrence windows.
+
+    - Derives a binary label from .hea text (healthy/normal -> 0, else 1)
+    - Slices rolling windows across two channels, builds recurrence images
+    - Trains a very small CNN for a few epochs and persists to disk
+    - Saves a CSV of the two channels to results/ for inspection
+    """
     try:
         rec_label_text = extract_diagnosis_from_hea(record_base) if record_base else None
         if not rec_label_text:
@@ -301,6 +344,10 @@ def train_model2d_on_record(signals, chan_names, record_base, max_windows=200, w
         logger.exception("2D training failed: %s", e)
 
 def predict_recurrence_pair(x, y):
+    """Run the 2D CNN on a recurrence image built from x and y.
+
+    Returns dict with label, probabilities, and confidence or None on failure.
+    """
     try:
         img = build_recurrence_image(x, y, size=128)
         arr = (img - np.mean(img)) / (np.std(img) + 1e-6)
@@ -317,6 +364,10 @@ def predict_recurrence_pair(x, y):
 
 # WFDB load
 def load_wfdb_record(record_base):
+    """Load a WFDB record given its base path (without extension).
+
+    Returns (signals, signal_names, fs). Raises if wfdb is not available.
+    """
     if wfdb is None:
         raise RuntimeError("wfdb package not available in environment")
     rec = wfdb.rdrecord(record_base)
@@ -326,6 +377,11 @@ def load_wfdb_record(record_base):
     return signals, sig_names, fs
 
 def setup_simulated_record():
+    """Initialize a synthetic 12-lead ECG-like signal for demo purposes.
+
+    Produces slow sinusoids plus periodic spikes to resemble QRS complexes.
+    Populates the global _stream with signals and metadata.
+    """
     logger.info("No WFDB record found — using simulated ECG (12 leads).")
     fs = _stream.get("fs", FREQ_DEFAULT)
     duration_s = 60
@@ -380,13 +436,23 @@ if not _stream["loaded"]:
 # Downsample **with aliasing** (raw slicing, no anti-aliasing)
 # -------------------------
 def resample_with_aliasing(sig, native_fs, target_fs, pos_native: int = 0):
-    """Strict decimation without anti-aliasing using persistent phase state stored in _stream['alias_phase']."""
+    """Strict decimation without anti-aliasing using persistent phase.
+
+    This intentionally skips anti-alias filtering to demonstrate how aliasing
+    distorts signals when reducing sample rate. The decimator keeps an
+    `_stream['alias_phase']` dict to maintain continuity across chunks so the
+    aliasing artifacts appear consistent over time.
+    """
     # Delegate to the shared implementation, preserving ECG's alias_phase state
     phase_state = _stream.setdefault("alias_phase", {})
     return decimate_with_aliasing(sig, native_fs, target_fs, pos_native=pos_native, phase_state=phase_state)
 
 # Example of streaming a chunk
 def get_stream_chunk(duration_s=1.0):
+    """Return one streaming chunk downsampled to DISPLAY_FS from native raw.
+
+    Uses circular indexing to loop seamlessly when reaching the end.
+    """
     if not _stream["loaded"]:
         return None
     fs_cur = _stream["fs"]
@@ -412,10 +478,16 @@ ECG_BP = Blueprint("ecg", __name__, url_prefix="/ecg", template_folder="template
 
 @ECG_BP.route("/")
 def index():
+    """Render the ECG viewer page."""
     return render_template("ecg.html")
 
 @ECG_BP.route("/config")
 def config():  
+    """Return configuration for the frontend UI.
+
+    Includes channel names, native fs, current display fs, defaults, and any
+    diagnosis text read from the .hea file.
+    """
     display_fs = _stream.get("display_fs") or DISPLAY_FS
     return jsonify({        #This ensures the UI knows available channels and native sampling rate.
         "fs": _stream["fs"],
@@ -430,6 +502,11 @@ def config():
 
 @ECG_BP.route("/set_freq", methods=["POST"])
 def set_freq():
+    """Set current streaming sampling frequency (alias of set_sampling).
+
+    Clamps to [FREQ_MIN, native_fs, 500], resamples raw signals with aliasing,
+    and updates _stream state without clearing prediction histories.
+    """
     try:
         data = request.get_json(silent=True) or {}
         # Accept both keys for compatibility with frontend
@@ -472,7 +549,10 @@ def set_freq():
 
 @ECG_BP.route("/set_sampling", methods=["POST"])
 def set_sampling():
-    """Alias for set_freq that accepts {sampling_freq: <float>} from the UI."""
+    """Alias for set_freq that accepts {sampling_freq: <float>} from the UI.
+
+    Performs the same work as set_freq but normalizes the accepted key.
+    """
     try:
         data = request.get_json(silent=True) or {}
         # Normalize to a single variable
@@ -513,7 +593,10 @@ def set_sampling():
 
 @ECG_BP.route("/reset_sampling", methods=["POST"])
 def reset_sampling():
-    """Resets the streaming frequency to the original native frequency."""
+    """Reset the streaming frequency to the original native frequency.
+
+    Restores _stream["signals"] to the raw copy and resets alias phase state.
+    """
     try:
         raw = _stream.get("signals_raw")
         native_fs = _stream.get("fs_native", _stream.get("fs", FREQ_DEFAULT))
@@ -583,6 +666,11 @@ def predict_signal(sig_chunk):
 
 @ECG_BP.route("/upload", methods=["POST"])
 def upload():
+    """Handle multi-file upload (.hea, .dat, optional .xyz) and attempt reload.
+
+    Saves to ./uploads, then if both .hea and .dat are present, tries to load
+    the record and refreshes the _stream accordingly. Returns status JSON.
+    """
     upload_dir = os.path.join(os.getcwd(), "uploads")
     os.makedirs(upload_dir, exist_ok=True)
     
@@ -628,6 +716,11 @@ def upload():
 # Try to load record after upload
 # -------------------------
 def _try_load_record_after_upload(file_path):
+    """Load an uploaded record into _stream using WFDB if available.
+
+    Falls back to CSV when wfdb isn't available. Extracts diagnosis from .hea
+    and resets model buffers, then kicks off background 2D training.
+    """
     """
     Load the uploaded record into _stream.
     Uses WFDB if available; otherwise, treat as CSV/NumPy.
@@ -689,6 +782,16 @@ def _try_load_record_after_upload(file_path):
 
 @ECG_BP.route("/update", methods=["POST"])
 def update():
+    """Main streaming endpoint consumed by the frontend.
+
+    Workflow per request
+    - Parse selected channels and validate against loaded signals
+    - Extract next native chunk, decimate to current streaming fs with aliasing
+    - Update rolling per-channel buffers sized to model length
+    - Build model-ready arrays and run 1D predictions
+    - Optionally compute recurrence pair predictions for 2 channels
+    - Return plot-ready arrays and metadata for the frontend renderer
+    """
     try:
         # -------------------------
         # Accept JSON and parse parameters

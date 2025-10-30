@@ -6,6 +6,7 @@
   <title>Real-Time ECG Viewer</title>
   <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"/>
+  <link rel="stylesheet" href="/static/shared_styles.css"/>
  
   <script src="/static/js/signal_shared.js"></script>
 <style>
@@ -79,16 +80,22 @@
   .nav .btn-secondary.active { background: linear-gradient(135deg, #9250a4 0%, #d0a7cd 100%); color:#ffffff; border-color: rgba(255,255,255,0.0); box-shadow: 0 6px 16px rgba(139,92,246,0.45); }
 
   /* Plot cards */
-  .plot-card { background:#ffffff; border:1px solid #e2e8f0; border-radius: 10px; padding: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.06); }
-  .info-panel { margin-left: 12px; }
-  .plots-col { padding-left: 12px; }
-  .plot-container { position: relative; overflow: hidden; }
-  .plot-container > div[id$='Plot']{ width: 100% !important; height: 100% !important; }
+  .plot-card { background:#ffffff; border:1px solid #e2e8f0; border-radius: 10px; padding: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.06); }
+  .info-panel { margin-left: 8px; }
+  .plots-col { padding-left: 4px; padding-right: 4px; }
+  /* Force plots to stack vertically, not side-by-side */
+  .plots-grid { display: block !important; }
+  .plots-grid > .row { width: 100%; margin: 0; display:block; }
+  .plots-grid .row .col-12 { width: 100%; float: none; display:block; }
+  .plots-grid .plot-container { width: 100%; display:block; }
+  .plot-container { position: relative; overflow: visible; margin-bottom: 8px; }
+  /* Let relayout set exact pixel height; keep width flexible */
+  .plot-container > div[id$='Plot']{ width: 100% !important; }
   body{ margin:0 !important; padding:0 !important; }
   .container, .container-fluid{ padding-left:0 !important; padding-right:0 !important; }
   .row{ margin-left:0 !important; margin-right:0 !important; --bs-gutter-x: 0; }
 
-  /* Animations (like EEG) */
+  /* Animations  */
   @keyframes slideDown { from { opacity: 0; transform: translateY(-20px);} to { opacity: 1; transform: translateY(0);} }
   @keyframes slideUp { from { opacity: 0; transform: translateY(20px);} to { opacity: 1; transform: translateY(0);} }
   .header { animation: slideDown 0.6s ease-out; }
@@ -101,12 +108,13 @@
   input[type=range]::-webkit-slider-thumb { appearance:none; width:16px; height:16px; border-radius:50%; background:#8b5cf6; box-shadow:0 0 0 3px rgba(139,92,246,.25); cursor:pointer; margin-top:-5px; }
   input[type=range]::-moz-range-thumb { width:16px; height:16px; border-radius:50%; background:#8b5cf6; border:none; box-shadow:0 0 0 3px rgba(139,92,246,.25); cursor:pointer; }
   .btn-primary, .btn-secondary { border-radius:999px; }
-  .btn-primary { background: linear-gradient(135deg, #8016c2 0%, #8016c2 100%); border: 0; }
-  .btn-primary:hover { filter: brightness(1.05); }
+  
+  .btn-primary { background: #00eaff; border: 0; color: #0b1220; }
+  .btn-primary:hover { filter: brightness(0.95); }
   .btn-secondary { background:#f8fafc; border:2px solid #e2e8f0; color:#1e293b; }
   .btn-secondary:hover { background:#ffffff; border-color:#6366f1; color:#6366f1; }
 
-  /* Responsive layout borrowed from EEG */
+  
   @media (max-width: 1400px) {
     .main-container { grid-template-columns: 250px 1fr 280px; gap: 1rem; padding: 1rem; }
   }
@@ -157,24 +165,24 @@
     color: #1e293b;
     cursor: pointer;
   }
-  .form-check-input { cursor: pointer; accent-color:#8b5cf6; }
-  /* EEG-like channel list spacing */
+  .form-check-input { cursor: pointer; accent-color:#babbe474; }
+ 
   #channelList { max-height: 240px; overflow-y: auto; padding: 0.5rem 0; }
   #channelList .form-check { display:flex; align-items:center; gap:.5rem; margin-bottom: .35rem; }
   #channelList .form-check-input { width: 18px; height: 18px; }
   #channelList .form-check-label { font-size: 0.9rem; font-weight: 500; }
   /* Emphasize label when selected */
   .form-check-input:checked + .form-check-label { font-weight:700; color:#1f2937; }
-  /* Stronger visible state for checked boxes */
-  .form-check-input:checked { background-color:#6366f1 !important; border-color:#6366f1 !important; box-shadow: 0 0 0 2px rgba(139,92,246,.15); }
-  .form-check-input:focus { border-color:#6366f1; box-shadow: 0 0 0 0.15rem rgba(139,92,246,.25); }
-  /* Custom purple check icon inside the box (only for channel list) */
+  /* Stronger visible state for checked boxes (generic) */
+  .form-check-input:checked { background-color:#6d7685 !important; border-color: #6d7685 !important; box-shadow: 0 0 0 2px rgba(208, 92, 246, 0.15); }
+  .form-check-input:focus { border-color:#6d7685; box-shadow: 0 0 0 0.15rem rgba(172, 157, 205, 0.25); }
+  
   #channelList .form-check-input {
     appearance: none;
     -webkit-appearance: none;
     -moz-appearance: none;
     width: 18px; height: 18px;
-    border: 2px solid #94a3b8; /* slate-400 */
+    border: 2px solid #babbe464; /* slate-400 */
     border-radius: 4px;
     background-color: #ffffff;
     position: relative;
@@ -182,16 +190,23 @@
     vertical-align: middle;
     transition: border-color .15s ease, box-shadow .15s ease;
   }
-  #channelList .form-check-input:hover { border-color: #6366f1; }
-  #channelList .form-check-input:focus { outline: none; border-color: #6366f1; box-shadow: 0 0 0 2px rgba(99,102,241,0.15); }
+  #channelList .form-check-input:hover { border-color: #babbe4e1; }
+  #channelList .form-check-input:focus { outline: none; border-color: #babbe4e1; box-shadow: 0 0 0 2px rgba(203,124,222,0.25); }
   #channelList .form-check-input:checked {
-    border-color: #8b5cf6;
+    border-color: #babbe4e1;
     background-color: #ffffff; /* keep white box */
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M20 6L9 17l-5-5' fill='none' stroke='%238b5cf6' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: center;
-    background-size: 16px 16px;
-    box-shadow: 0 0 0 2px rgba(139,92,246,.15);
+    box-shadow: 0 0 0 2px rgba(206, 166, 236, 0.15);
+  }
+  #channelList .form-check-input:checked::after {
+    content: "";
+    position: absolute;
+    left: 4px;
+    top: 0px;
+    width: 6px;
+    height: 12px;
+    border-right: 3px solid #ffffff;
+    border-bottom: 3px solid #ffffff;
+    transform: rotate(45deg);
   }
   /* Keep 'choose files' link color consistent */
   #pickFiles { color:#8016c2; text-decoration: underline; cursor: pointer; }
@@ -214,22 +229,13 @@
   
 
 .form-check-input:checked {
-    background-color: #6366f1; 
-    border-color: #6366f1;
+    background-color: #bf63f1; 
+    border-color: #f163ea;
 }
 
   .form-text { color: #475569; }
 
-  /* Override for channel list: force white box with purple check SVG */
-  #channelList .form-check-input:checked{
-    background-color:#ffffff !important;
-    border-color:#8b5cf6 !important;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M20 6L9 17l-5-5' fill='none' stroke='%238b5cf6' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") !important;
-    background-repeat: no-repeat !important;
-    background-position: center !important;
-    background-size: 16px 16px !important;
-    box-shadow: 0 0 0 2px rgba(139,92,246,.15) !important;
-  }
+  /* Remove legacy SVG-based checkmark override */
 
   /* Heading */
   h1 {
@@ -244,22 +250,22 @@
   #freqValue { color: #334155; font-weight:700; }
   #freqSlider { width:100%; accent-color:#8016c2; margin-bottom:6px; }
 
-  /* Header/Nav like EEG */
+  /* Header/Nav  */
   .header { background: linear-gradient(135deg, #8016c2 0%, #e754c2 100%); color: #fff; padding: 1rem 1.5rem; box-shadow: 0 8px 24px rgba(99,102,241,0.2); display:flex; justify-content:space-between; align-items:center; border-radius: 8px; margin: 8px; }
   .header h1 { color: #fff; margin: 0; font-size: 1.5rem; }
   .status-indicator { display:flex; align-items:center; gap:.5rem; background: rgba(255,255,255,0.2); padding:.35rem .75rem; border-radius: 20px; font-weight:600; }
   .status-dot { width:10px; height:10px; border-radius:50%; background:#ef4444; }
   .status-dot.active { background:#10b981; }
   .header-controls { display:flex; gap: .75rem; align-items:center; }
-  /* XOR controls sticky card */
+  /* XOR controls: blend into the info panel (no separate card look) */
   #xorControls {
-    position: sticky;
-    top: 8px;
-    background: #ffffff;
-    border: 1px solid #e2e8f0;
-    border-radius: 10px;
-    padding: 12px;
-    box-shadow: 0 8px 24px rgba(2,6,23,0.06);
+    position: static;
+    top: auto;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    padding: 8px 0 0 0;
+    box-shadow: none;
   }
 </style>
 </head>
@@ -268,15 +274,15 @@
 <div class="header">
   <h1>ECG Viewer</h1>
   <div class="nav">
-    <button id="timeModeButton" class="btn btn-secondary" type="button">Time</button>
-    <button id="xorModeButton" class="btn btn-secondary" type="button">XOR</button>
-    <button id="polarModeButton" class="btn btn-secondary" type="button">Polar</button>
-    <button id="recurrenceModeButton" class="btn btn-secondary" type="button">Recurrence</button>
+    <button id="timeModeButton" class="btn-secondary" type="button">Time Graph</button>
+    <button id="polarModeButton" class="btn-secondary" type="button">Polar Graph</button>
+    <button id="recurrenceModeButton" class="btn-secondary" type="button">Recurrence Graph</button>
+    <button id="xorModeButton" class="btn-secondary" type="button">XOR</button>
   </div>
 </div>
-<div class="container-fluid main-container">
+<div class="container-fluid">
   <div class="row">
-    <div class="col-md-2 sidebar">
+    <div class="col-md-2 col-lg-2 col-xl-2 sidebar">
       <h5>ECG Controls</h5>
       <form id="channelForm">
         <div class="mb-2">
@@ -288,12 +294,12 @@
           <input id="width" class="form-control" type="number" min="0.5" step="0.5" value="5"/>
         </div>
         <div class="mb-2">
-          <label class="form-label">Upload .hea/.dat (drag & drop)</label>
+          <label class="form-label">📁 file upload</label>
           <div id="dropZone">Drop files here or <a href="#" id="pickFiles">choose files</a></div>
           <input id="filePicker" type="file" accept=".hea,.dat,.xyz" multiple style="display:none;" />
         </div>
         <div class="mb-2">
-          <label class="form-label">Channels</label>
+          <label class="form-label">📊 Channels</label>
           <div id="channelSelectionContainer">
             <div id="channelInstructions" class="form-text" style="display:none;">Channels load after file upload.</div>
             <div id="channelList" style="max-height:240px; overflow:auto; padding:.25rem 0;">Channels load after file upload.</div>
@@ -321,12 +327,12 @@
           </div>
           <div class="form-text small-muted">Lower frequency simulates lower-sampling hardware — predictions & signal will change.</div>
         </div>
-        <button id="startBtn" class="btn btn-primary w-100" style="color:#e0e0e0;" type="submit" disabled>Start Streaming</button>
+        <button id="startBtn" class="btn-primary w-100" type="submit" disabled>▶ Start Streaming</button>
         <button id="stopBtn" class="btn btn-secondary w-100 mt-2" type="button">Stop</button>
       </form>
     </div>
 
-    <div class="col-md-7 plots-col plots-grid">
+    <div class="col-md-8 col-lg-7 col-xl-8 plots-col plots-grid">
       <!-- Time plot -->
       <div class="plot-container plot-card">
         <div id="timePlot" style="width:100%;height:100%;"></div>
@@ -359,17 +365,17 @@
       </div>
     </div>
 
-    <!-- Right info panel like EEG -->
-    <div class="col-md-3">
+    
+    <div class="col-md-2 col-lg-3 col-xl-2">
       <div class="plot-card info-panel" style="position:sticky; top:0.75rem;">
-        <h6 style="font-weight:700; color:#6366f1;">Prediction</h6>
+        <h6 style="font-weight:700; color:#6366f1;">📈 Prediction</h6>
         <div id="predictionResult" class="prediction-result">Waiting for data...</div>
         <div id="predictionDescription" style="margin-top:8px; color:#475569; font-size:0.9rem;"></div>
         <div id="recurrencePrediction" style="margin-top:6px; color:#334155; font-size:0.9rem;"></div>
         <div id="diseaseName" class="disease-name"></div>
         <div id="aliasingNote" style="margin-top:6px; color:#ffb74d; font-size:0.85rem;"></div>
         <hr style="margin:12px 0;"/>
-        <h6 style="font-weight:700; color:#6366f1;">Statistics</h6>
+        <h6 style="font-weight:700; color:#6366f1;">🧮 Statistics</h6>
         <div class="stat-item" style="display:flex; justify-content:space-between; padding:4px 0;">
           <span>Status</span><span id="ecgStatus">Idle</span>
         </div>
@@ -382,12 +388,10 @@
         <div class="stat-item" style="display:flex; justify-content:space-between; padding:4px 0;">
           <span>Window</span><span id="ecgWindowSize">5s</span>
         </div>
-        <div id="xorControls" class="mb-1 mt-2" style="display:none; border:1px solid #e2e8f0; border-radius:10px; padding:12px; background: linear-gradient(135deg, rgba(139,92,246,0.06) 0%, rgba(217,92,233,0.06) 100%);">
+        <hr style="margin:12px 0;"/>
+        <h6 style="font-weight:700; color:#6366f1;">XOR Control</h6>
           <div style="display:flex; align-items:center; justify-content:space-between;">
-            <h6 style="font-weight:700; color:#6366f1; margin:0;">XOR Controls</h6>
-            <button id="xorToggleBtn" type="button" class="btn btn-secondary" style="padding:.25rem .5rem; border-radius:8px;">
-              <span id="xorToggleIcon" style="display:inline-block; transition: transform .2s ease; transform: rotate(0deg);">▾</span>
-            </button>
+        
           </div>
           <div id="xorControlsContent" style="margin-top:8px;">
             <div class="mb-2">
@@ -413,6 +417,26 @@
 </div>
 
 <script>
+// ================================================
+// ECG Frontend Orchestrator
+// --------------------------------
+// This script powers the ECG Viewer UI:
+// - Handles file upload of WFDB (.hea/.dat)
+// - Fetches config from backend to learn channels and native Fs
+// - Manages UI state: selected channels, display mode, sampling slider
+// - Requests streaming chunks from /ecg/update and renders plots:
+//     Time plot, XOR view (chunk vs previous), Polar plot, Recurrence density
+// - Coordinates sample-rate adjustments and reflects aliasing in plots
+// Structure:
+//   1) Global UI/state variables
+//   2) Channel/montage utilities and UI enabling
+//   3) Config initialization from backend
+//   4) File upload handlers
+//   5) Plot sizing utilities
+//   6) Display mode switching and status
+//   7) Plot initialization
+//   8) Streaming loop (fetchData) -> delegates drawing to SignalShared
+// ================================================
 let streaming=false, intervalId=null;
 let updateSpeed=1, allChannels=[], selectedChannels=[], widthSec=5;
 let nativeFs=500, displayFs=200;
@@ -428,22 +452,18 @@ let ssBuffers = {}; // { chIndex: {data:[], time:[]} }
 let nameMap = {};   // { "0": "Lead 1", ... }
 let ssGlobalTime = 0;
 
-// EEG-like channel maps and montage support
-let channelNameMap = {};                 // cleanedName -> index
-let channelIndexToOriginalName = {};     // index -> original name
-let allAvailableChannels = {};           // index -> original name
 
-const montages = {
-  'standard': ['FP1','FP2','F3','F4','C3','C4','P3','P4','O1','O2','FZ','CZ','PZ'],
-  'frontal': ['FP1','FP2','F3','F4','F7','F8','FZ'],
-  'occipital': ['P3','P4','O1','O2','OZ'],
-  'all': []
-};
+
+
 
 function cleanChannelName(name){
   return String(name).trim().toUpperCase().split(/[-_/\s().]/)[0].replace(/[^A-Z0-9]/g, '');
 }
 
+/**
+ * Render the list of channel checkboxes based on provided map {index -> label}.
+ * Also wires change listener to keep selectedChannels in sync and updates counts.
+ */
 function renderChannelCheckboxes(channelsToShow){
   const channelListDiv = document.getElementById('channelList');
   if(!channelListDiv) return;
@@ -464,6 +484,10 @@ function renderChannelCheckboxes(channelsToShow){
   if(cc){ cc.textContent = String(document.querySelectorAll('#channelList input[name=channels]:checked').length); }
 }
 
+/**
+ * Apply a montage preset by mapping human-friendly names to actual indices.
+ * If 'all', shows all and pre-selects them. Otherwise filters to listed names.
+ */
 function applyMontage(key){
   const show = {};
   let names = [];
@@ -486,8 +510,11 @@ function applyMontage(key){
   updateStartEnable();
 }
 // Enable Start only if files uploaded and at least one channel selected
+/**
+ * Return currently selected channel indices from the checkbox list (or fallback select).
+ */
 function getSelectedChannels(){
-  // EEG-like: checkboxes inside #channelList
+  //checkboxes inside #channelList
   const boxes = document.querySelectorAll('#channelList input[name=channels]:checked');
   if(boxes && boxes.length){
     return Array.from(boxes).map(cb=>parseInt(cb.value)).filter(v=>!isNaN(v));
@@ -500,6 +527,10 @@ function getSelectedChannels(){
   return [];
 }
 
+/**
+ * Enable the Start button only when files are uploaded AND at least one channel is selected.
+ * Also reflects the live count in the stats panel.
+ */
 function updateStartEnable(){
   try{
     const anySelected = getSelectedChannels().length>0;
@@ -510,9 +541,14 @@ function updateStartEnable(){
   }catch(e){}
 }
 
-function renderChannelSummary(){ /* not used in ECG when matching EEG; safe no-op */ }
 
 // Init config
+/**
+ * Fetch initial configuration from /ecg/config.
+ * - Sets native/display Fs and slider limits
+ * - Loads channel names and renders checkboxes
+ * - Prepares UI to allow streaming after upload
+ */
 async function initConfig(){
   try{
     const cfg = await fetch("/ecg/config").then(r=>r.json());
@@ -523,11 +559,16 @@ async function initConfig(){
     const sliderEl = document.getElementById("freqSlider");
     sliderEl.max = Math.min(500, nativeFs);
     sliderEl.value = requestedSampling;
+    // IMPORTANT: The slider is UI-only until fetchData sends sampling_freq.
+    // The backend may clamp further (<= nativeFs, <= 500). We then read back
+    // the actually used sampling in responses and mirror it into the label.
     document.getElementById("freqValue").innerText = requestedSampling + " Hz";
-    // Build channel maps like EEG
+    // Build channel maps from server channels or fallback to Lead 1..N.
+    // cleanChannelName() lets montage name lists map to actual indices.
     allChannels = cfg.channels || Array.from({length:12}, (_,i)=>`Lead ${i+1}`);
     channelNameMap = {}; channelIndexToOriginalName = {}; allAvailableChannels = {};
     allChannels.forEach((nm,i)=>{ channelIndexToOriginalName[i]=nm; channelNameMap[cleanChannelName(nm)] = i; allAvailableChannels[i]=nm; });
+    // Render the checkbox list and gate Start by file-upload + selection.
     renderChannelCheckboxes(allAvailableChannels);
     updateStartEnable();
   }catch(e){ console.warn("Config fetch failed", e); }
@@ -580,6 +621,10 @@ dropZone.addEventListener('drop', (e)=>{
 });
 filePicker.addEventListener('change', (e)=> handleFiles(e.target.files));
 
+/**
+ * Handle dropped/selected files. Uploads as multipart to /ecg/upload.
+ * On success, re-initializes config and enables Start when channels selected.
+ */
 function handleFiles(fileList){ // upload ECG files
   if(!fileList || fileList.length===0) return;
   const fd = new FormData();
@@ -611,6 +656,10 @@ function handleFiles(fileList){ // upload ECG files
 }
 
 // Resize helper to fit container width for visible plot
+/**
+ * Resize the currently visible plot to match its container card dimensions.
+ * Invoked on window resize and after display mode changes.
+ */
 function resizeVisiblePlots(){
   const active = currentDisplay||'Time';
   const map = { 'Time':'timePlot', 'XOR':'xorPlot', 'Polar':'polarPlot', 'Recurrence':'recurrenceScatterPlot' };
@@ -621,6 +670,10 @@ function resizeVisiblePlots(){
 window.addEventListener('resize', resizeVisiblePlots);
 
 // Force a plot to exactly match its closest .plot-container dimensions
+/**
+ * Compute inner content size of the surrounding .plot-container and force Plotly
+ * to adopt that exact width/height so the card looks crisp and responsive.
+ */
 function fitPlotToContainer(plotId){
   if(!plotId) return;
   const plotDiv = document.getElementById(plotId);
@@ -665,7 +718,6 @@ function syncNavActive(){
     if(currentDisplay===k){ btn.classList.add('active'); } else { btn.classList.remove('active'); }
   });
 }
-
 function setStatus(active, text){
   if(statusDot){
     statusDot.classList.toggle('active', !!active);
@@ -675,22 +727,36 @@ function setStatus(active, text){
   if(st){ st.textContent = active ? 'Streaming' : 'Idle'; }
 }
 
+
 function applyDisplaySelection(val){
   currentDisplay = val;
-  const sizes = {'Time':'750px','XOR':'560px','Polar':'700px','Recurrence':'650px'};
+  // Use viewport-based heights to keep plots fully visible and consistent
+  const vh = Math.max(420, Math.floor(window.innerHeight * 0.75));
+  const sizes = {
+    'Time': `${vh}px`,
+    'XOR': `${Math.max(440, Math.floor(vh * 0.85))}px`,
+    'Polar': `${vh}px`,
+    'Recurrence': `${Math.max(420, Math.floor(vh * 0.8))}px`
+  };
   Object.keys(containers).forEach(k=>{
     const plotId = (k==='Time')?'timePlot':(k==='XOR')?'xorPlot':(k==='Polar')?'polarPlot':'recurrenceScatterPlot';
     const plotDiv = document.getElementById(plotId);
     if(k===currentDisplay){
       containers[k].style.display='block';
-      // Set the container card height; inner plot fills 100%
-      containers[k].style.height = sizes[k] || '500px';
-      if(plotDiv) plotDiv.style.height='100%';
+      // Set the container card height, then force Plotly div to exact px
+      const targetH = sizes[k] || `${vh}px`;
+      containers[k].style.height = targetH;
+      // Do not set an inline height on plotDiv; relayout will set exact pixels
       try{
         if(plotDiv){
-          // Force autosize to container bounds
-          Plotly.relayout(plotId,{autosize:true});
-          // Ensure a resize to adopt new container size
+          // Compute numeric height/width and relayout to exact pixels
+          const container = containers[k];
+          const cs = getComputedStyle(container);
+          const padX = parseFloat(cs.paddingLeft||'0') + parseFloat(cs.paddingRight||'0');
+          const padY = parseFloat(cs.paddingTop||'0') + parseFloat(cs.paddingBottom||'0');
+          const w = Math.max(0, container.clientWidth - padX);
+          const h = Math.max(0, container.clientHeight - padY);
+          Plotly.relayout(plotId,{width:w, height:h, autosize:false});
           Plotly.Plots.resize(plotDiv);
         }
       }catch(e){}
@@ -699,6 +765,17 @@ function applyDisplaySelection(val){
   // Resize visible plot once more after layout shifts
   resizeVisiblePlots();
   syncNavActive();
+  // Run a double-fit on next two frames to ensure final dimensions stick
+  try{
+    const map = { 'Time':'timePlot', 'XOR':'xorPlot', 'Polar':'polarPlot', 'Recurrence':'recurrenceScatterPlot' };
+    const pid = map[currentDisplay||'Time'];
+    if(pid){
+      requestAnimationFrame(()=>{
+        fitPlotToContainer(pid);
+        requestAnimationFrame(()=>{ fitPlotToContainer(pid); });
+      });
+    }
+  }catch(e){}
   // XOR controls visibility + channel dropdown sync
   if(currentDisplay==='XOR'){
     const one = selectedChannels.length===1;
@@ -757,7 +834,6 @@ freqSlider.addEventListener('input', (e)=>{
   }, 200);
 });
 
-// Removed Apply/Reset sampling buttons; slider applies in real time.
 
 // Form submit (start)  
 document.getElementById("channelForm").addEventListener("submit", ev=>{
@@ -798,6 +874,13 @@ document.getElementById("speedControl").addEventListener("change", ev=>{
   }
 });
 
+/**
+ * Initialize empty Plotly figures for all modes using selected channels.
+ * Time: one line per channel.
+ * XOR: if 1 ch, scatter of abs(diff) over time-within-chunk.
+ * Polar: per-channel scatterpolar (fixed or cumulative per fetchData state).
+ * Recurrence: if 2 ch, histogram2d density (SignalShared fills data later).
+ */
 function initPlots(channels){
   if(!filesUploaded) return;
   const timeTraces = channels.map(ch=>({
@@ -846,13 +929,22 @@ function initPlots(channels){
 
 //Sends current selected channels, window size, polar mode, XOR threshold, and sampling frequency to the backend.
 //Backend returns signal data + predictions + aliasing info
+/**
+ * Core streaming loop. Sends UI state to backend and dispatches render updates.
+ * - Handles XOR-only mode early (single channel required)
+ * - Uses SignalShared.fetchAndDispatchECG to update Time/Polar/Recurrence
+ * - Updates sampling label and aliases plot title when downsampled
+ * - Shows predictions and recurrence results from server
+ */
 async function fetchData(){
   if(!streaming) return;
   try{
     const xorThresholdVal = xorThresholdInput ? parseFloat(xorThresholdInput.value)||0.05 : 0.05;
     const displayMode = (currentDisplay||'Time');
     const mapped = displayMode.toLowerCase(); // 'time','xor','polar','recurrence','all'
-
+    // IMPORTANT: sampling_freq communicates the slider choice to the server.
+    // The server can still cap it. We always reflect the server-reported
+    // used_sampling_freq back into the label to avoid UI drift.
     const payload = { channels: selectedChannels, width: widthSec, polar_mode: polarMode, xor_threshold: xorThresholdVal, sampling_freq: requestedSampling };
 
     if(mapped === 'xor'){
@@ -877,6 +969,8 @@ async function fetchData(){
         const v = Math.abs(xorChunk[i]);
         if(v>thr){ y.push(v); x.push((i/plotFs) % xorPeriodSec); }
       }
+      // NOTE: We visualize only a fixed time horizon via xorDurationSec.
+      // This prevents unbounded growth and keeps UI responsive.
       // Limit to chosen duration window
       const maxPts = Math.max(1, Math.floor(xorDurationSec * plotFs));
       const xs = x.slice(-maxPts);
@@ -899,6 +993,8 @@ async function fetchData(){
       if(recHint) recHint.style.display = 'none';
     }
 
+    // IMPORTANT: Delegates rendering to SignalShared. It keeps per-plot
+    // buffers, applies widths, and updates traces. We pass ids/state here.
     const out = await SignalShared.fetchAndDispatchECG({
       updateUrl: '/ecg/update',
       payload,
@@ -921,14 +1017,40 @@ async function fetchData(){
     const usedFsRaw = (result && result.used_sampling_freq!=null) ? result.used_sampling_freq : (requestedSampling!=null ? requestedSampling : nativeFs);
     const usedFs = Math.min(500, usedFsRaw);
     document.getElementById('freqValue').innerText = usedFs + ' Hz';
-    // Adopt server-reported sampling for next iterations to align time axis with aliasing
+    // IMPORTANT: Always trust server-reported sampling going forward so
+    // the UI timebases and aliasing notation stay consistent with backend.
     displayFs = usedFs;
     if(result && result.native_fs){ nativeFs = result.native_fs; }
     // Annotate time plot title with aliasing indicator when downsampled
     try {
       const aliasing = (usedFs < nativeFs);
+      // IMPORTANT: Title tag is a visual cue only; no logic changes.
       const aliasTag = aliasing ? ' (WITH ALIASING)' : '';
       Plotly.relayout('timePlot', { title: `Real-time ECG (time domain)${aliasTag}` });
+    } catch(e){}
+
+    // Force a final fit so the inner graph height matches the visible card
+    try {
+      const active = currentDisplay || 'Time';
+      const map = { 'Time':'timePlot', 'XOR':'xorPlot', 'Polar':'polarPlot', 'Recurrence':'recurrenceScatterPlot' };
+      const pid = map[active];
+      // Compute and apply exact width/height to the active plot
+      fitPlotToContainer(pid);
+      // Tighten margins a bit to reclaim vertical space
+      const plotDiv = document.getElementById(pid);
+      if (plotDiv) {
+        const container = plotDiv.closest('.plot-container') || plotDiv.parentElement;
+        if (container) {
+          const cs = getComputedStyle(container);
+          const padX = parseFloat(cs.paddingLeft||'0') + parseFloat(cs.paddingRight||'0');
+          const padY = parseFloat(cs.paddingTop||'0') + parseFloat(cs.paddingBottom||'0');
+          const w = Math.max(0, container.clientWidth - padX);
+          const h = Math.max(0, container.clientHeight - padY);
+          if (w>0 && h>0) {
+            Plotly.relayout(pid, { width: w, height: h, autosize: false, margin: { t: 48, r: 10, b: 48, l: 54 } });
+          }
+        }
+      }
     } catch(e){}
 
     if(selectedChannels.length===1 && (mapped === 'all')){
