@@ -305,31 +305,7 @@ So it essentially copies values from positions 0, floor(step), floor(2*step), â€
     }
   };
 
-  // Band power plotting helpers
-  SS.initBandPowerPlot = function(targetId, bandNames, bandColors, yRange){
-    const traces = [{ x: Array(bandNames.length).fill(0), y: bandNames, type:'bar', orientation:'h', marker:{color: bandColors} }];
-    const layout = {
-      title: 'Smoothed Average Power', paper_bgcolor:'#000', plot_bgcolor:'#000', font:{color:'#e5e7eb', family:'Inter'},
-      xaxis: { title: 'Smoothed Average Power (x10^10)', color:'#e5e7eb', gridcolor:'#374151', range:[0, yRange||500000] },
-      yaxis: { gridcolor:'#374151' },
-      margin: { t: 40, r: 10, b: 60, l: 40 }
-    };
-    Plotly.newPlot(targetId, traces, layout, {responsive:true, displayModeBar:false});
-  };
-
-  SS.updateBandPowerPlot = function(targetId, bandNames, smaBuffer, newBandPower, smaWindow, yRangeState){
-    if (!newBandPower) return;
-    smaBuffer.push(newBandPower);
-    if (smaBuffer.length > smaWindow) smaBuffer.shift();
-    const averaged = bandNames.map(k => smaBuffer.reduce((acc, cur)=> acc + (cur[k]||0), 0) / smaBuffer.length);
-    const maxPower = Math.max(...averaged, 0);
-    if (maxPower > yRangeState.value || maxPower < yRangeState.value * 0.7){
-      yRangeState.value = Math.max(100000, Math.ceil(maxPower / 100000) * 100000);
-      Plotly.relayout(targetId, { 'xaxis.range': [0, yRangeState.value] });
-    }
-    Plotly.restyle(targetId, { x: [averaged] });
-  };
-
+  
   // --- Polar/Recurrence shared helpers ---
   SS.initPolarPlot = function(targetId, selected, indexToName, widthSec, isCumulative, colors, layoutOverrides){
     const traces = selected.map((ch, i) => ({
