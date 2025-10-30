@@ -3,31 +3,60 @@
 <head>
   <meta charset="UTF-8">
   <title>Doppler Detection Result</title>
+  
+  <!-- Google Fonts: Inter - Modern sans-serif font family -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Bootstrap 5.3 - CSS framework for responsive grid and components -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+  
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
+    /* ========================================
+       RESET & BASE STYLES
+       ======================================== */
+    * { 
+      margin: 0; 
+      padding: 0; 
+      box-sizing: border-box; /* Include padding/border in element dimensions */
+    }
+    
     body {
       font-family: 'Inter', sans-serif;
+      /* Gradient background: light gray-blue to light purple */
       background: linear-gradient(135deg, #F5F7FA 0%, #E0E7FF 100%);
-      color: #1F2937;
+      color: #1F2937; /* Near-black text */
       padding: 30px 20px;
-      min-height: 100vh;
+      min-height: 100vh; /* Full viewport height minimum */
     }
-    .container-fluid { max-width: 1600px; margin: 0 auto; }
+    
+    /* Container with maximum width for large screens */
+    .container-fluid { 
+      max-width: 1600px; 
+      margin: 0 auto; 
+    }
+    
+    /* Main heading - centered, purple, large */
     h1 {
       text-align: center;
-      color: #6366F1;
+      color: #6366F1; /* Indigo purple */
       font-size: 2.5rem;
       font-weight: 700;
       margin-bottom: 40px;
     }
+    
+    /* ========================================
+       RESULTS ROW - Display detection results
+       ======================================== */
     .results-row {
+      /* CSS Grid for responsive card layout */
       display: grid;
+      /* Auto-fit columns with minimum 300px width */
       grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
       gap: 20px;
       margin-bottom: 40px;
     }
+    
+    /* Individual result card (speed, frequency) */
     .result-card {
       background: white;
       border: 2px solid #6366F1;
@@ -35,14 +64,35 @@
       padding: 25px;
       text-align: center;
       box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05), 0 2px 4px rgba(0, 0, 0, 0.05);
+      /* Smooth hover animation */
       transition: transform 0.3s, box-shadow 0.3s;
     }
+    
+    /* Lift card on hover */
     .result-card:hover {
       transform: translateY(-3px);
       box-shadow: 0 8px 16px rgba(99, 102, 241, 0.2);
     }
-    .result-card h4 { color: #6B7280; font-size: 1rem; font-weight: 600; margin-bottom: 10px; }
-    .result-card .value { color: #6366F1; font-size: 2.5rem; font-weight: 700; }
+    
+    /* Card label (e.g., "Predicted Speed") */
+    .result-card h4 { 
+      color: #6B7280; /* Gray */
+      font-size: 1rem; 
+      font-weight: 600; 
+      margin-bottom: 10px; 
+    }
+    
+    /* Card value (e.g., "50 km/hr") */
+    .result-card .value { 
+      color: #6366F1; /* Purple */
+      font-size: 2.5rem; 
+      font-weight: 700; 
+    }
+    
+    /* ========================================
+       SAMPLING CONTROL PANEL
+       Interactive resampling controls
+       ======================================== */
     .sampling-control {
       background: white;
       border: 2px solid #6366F1;
@@ -51,8 +101,24 @@
       margin-bottom: 40px;
       box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05), 0 2px 4px rgba(0, 0, 0, 0.05);
     }
-    .sampling-control h3 { color: #6366F1; font-size: 1.5rem; margin-bottom: 20px; text-align: center; font-weight: 700; }
-    .slider-container { margin: 25px 0; }
+    
+    .sampling-control h3 { 
+      color: #6366F1; 
+      font-size: 1.5rem; 
+      margin-bottom: 20px; 
+      text-align: center; 
+      font-weight: 700; 
+    }
+    
+    /* ========================================
+       RANGE SLIDER STYLES
+       Custom-styled sampling frequency slider
+       ======================================== */
+    .slider-container { 
+      margin: 25px 0; 
+    }
+    
+    /* Label showing current frequency */
     .slider-label {
       color: #6366F1;
       font-size: 1.2rem;
@@ -61,22 +127,28 @@
       display: block;
       margin-bottom: 15px;
     }
+    
+    /* Range slider track */
     .form-range {
       width: 100%;
       height: 8px;
-      background: #E5E7EB;
+      background: #E5E7EB; /* Light gray track */
       border-radius: 5px;
       outline: none;
     }
+    
+    /* Slider thumb (draggable circle) - Chrome/Safari */
     .form-range::-webkit-slider-thumb {
       width: 20px;
       height: 20px;
-      background: #6366F1;
+      background: #6366F1; /* Purple */
       border: 2px solid white;
-      border-radius: 50%;
+      border-radius: 50%; /* Perfect circle */
       cursor: pointer;
-      box-shadow: 0 2px 8px rgba(99, 102, 241, 0.4);
+      box-shadow: 0 2px 8px rgba(99, 102, 241, 0.4); /* Purple glow */
     }
+    
+    /* Slider thumb - Firefox */
     .form-range::-moz-range-thumb {
       width: 20px;
       height: 20px;
@@ -86,13 +158,20 @@
       cursor: pointer;
       box-shadow: 0 2px 8px rgba(99, 102, 241, 0.4);
     }
+    
+    /* Min/max labels below slider */
     .range-labels {
       display: flex;
       justify-content: space-between;
-      color: #6B7280;
+      color: #6B7280; /* Gray */
       font-size: 0.9rem;
       margin-top: 5px;
     }
+    
+    /* ========================================
+       STATUS INDICATOR
+       Shows aliasing status (good/warning/danger)
+       ======================================== */
     .status-indicator {
       text-align: center;
       padding: 15px 25px;
@@ -101,15 +180,46 @@
       font-size: 1.1rem;
       margin: 20px 0;
     }
-    .status-good { background: #D1FAE5; border: 2px solid #10B981; color: #065F46; }
-    .status-warning { background: #FEF3C7; border: 2px solid #F59E0B; color: #92400E; }
-    .status-danger { background: #FEE2E2; border: 2px solid #EF4444; color: #991B1B; }
-    .info-text { text-align: center; color: #6B7280; font-size: 0.95rem; margin: 10px 0; }
+    
+    /* Good status - no aliasing (green) */
+    .status-good { 
+      background: #D1FAE5; 
+      border: 2px solid #10B981; 
+      color: #065F46; 
+    }
+    
+    /* Warning status - moderate aliasing (yellow) */
+    .status-warning { 
+      background: #FEF3C7; 
+      border: 2px solid #F59E0B; 
+      color: #92400E; 
+    }
+    
+    /* Danger status - severe aliasing (red) */
+    .status-danger { 
+      background: #FEE2E2; 
+      border: 2px solid #EF4444; 
+      color: #991B1B; 
+    }
+    
+    /* Information text (Nyquist limits) */
+    .info-text { 
+      text-align: center; 
+      color: #6B7280; 
+      font-size: 0.95rem; 
+      margin: 10px 0; 
+    }
+    
+    /* ========================================
+       GENERATE BUTTON
+       Triggers resampling operation
+       ======================================== */
     .generate-btn {
       display: block;
       width: 100%;
       max-width: 400px;
       margin: 20px auto;
+      /* Purple gradient background */
       background: linear-gradient(135deg, #6366F1 0%, #4F46E5 100%);
       color: white;
       border: none;
@@ -119,26 +229,43 @@
       border-radius: 12px;
       cursor: pointer;
       transition: all 0.3s;
-      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3); /* Purple glow */
     }
+    
+    /* Button hover - lift and enhance glow */
     .generate-btn:hover { 
       transform: translateY(-2px); 
       box-shadow: 0 6px 16px rgba(99, 102, 241, 0.4);
       background: linear-gradient(135deg, #4F46E5 0%, #4338CA 100%);
     }
+    
+    /* Disabled state during processing */
     .generate-btn:disabled { 
-      background: #9CA3AF; 
+      background: #9CA3AF; /* Gray */
       cursor: not-allowed; 
       transform: none;
       box-shadow: none;
     }
+    
+    /* ========================================
+       SIGNAL VISUALIZATION GRID
+       Two-column layout for original vs resampled
+       ======================================== */
     .signals-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: 1fr 1fr; /* Two equal columns */
       gap: 30px;
       margin: 40px 0;
     }
-    @media (max-width: 1200px) { .signals-grid { grid-template-columns: 1fr; } }
+    
+    /* Responsive: single column on small screens */
+    @media (max-width: 1200px) { 
+      .signals-grid { 
+        grid-template-columns: 1fr; 
+      } 
+    }
+    
+    /* Individual signal box container */
     .signal-box {
       background: white;
       border: 2px solid #6366F1;
@@ -146,18 +273,45 @@
       padding: 25px;
       box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05), 0 2px 4px rgba(0, 0, 0, 0.05);
     }
-    .signal-box h4 { color: #6366F1; font-size: 1.3rem; font-weight: 700; margin-bottom: 20px; text-align: center; }
+    
+    .signal-box h4 { 
+      color: #6366F1; 
+      font-size: 1.3rem; 
+      font-weight: 700; 
+      margin-bottom: 20px; 
+      text-align: center; 
+    }
+    
+    /* Canvas for waveform plotting */
     .signal-canvas {
       width: 100%;
       height: 300px;
-      background: #F9FAFB;
+      background: #F9FAFB; /* Very light gray */
       border-radius: 12px;
       border: 1px solid #E5E7EB;
       margin: 15px 0;
       display: block;
     }
-    .audio-player { width: 100%; margin: 15px 0; border-radius: 10px; }
-    .signal-info { text-align: center; color: #6B7280; font-size: 0.9rem; margin-top: 10px; }
+    
+    /* HTML5 audio player */
+    .audio-player { 
+      width: 100%; 
+      margin: 15px 0; 
+      border-radius: 10px; 
+    }
+    
+    /* Signal metadata text */
+    .signal-info { 
+      text-align: center; 
+      color: #6B7280; 
+      font-size: 0.9rem; 
+      margin-top: 10px; 
+    }
+    
+    /* ========================================
+       BACK BUTTON
+       Return to main page
+       ======================================== */
     .back-btn {
       display: block;
       width: 200px;
@@ -172,6 +326,8 @@
       text-align: center;
       transition: all 0.3s;
     }
+    
+    /* Hover: invert colors */
     .back-btn:hover { 
       background: #6366F1; 
       color: white;
@@ -179,33 +335,65 @@
     }
   </style>
 </head>
+
+<!-- 
+  DATA ATTRIBUTES
+  Flask template variables are embedded in data attributes for JavaScript access
+  This avoids inline JSON which can cause template rendering issues
+-->
 <body 
-  data-y-plot='{{ y_plot_list | tojson }}'
-  data-freq='{{ f_original }}'
-  data-speed='{{ estimated_speed }}'
-  data-file-id='{{ audio_file_id }}'
-  data-sr='{{ sr }}'
+  data-y-plot='{{ y_plot_list | tojson }}'      <!-- Waveform amplitude data -->
+  data-freq='{{ f_original }}'                   <!-- Detected frequency -->
+  data-speed='{{ estimated_speed }}'             <!-- Predicted speed -->
+  data-file-id='{{ audio_file_id }}'             <!-- Audio file UUID -->
+  data-sr='{{ sr }}'                             <!-- Original sampling rate -->
 >
   <div class="container-fluid">
     <h1>🚗 Doppler Effect Detection Result</h1>
 
+    <!-- ========================================
+         RESULTS CARDS
+         Display detected speed and frequency
+         ======================================== -->
     <div class="results-row">
+      <!-- Card 1: Predicted speed from neural network -->
       <div class="result-card">
         <h4>🎯 Predicted Speed</h4>
         <div class="value">{{ estimated_speed }} km/hr</div>
       </div>
+      
+      <!-- Card 2: Estimated dominant frequency -->
       <div class="result-card">
         <h4>📊 Estimated Frequency</h4>
         <div class="value">{{ f_original }} Hz</div>
       </div>
     </div>
 
+    <!-- ========================================
+         SAMPLING CONTROL PANEL
+         Interactive resampling with aliasing demo
+         ======================================== -->
     <div class="sampling-control">
       <h3>🎚️ Sampling Rate & Aliasing Demonstration</h3>
       
+      <!-- Range slider for sampling frequency selection -->
       <div class="slider-container">
-        <label id="samplingRateLabel" class="slider-label">Sampling Frequency: 2000 Hz</label>
-        <input type="range" min="500" max="8000" value="2000" step="100" id="samplingSlider" class="form-range">
+        <label id="samplingRateLabel" class="slider-label">
+          Sampling Frequency: 2000 Hz
+        </label>
+        
+        <!-- Slider: 500 Hz to 8000 Hz in 100 Hz steps -->
+        <input 
+          type="range" 
+          min="500" 
+          max="8000" 
+          value="2000" 
+          step="100" 
+          id="samplingSlider" 
+          class="form-range"
+        >
+        
+        <!-- Min/current/max labels -->
         <div class="range-labels">
           <span>500 Hz</span>
           <span>4000 Hz</span>
@@ -213,39 +401,71 @@
         </div>
       </div>
 
-      <div id="aliasingStatus" class="status-indicator status-good">Waiting...</div>
+      <!-- Dynamic aliasing status indicator -->
+      <div id="aliasingStatus" class="status-indicator status-good">
+        Waiting...
+      </div>
       
+      <!-- Nyquist information display -->
       <p class="info-text">
         Nyquist limit: <strong id="nyquistDisplay">-</strong> | 
         Threshold: <strong id="nyquistThreshold">-</strong>
       </p>
 
-      <button id="generateBtn" class="generate-btn">🔄 Resample Audio</button>
+      <!-- Button to trigger resampling -->
+      <button id="generateBtn" class="generate-btn">
+        🔄 Resample Audio
+      </button>
     </div>
 
+    <!-- ========================================
+         SIGNAL COMPARISON GRID
+         Side-by-side original vs resampled signals
+         ======================================== -->
     <div class="signals-grid">
+      <!-- LEFT: Original uploaded signal -->
       <div class="signal-box">
         <h4>📁 Original Uploaded Signal</h4>
+        
+        <!-- Canvas for waveform visualization -->
         <canvas id="originalCanvas" class="signal-canvas"></canvas>
+        
+        <!-- Audio player for original file -->
         <audio id="originalAudio" controls class="audio-player">
           <source src="{{ url_for('doppler.serve_audio', file_id=audio_file_id) }}" type="audio/wav">
         </audio>
+        
+        <!-- Metadata display -->
         <p class="signal-info">Original file ({{ sr }} Hz sampling rate)</p>
       </div>
 
+      <!-- RIGHT: Resampled signal (populated by JavaScript) -->
       <div class="signal-box">
         <h4>🔊 Resampled Signal</h4>
+        
+        <!-- Canvas for resampled waveform -->
         <canvas id="sampledCanvas" class="signal-canvas"></canvas>
+        
+        <!-- Audio player (source set by JavaScript after resampling) -->
         <audio id="generatedAudio" controls class="audio-player"></audio>
+        
+        <!-- Placeholder text before resampling -->
         <p class="signal-info" id="generatedInfo">Click "Resample" button</p>
       </div>
     </div>
 
+    <!-- Back button to main page -->
     <a href="{{ url_for('doppler.index') }}" class="back-btn">⬅️ Back</a>
   </div>
 
   <script>
-    // ✅ FIX 1: Parse data from data attributes (no editor warnings)
+    /* ========================================
+       DATA EXTRACTION FROM TEMPLATE
+       Parse Flask template variables from data attributes
+       ======================================== */
+    
+    // Create temporary element to safely parse data attributes
+    // This avoids issues with special characters in JSON
     const dataEl = document.createElement('div');
     dataEl.innerHTML = `
       <span data-y-plot='{{ y_plot_list | tojson }}'></span>
@@ -255,152 +475,251 @@
       <span data-sr='{{ sr }}'></span>
     `;
     
+    // Extract and parse all data
     const originalYData = JSON.parse(dataEl.querySelector('[data-y-plot]').dataset.yPlot);
     const originalFreq = parseFloat(dataEl.querySelector('[data-freq]').dataset.freq);
     const estimatedSpeed = parseFloat(dataEl.querySelector('[data-speed]').dataset.speed);
     const audioFileId = dataEl.querySelector('[data-file-id]').dataset.fileId;
     const originalSR = parseInt(dataEl.querySelector('[data-sr]').dataset.sr);
 
+    // Debug logging
     console.log("=== DATA LOADED ===");
     console.log("Y data points:", originalYData.length);
     console.log("Y range:", Math.min(...originalYData), "to", Math.max(...originalYData));
     console.log("Frequency:", originalFreq, "Hz");
     console.log("Original SR:", originalSR, "Hz");
 
+    /* ========================================
+       NYQUIST CALCULATIONS
+       Calculate minimum sampling rates to avoid aliasing
+       ======================================== */
+    
+    // Nyquist frequency: 2× max frequency (with 3 harmonics)
+    // Formula: Nyquist = 2 × (base_freq × 3)
     const nyquistFrequency = Math.round(originalFreq * 2 * 3);
+    
+    // Threshold for moderate aliasing (80% of Nyquist)
     const moderateAliasingThreshold = Math.round(nyquistFrequency * 0.8);
 
+    // Display calculated limits
     document.getElementById('nyquistDisplay').textContent = nyquistFrequency + ' Hz';
     document.getElementById('nyquistThreshold').textContent = moderateAliasingThreshold + ' Hz';
 
+    /* ========================================
+       INITIALIZATION
+       Draw original signal and set up event listeners
+       ======================================== */
+    
+    // Draw original waveform on page load
     drawOriginalSignal();
 
+    // Slider event: update label and status on input
     const slider = document.getElementById('samplingSlider');
     slider.addEventListener('input', function(e) {
       const selectedFs = parseInt(e.target.value);
-      document.getElementById('samplingRateLabel').textContent = `Sampling Frequency: ${selectedFs} Hz`;
+      // Update display label
+      document.getElementById('samplingRateLabel').textContent = 
+        `Sampling Frequency: ${selectedFs} Hz`;
+      // Update aliasing status indicator
       updateAliasingStatus(selectedFs);
     });
+    
+    // Initialize status at default value (2000 Hz)
     updateAliasingStatus(2000);
 
+    // Resample button click handler
     document.getElementById('generateBtn').addEventListener('click', function() {
       const selectedFs = parseInt(slider.value);
       console.log("🎛️ Resample clicked, fs:", selectedFs);
       resampleAudio(selectedFs);
     });
 
+    /* ========================================
+       FUNCTION: updateAliasingStatus
+       Updates status indicator based on sampling frequency
+       ======================================== */
     function updateAliasingStatus(fs) {
       const statusElement = document.getElementById('aliasingStatus');
+      
+      // Compare sampling rate to Nyquist limits
       if (fs >= nyquistFrequency) {
+        // Good: Properly sampled (no aliasing)
         statusElement.innerHTML = '✅ <strong>No aliasing</strong>';
         statusElement.className = 'status-indicator status-good';
       } else if (fs >= moderateAliasingThreshold) {
+        // Warning: Near Nyquist (moderate aliasing possible)
         statusElement.innerHTML = '⚠️ <strong>Moderate aliasing</strong>';
         statusElement.className = 'status-indicator status-warning';
       } else {
+        // Danger: Severely undersampled (severe aliasing)
         statusElement.innerHTML = '❌ <strong>Severe aliasing</strong>';
         statusElement.className = 'status-indicator status-danger';
       }
     }
 
+    /* ========================================
+       FUNCTION: drawOriginalSignal
+       Render original uploaded waveform on canvas
+       ======================================== */
     function drawOriginalSignal() {
       const canvas = document.getElementById('originalCanvas');
       const ctx = canvas.getContext('2d');
+      
+      // Set canvas dimensions to match CSS size
       const width = canvas.width = canvas.offsetWidth;
       const height = canvas.height = canvas.offsetHeight;
       
+      // Clear and fill background
       ctx.clearRect(0, 0, width, height);
-      ctx.fillStyle = '#F9FAFB';
+      ctx.fillStyle = '#F9FAFB'; // Light gray
       ctx.fillRect(0, 0, width, height);
       
-      // Grid
-      ctx.strokeStyle = 'rgba(99, 102, 241, 0.1)';
+      // === Draw Grid Lines ===
+      ctx.strokeStyle = 'rgba(99, 102, 241, 0.1)'; // Light purple
       ctx.lineWidth = 1;
+      
+      // Vertical grid lines (every 50px)
       for (let x = 0; x < width; x += 50) {
-        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, height); ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, height);
+        ctx.stroke();
       }
+      
+      // Horizontal grid lines (every 50px)
       for (let y = 0; y < height; y += 50) {
-        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(width, y); ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(width, y);
+        ctx.stroke();
       }
       
-      // Center line
-      ctx.strokeStyle = 'rgba(107, 114, 128, 0.3)';
+      // === Draw Center Line (zero amplitude) ===
+      ctx.strokeStyle = 'rgba(107, 114, 128, 0.3)'; // Gray
       ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.moveTo(0, height / 2); ctx.lineTo(width, height / 2); ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(0, height / 2);
+      ctx.lineTo(width, height / 2);
+      ctx.stroke();
       
+      // === Draw Waveform ===
       if (originalYData && originalYData.length > 0) {
         ctx.beginPath();
-        const xScale = width / originalYData.length;
-        const yScale = height * 0.45;
         
+        // Scale factors
+        const xScale = width / originalYData.length;  // Pixels per sample
+        const yScale = height * 0.45;                 // Amplitude scaling (90% of half-height)
+        
+        // Plot all data points
         for (let i = 0; i < originalYData.length; i++) {
           const x = i * xScale;
+          // Y is inverted: positive amplitude goes up
           const y = (height / 2) - (originalYData[i] * yScale);
-          if (i === 0) ctx.moveTo(x, y);
-          else ctx.lineTo(x, y);
+          
+          if (i === 0) {
+            ctx.moveTo(x, y); // Start path
+          } else {
+            ctx.lineTo(x, y); // Continue path
+          }
         }
         
-        ctx.strokeStyle = "#6366F1";
+        // Style and render waveform
+        ctx.strokeStyle = "#6366F1"; // Purple
         ctx.lineWidth = 2;
         ctx.stroke();
+        
         console.log("✅ Original drawn:", originalYData.length, "points");
       }
     }
 
+    /* ========================================
+       FUNCTION: drawSampledSignal
+       Render resampled waveform on canvas
+       ======================================== */
     function drawSampledSignal(yData) {
       const canvas = document.getElementById('sampledCanvas');
       const ctx = canvas.getContext('2d');
+      
+      // Set canvas dimensions
       const width = canvas.width = canvas.offsetWidth;
       const height = canvas.height = canvas.offsetHeight;
       
+      // Clear and fill background
       ctx.clearRect(0, 0, width, height);
       ctx.fillStyle = '#F9FAFB';
       ctx.fillRect(0, 0, width, height);
       
-      // Grid
+      // === Draw Grid ===
       ctx.strokeStyle = 'rgba(99, 102, 241, 0.1)';
+      
+      // Vertical lines
       for (let x = 0; x < width; x += 50) {
-        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, height); ctx.stroke();
-      }
-      for (let y = 0; y < height; y += 50) {
-        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(width, y); ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, height);
+        ctx.stroke();
       }
       
-      // Center line
+      // Horizontal lines
+      for (let y = 0; y < height; y += 50) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(width, y);
+        ctx.stroke();
+      }
+      
+      // === Center Line ===
       ctx.strokeStyle = 'rgba(107, 114, 128, 0.3)';
       ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.moveTo(0, height / 2); ctx.lineTo(width, height / 2); ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(0, height / 2);
+      ctx.lineTo(width, height / 2);
+      ctx.stroke();
       
+      // === Draw Resampled Waveform ===
       if (yData && yData.length > 0) {
         ctx.beginPath();
+        
         const xScale = width / yData.length;
         const yScale = height * 0.45;
         
         for (let i = 0; i < yData.length; i++) {
           const x = i * xScale;
           const y = (height / 2) - (yData[i] * yScale);
-          if (i === 0) ctx.moveTo(x, y);
-          else ctx.lineTo(x, y);
+          
+          if (i === 0) {
+            ctx.moveTo(x, y);
+          } else {
+            ctx.lineTo(x, y);
+          }
         }
         
         ctx.strokeStyle = "#6366F1";
         ctx.lineWidth = 2;
         ctx.stroke();
+        
         console.log("✅ Resampled drawn:", yData.length, "points");
       }
     }
 
+    /* ========================================
+       FUNCTION: resampleAudio
+       Send AJAX request to resample audio at new rate
+       ======================================== */
     function resampleAudio(targetFs) {
       const generateBtn = document.getElementById('generateBtn');
+      
+      // Update button to show processing state
       generateBtn.textContent = '🔄 Processing...';
       generateBtn.disabled = true;
 
+      // Send POST request to Flask backend
       fetch('{{ url_for("doppler.resample_uploaded_audio") }}', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          target_fs: targetFs,
-          audio_file_id: audioFileId
+          target_fs: targetFs,          // Desired sampling rate
+          audio_file_id: audioFileId    // Original file UUID
         })
       })
       .then(res => res.json())
@@ -408,15 +727,23 @@
         console.log("✅ Response:", data);
         
         if (data.success) {
+          // === Update Audio Player ===
           const audioPlayer = document.getElementById('generatedAudio');
-          audioPlayer.src = '{{ url_for("doppler.serve_audio", file_id="") }}' + data.resampled_file_id + '?t=' + Date.now();
-          audioPlayer.load();
+          // Set source to resampled audio file URL
+          // Add timestamp to prevent browser caching
+          audioPlayer.src = '{{ url_for("doppler.serve_audio", file_id="") }}' + 
+                           data.resampled_file_id + '?t=' + Date.now();
+          audioPlayer.load(); // Force reload
           
+          // === Update Waveform Visualization ===
           if (data.y_plot) {
             drawSampledSignal(data.y_plot);
           }
           
-          document.getElementById('generatedInfo').textContent = `Resampled at ${targetFs} Hz (${data.resampled_length} samples)`;
+          // === Update Info Text ===
+          document.getElementById('generatedInfo').textContent = 
+            `Resampled at ${targetFs} Hz (${data.resampled_length} samples)`;
+          
           console.log("🎉 Complete!");
         } else {
           throw new Error(data.error || 'Unknown error');
@@ -427,6 +754,7 @@
         alert('Error: ' + err.message);
       })
       .finally(() => {
+        // Reset button state
         generateBtn.textContent = '🔄 Resample Audio';
         generateBtn.disabled = false;
       });

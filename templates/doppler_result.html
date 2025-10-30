@@ -4,28 +4,47 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Doppler Generation Result</title>
+  
+  <!-- Bootstrap 5.3 - CSS framework for layout and components -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+  
+  <!-- Chart.js - JavaScript library for creating interactive charts -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  
   <style>
+    /* ========================================
+       BASE STYLES
+       ======================================== */
     body {
+      /* Gradient background: light gray-blue to light purple */
       background: linear-gradient(135deg, #F5F7FA 0%, #E0E7FF 100%);
-      color: #1F2937;
-      text-align: center;
+      color: #1F2937; /* Near-black text */
+      text-align: center; /* Center all text by default */
       font-family: 'Inter', -apple-system, sans-serif;
       padding-bottom: 50px;
-      min-height: 100vh;
+      min-height: 100vh; /* Full viewport height */
     }
+    
+    /* Main heading - large, purple, bold */
     h1 { 
       color: #6366F1; 
       font-weight: 700; 
       margin: 30px 0;
     }
+    
+    /* Section subheadings */
     h2 { 
       color: #6366F1; 
       margin-top: 40px;
       font-size: 1.5rem;
       font-weight: 600;
     }
+    
+    /* ========================================
+       BUTTON STYLES
+       ======================================== */
+    
+    /* Primary button - purple gradient with glow */
     .doppler-btn { 
       background: linear-gradient(135deg, #6366F1 0%, #4F46E5 100%);
       border: none; 
@@ -34,14 +53,18 @@
       padding: 12px 30px;
       border-radius: 10px;
       transition: all 0.3s;
-      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3); /* Purple shadow */
     }
+    
+    /* Hover state - darker gradient, lift effect */
     .doppler-btn:hover { 
       background: linear-gradient(135deg, #4F46E5 0%, #4338CA 100%);
       color: white;
-      transform: translateY(-2px);
+      transform: translateY(-2px); /* Lift 2px */
       box-shadow: 0 6px 16px rgba(99, 102, 241, 0.4);
     }
+    
+    /* Back button - outline style (inverts on hover) */
     .back-btn { 
       background: white; 
       border: 2px solid #6366F1; 
@@ -51,11 +74,18 @@
       border-radius: 10px;
       transition: all 0.3s;
     }
+    
+    /* Back button hover - filled purple */
     .back-btn:hover { 
       background: #6366F1; 
       color: white;
       transform: translateY(-2px);
     }
+    
+    /* ========================================
+       CHART CONTAINER
+       White box with shadow for waveform plot
+       ======================================== */
     .chart-container {
       position: relative;
       height: 450px;
@@ -65,8 +95,13 @@
       padding: 25px;
       box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05), 0 2px 4px rgba(0, 0, 0, 0.05);
       border: 1px solid #E5E7EB;
-      max-width: 900px;
+      max-width: 900px; /* Limit width on large screens */
     }
+    
+    /* ========================================
+       SAMPLING STATUS BADGE
+       Dynamic indicator showing aliasing state
+       ======================================== */
     #sampling_status { 
       font-weight: 600; 
       font-size: 1.3rem; 
@@ -76,21 +111,32 @@
       max-width: 600px;
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     }
+    
+    /* Good status - green (properly sampled) */
     .status-good { 
       color: #065F46; 
       background: #D1FAE5;
       border: 2px solid #10B981;
     }
+    
+    /* Warning status - yellow (marginal sampling) */
     .status-warning { 
       color: #92400E; 
       background: #FEF3C7;
       border: 2px solid #F59E0B;
     }
+    
+    /* Danger status - red (undersampled/aliasing) */
     .status-danger { 
       color: #991B1B; 
       background: #FEE2E2;
       border: 2px solid #EF4444;
     }
+    
+    /* ========================================
+       PARAMETERS BOX
+       White box displaying simulation parameters
+       ======================================== */
     .params-box {
       background: white;
       border-radius: 16px;
@@ -100,62 +146,92 @@
       border: 1px solid #E5E7EB;
       box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05), 0 2px 4px rgba(0, 0, 0, 0.05);
     }
+    
+    /* Unstyled list for parameter rows */
     .params-box ul {
       list-style: none;
       padding: 0;
       margin: 15px 0 0 0;
     }
+    
+    /* Individual parameter row */
     .params-box li {
       padding: 12px 0;
-      border-bottom: 1px solid #E5E7EB;
+      border-bottom: 1px solid #E5E7EB; /* Divider line */
       display: flex;
-      justify-content: space-between;
+      justify-content: space-between; /* Label left, value right */
       align-items: center;
     }
+    
+    /* Remove bottom border from last item */
     .params-box li:last-child {
       border-bottom: none;
     }
+    
+    /* Parameter label (left side) */
     .param-label {
-      color: #6B7280;
+      color: #6B7280; /* Gray */
       font-weight: 500;
     }
+    
+    /* Parameter value (right side) */
     .param-value {
-      color: #6366F1;
+      color: #6366F1; /* Purple */
       font-weight: 700;
     }
+    
+    /* ========================================
+       AUDIO PLAYER
+       ======================================== */
     audio {
       margin: 20px 0;
       width: 100%;
       max-width: 600px;
       border-radius: 10px;
     }
+    
+    /* ========================================
+       FREQUENCY INFO CARDS
+       Two-card layout for approaching/receding frequencies
+       ======================================== */
     .frequency-info {
       display: flex;
       justify-content: space-around;
       max-width: 500px;
       margin: 20px auto;
-      gap: 20px;
+      gap: 20px; /* Space between cards */
     }
+    
+    /* Individual frequency card */
     .freq-card {
-      background: #EEF2FF;
+      background: #EEF2FF; /* Light purple */
       padding: 15px;
       border-radius: 12px;
-      border: 1px solid #C7D2FE;
-      flex: 1;
+      border: 1px solid #C7D2FE; /* Purple border */
+      flex: 1; /* Equal width */
       box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
     }
+    
+    /* Card heading */
     .freq-card h4 {
       color: #6366F1;
       font-size: 0.9rem;
       margin-bottom: 5px;
       font-weight: 600;
     }
+    
+    /* Card value */
     .freq-card p {
       color: #1F2937;
       font-size: 1.3rem;
       font-weight: 700;
       margin: 0;
     }
+    
+    /* ========================================
+       ERROR MESSAGE
+       Red alert box for displaying errors
+       ======================================== */
     .error-message {
       background: #FEE2E2;
       color: #991B1B;
@@ -164,16 +240,23 @@
       border: 2px solid #EF4444;
       margin: 20px;
     }
+    
+    /* ========================================
+       DOPPLER EXPLANATION BOX
+       Educational info about the effect
+       ======================================== */
     .doppler-explanation {
-      background: #EEF2FF;
-      border-left: 4px solid #6366F1;
+      background: #EEF2FF; /* Light purple */
+      border-left: 4px solid #6366F1; /* Accent border */
       padding: 15px;
       margin: 20px auto;
       max-width: 700px;
       border-radius: 8px;
-      text-align: left;
+      text-align: left; /* Override center alignment */
       color: #1F2937;
     }
+    
+    /* Bold text in params box header */
     .params-box > p > strong {
       color: #1F2937;
       font-size: 1.1rem;
@@ -184,26 +267,38 @@
   <div class="container mt-5">
     <h1>🔊 Doppler Effect Simulation Result</h1>
    
-    <!-- Parameters -->
+    <!-- ========================================
+         SIMULATION PARAMETERS
+         Display all input parameters used
+         ======================================== -->
     <div class="params-box">
         <p><strong>📊 Simulation Parameters</strong></p>
         <ul>
+            <!-- Vehicle speed -->
             <li>
               <span class="param-label">🚗 Vehicle Velocity:</span>
               <span class="param-value">{{ v }} m/s</span>
             </li>
+            
+            <!-- Base frequency (un-shifted) -->
             <li>
               <span class="param-label">📢 Base Horn Frequency:</span>
               <span class="param-value">{{ f0 }} Hz</span>
             </li>
+            
+            <!-- Maximum frequency (including harmonics) -->
             <li>
               <span class="param-label">📈 Max Frequency (with harmonics):</span>
               <span class="param-value">{{ max_freq }} Hz</span>
             </li>
+            
+            <!-- Nyquist rate: minimum sampling to avoid aliasing -->
             <li>
               <span class="param-label">⚡ Nyquist Rate:</span>
               <span class="param-value">{{ nyquist_freq }} Hz</span>
             </li>
+            
+            <!-- Signal duration -->
             <li>
               <span class="param-label">⏱️ Duration:</span>
               <span class="param-value">{{ duration }} seconds</span>
@@ -211,57 +306,89 @@
         </ul>
     </div>
     
-    
-    <!-- Sampling Status -->
+    <!-- ========================================
+         SAMPLING STATUS
+         Dynamic indicator showing if aliasing occurred
+         ======================================== -->
     <p id="sampling_status" class="status-{{ status_class }}">
       {{ sampling_status }}
     </p>
     
-    <!-- Doppler Explanation -->
+    <!-- ========================================
+         DOPPLER EXPLANATION
+         Educational text about what user should hear
+         ======================================== -->
     <div class="doppler-explanation">
       <strong>🎯 What you should hear:</strong><br>
-      The car starts from a distance, approaches you (higher pitch), passes by, and then recedes into the distance (lower pitch).
+      The car starts from a distance, approaches you (higher pitch), passes by, 
+      and then recedes into the distance (lower pitch).
       This creates the classic "wee-oo" Doppler effect sound over {{ duration }} seconds.
     </div>
     
-    <!-- Audio Player -->
+    <!-- ========================================
+         AUDIO PLAYER SECTION
+         Play and download generated audio
+         ======================================== -->
     <div id="audio-player-container" class="mb-4">
         <h2>🎵 Generated Doppler Sound</h2>
+        
+        <!-- HTML5 audio player with controls -->
         <audio controls id="audioPlayer">
+            <!-- Source points to Flask route serving the WAV file -->
             <source src="{{ url_for('doppler.serve_audio', file_id=audio_file_id) }}" type="audio/wav">
             Your browser does not support the audio element.
         </audio>
+        
         <br>
+        
+        <!-- Download button with dynamic filename -->
         <a href="{{ url_for('doppler.serve_audio', file_id=audio_file_id) }}"
            download="doppler_v{{ v }}_f{{ f0 }}_fs{{ fs_user }}.wav"
            class="btn doppler-btn mt-3">⬇️ Download WAV File</a>
     </div>
     
-    <!-- Signal Plot -->
+    <!-- ========================================
+         SIGNAL WAVEFORM PLOT
+         Time-domain visualization using Chart.js
+         ======================================== -->
     <div>
         <h2>📉 Time-Domain Signal Waveform</h2>
-        <p style="color: #6B7280; font-size: 0.95rem;">Showing complete {{ duration }} second signal </p>
+        <p style="color: #6B7280; font-size: 0.95rem;">
+          Showing complete {{ duration }} second signal 
+        </p>
+        
+        <!-- Chart.js canvas element -->
         <div class="chart-container">
           <canvas id="signalPlot"></canvas>
         </div>
     </div>
     
-    <!-- Return Button -->
-    <a href="{{ url_for('doppler.index') }}" class="btn back-btn mt-5">⬅️ Return to Generator</a>
+    <!-- Return to generator button -->
+    <a href="{{ url_for('doppler.index') }}" class="btn back-btn mt-5">
+      ⬅️ Return to Generator
+    </a>
   </div>
   
   <script>
     console.log('Script started');
     
-    // Parse data from Flask with error handling
+    /* ========================================
+       DATA PARSING
+       Extract waveform data from Flask template
+       ======================================== */
+    
+    // Parse data from Flask with comprehensive error handling
     let xData, yData;
     try {
+      // Flask template injects JSON directly into JavaScript
+      // Using 'safe' filter to prevent HTML escaping
       const xDataRaw = '{{ x_plot_json | safe }}';
       const yDataRaw = '{{ y_plot_json | safe }}';
       
       console.log('Raw X data length:', xDataRaw.length);
       console.log('Raw Y data length:', yDataRaw.length);
       
+      // Parse JSON strings to JavaScript arrays
       xData = JSON.parse(xDataRaw);
       yData = JSON.parse(yDataRaw);
       
@@ -270,6 +397,8 @@
       console.log('First few X values:', xData.slice(0, 5));
       console.log('First few Y values:', yData.slice(0, 5));
       
+      // === VALIDATION ===
+      // Ensure data is in correct format
       if (!Array.isArray(xData) || !Array.isArray(yData)) {
         throw new Error('Data is not in array format');
       }
@@ -282,38 +411,40 @@
         throw new Error('X and Y data lengths do not match');
       }
       
-      // Create the chart with better configuration for 6-second signal
+      // === CHART CREATION ===
       const ctx = document.getElementById('signalPlot');
       if (!ctx) {
         throw new Error('Canvas element not found');
       }
       
       console.log('Creating chart...');
+      
+      // Create Chart.js line chart
       const chart = new Chart(ctx.getContext('2d'), {
           type: 'line',
           data: {
-              labels: xData,
+              labels: xData,  // X-axis: time values
               datasets: [{
                   label: 'Amplitude',
-                  data: yData,
-                  borderColor: '#6366F1',
-                  backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                  data: yData,    // Y-axis: amplitude values
+                  borderColor: '#6366F1',     // Purple line
+                  backgroundColor: 'rgba(99, 102, 241, 0.1)',  // Light purple fill
                   borderWidth: 2,
-                  pointRadius: 0,
-                  fill: true,
-                  tension: 0, // No smoothing to see actual aliasing
+                  pointRadius: 0,  // No dots at data points (too many points)
+                  fill: true,      // Fill area under curve
+                  tension: 0,      // No smoothing - show actual samples
                   borderJoinStyle: 'round'
               }]
           },
           options: {
               responsive: true,
-              maintainAspectRatio: false,
+              maintainAspectRatio: false,  // Allow custom height
               animation: {
-                  duration: 0
+                  duration: 0  // Disable animation for performance
               },
               interaction: {
-                  intersect: false,
-                  mode: 'index'
+                  intersect: false,  // Tooltip shows on nearest point
+                  mode: 'index'      // Tooltip follows vertical line
               },
               plugins: {
                   legend: { 
@@ -332,9 +463,11 @@
                       borderWidth: 2,
                       padding: 12,
                       callbacks: {
+                          // Format tooltip label
                           label: function(context) {
                               return 'Amplitude: ' + context.parsed.y.toFixed(4);
                           },
+                          // Format tooltip title
                           title: function(context) {
                               return 'Time: ' + context[0].parsed.x.toFixed(2) + ' s';
                           }
@@ -343,7 +476,7 @@
               },
               scales: {
                   x: {
-                      type: 'linear',
+                      type: 'linear',  // Continuous numeric scale
                       title: { 
                           display: true, 
                           text: 'Time (seconds)', 
@@ -352,17 +485,18 @@
                       },
                       ticks: { 
                           color: '#1F2937',
-                          maxTicksLimit: 12, // More ticks for 6 seconds
+                          maxTicksLimit: 12,  // More ticks for 6-second signal
                           callback: function(value) {
+                              // Format ticks as "1.0s", "2.0s", etc.
                               return value.toFixed(1) + 's';
                           }
                       },
                       grid: { 
-                          color: '#E5E7EB',
+                          color: '#E5E7EB',    // Light gray grid lines
                           lineWidth: 1
                       },
                       min: 0,
-                      max: 6 // Fixed to 6 seconds
+                      max: 6  // Fixed to 6 seconds
                   },
                   y: {
                       title: { 
@@ -381,7 +515,7 @@
                           color: '#E5E7EB',
                           lineWidth: 1
                       },
-                      min: -1,
+                      min: -1,  // Normalized amplitude range
                       max: 1
                   }
               }
@@ -391,9 +525,14 @@
       console.log('Chart created successfully!');
       
     } catch (error) {
+      /* ========================================
+         ERROR HANDLING
+         Display user-friendly error message
+         ======================================== */
       console.error('Error loading chart:', error);
       console.error('Error stack:', error.stack);
       
+      // Replace chart with error message
       const chartContainer = document.querySelector('.chart-container');
       if (chartContainer) {
         chartContainer.innerHTML = 
@@ -405,16 +544,22 @@
       }
     }
     
-    // Audio player setup
+    /* ========================================
+       AUDIO PLAYER SETUP
+       Configure audio on page load
+       ======================================== */
     window.addEventListener('load', function() {
       const audio = document.getElementById('audioPlayer');
       if (audio) {
+        // Set default volume to 70%
         audio.volume = 0.7;
         console.log('Audio player ready');
         
-        // Add event listener for playback issues
+        // Add error handler for playback issues
         audio.addEventListener('error', function(e) {
           console.error('Audio playback error:', e);
+          
+          // Display error message to user
           const container = document.getElementById('audio-player-container');
           container.innerHTML += 
             '<div class="error-message mt-3">' +
