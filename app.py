@@ -1,8 +1,14 @@
+<<<<<<< Updated upstream
 from flask import Flask, render_template, send_from_directory
+=======
+from flask import Flask, render_template
+from flask_cors import CORS
+>>>>>>> Stashed changes
 # Added 'voice' to the imports to reflect the new module/blueprint
 from signals import eeg, ecg, radar, doppler , sar, voice
 
 app = Flask(__name__)
+CORS(app, resources={r"/voice/*": {"origins": "*"}})
 
 
 app.secret_key = 'a_secure_and_random_string_of_your_choice_1234567890' 
