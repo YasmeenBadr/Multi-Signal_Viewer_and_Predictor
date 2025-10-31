@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -9,87 +8,43 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body {
-<<<<<<< Updated upstream
-            font-family: 'Inter', sans-serif;
-            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-            color: #1e293b;
-=======
             font-family: 'Inter', sans-serif; 
             background: linear-gradient(135deg, #f5f7fa 0%, #e4e7ec 100%);
             color: #2d3748;
->>>>>>> Stashed changes
             overflow-x: hidden;
         }
-
         .main-color {
-<<<<<<< Updated upstream
-            color: #6366f1;
-=======
             color: #3b82f6; /* Blue accent */
->>>>>>> Stashed changes
         }
-
         .glass-card {
             backdrop-filter: blur(12px);
-<<<<<<< Updated upstream
-            background: #ffffff;
-            border: 1px solid #e2e8f0;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07), 0 10px 13px rgba(0, 0, 0, 0.05);
-=======
             background: rgba(255, 255, 255, 0.9);
             border: 1px solid rgba(226, 232, 240, 0.8);
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
->>>>>>> Stashed changes
             transition: all 0.4s ease;
         }
-
         .glass-card:hover {
-<<<<<<< Updated upstream
-            border-color: #cbd5e1;
-            box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1), 0 4px 6px rgba(0, 0, 0, 0.05);
-=======
             border-color: rgba(59, 130, 246, 0.4);
             box-shadow: 0 6px 25px rgba(0, 0, 0, 0.12);
->>>>>>> Stashed changes
             transform: translateY(-2px);
         }
-
         .drag-area {
-<<<<<<< Updated upstream
-            border: 2px dashed #6366f1;
-            background-color: #f8fafc;
-=======
             border: 2px dashed #cbd5e0;
             background-color: rgba(255, 255, 255, 0.7);
->>>>>>> Stashed changes
             transition: 0.4s ease;
             backdrop-filter: blur(6px);
         }
-
         .drag-area.drag-over {
-<<<<<<< Updated upstream
-            background-color: #eef2ff;
-            border-color: #6366f1;
-            box-shadow: 0 0 12px rgba(99, 102, 241, 0.2);
-        }
-
-=======
             background-color: rgba(59, 130, 246, 0.05);
             border-color: #3b82f6;
             box-shadow: 0 0 12px rgba(59, 130, 246, 0.15);
         }
         /* Custom styling for the range slider thumb */
->>>>>>> Stashed changes
         input[type=range]::-webkit-slider-thumb {
             -webkit-appearance: none;
             width: 18px;
             height: 18px;
             border-radius: 50%;
-<<<<<<< Updated upstream
-            background: #6366f1;
-            cursor: pointer;
-            box-shadow: 0 0 10px rgba(99, 102, 241, 0.4);
-=======
             background: #3b82f6;
             cursor: pointer;
             box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
@@ -98,75 +53,15 @@
             height: 8px;
             background: #e2e8f0;
             border-radius: 4px;
->>>>>>> Stashed changes
         }
-
-        input[type=range]::-moz-range-thumb {
-            width: 18px;
-            height: 18px;
-            border-radius: 50%;
-            background: #6366f1;
-            cursor: pointer;
-            box-shadow: 0 0 10px rgba(99, 102, 241, 0.4);
-            border: none;
-        }
-
-        input[type=range] {
-            background: linear-gradient(to right, #e0e7ff 0%, #e0e7ff 100%);
-            background-size: 100% 100%;
-            background-repeat: no-repeat;
-        }
-
         .btn-control {
-<<<<<<< Updated upstream
-            background: #ffffff;
-            border: 1px solid #cbd5e1;
-            color: #1e293b;
-            transition: all 0.3s ease;
-            position: relative;
-        }
-
-        .btn-control::after {
-            content: "";
-            position: absolute;
-            inset: 0;
-            border-radius: 9999px;
-            border: 1px solid rgba(99, 102, 241, 0.2);
-=======
             background: rgba(255, 255, 255, 0.9);
             border: 1px solid rgba(203, 213, 224, 0.8);
             color: #4a5568;
->>>>>>> Stashed changes
             transition: all 0.3s ease;
             box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
         }
-
         .btn-control:hover {
-<<<<<<< Updated upstream
-            background: #f8fafc;
-            border-color: #6366f1;
-            color: #6366f1;
-        }
-
-        .btn-control:hover::after {
-            border-color: rgba(99, 102, 241, 0.6);
-            box-shadow: 0 0 10px rgba(99, 102, 241, 0.2);
-        }
-
-        .btn-control:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        .results-male {
-            border-color: #6366f1;
-            box-shadow: 0 0 25px rgba(99, 102, 241, 0.15);
-        }
-
-        .results-female {
-            border-color: #ec4899;
-            box-shadow: 0 0 25px rgba(236, 72, 153, 0.15);
-=======
             background: rgba(255, 255, 255, 1);
             border-color: rgba(59, 130, 246, 0.6);
             box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
@@ -186,9 +81,9 @@
         .results-female {
             border-color: #ec4899;
             box-shadow: 0 0 20px rgba(236, 72, 153, 0.15);
->>>>>>> Stashed changes
         }
 
+        /* Creative accent bar */
         .gender-accent-bar {
             height: 6px;
             width: 100%;
@@ -196,79 +91,23 @@
             margin-bottom: 20px;
             transition: background 0.5s ease;
         }
-
         .gender-accent-bar-male {
-<<<<<<< Updated upstream
-            background: linear-gradient(90deg, #6366f1 0%, #818cf8 100%);
-=======
             background: linear-gradient(90deg, #3b82f6 0%, #60a5fa 100%);
->>>>>>> Stashed changes
         }
-
         .gender-accent-bar-female {
             background: linear-gradient(90deg, #ec4899 0%, #f472b6 100%);
         }
 
+        /* Recording indicator animation */
         @keyframes pulse-red {
-<<<<<<< Updated upstream
-            0%,
-            100% {
-                opacity: 1;
-            }
-            50% {
-                opacity: 0.5;
-            }
-=======
             0%, 100% { opacity: 1; }
             50% { opacity: 0.7; }
->>>>>>> Stashed changes
         }
-
         .recording-indicator {
             animation: pulse-red 1.5s ease-in-out infinite;
         }
-
+        
         .record-btn-active {
-<<<<<<< Updated upstream
-            background: #fee2e2 !important;
-            border-color: #fca5a5 !important;
-            color: #dc2626 !important;
-        }
-
-        /* Toggle Switch Styling */
-        .peer-checked:bg-indigo-600 {
-            background-color: #6366f1;
-        }
-
-        .peer:checked ~ .peer-checked\:bg-indigo-600 {
-            background-color: #6366f1;
-        }
-
-        /* Section backgrounds */
-        .section-bg {
-            background: #f8fafc;
-            border: 1px solid #e2e8f0;
-        }
-
-        .section-bg-purple {
-            background: #f3f0ff;
-            border: 1px solid #e9d5ff;
-        }
-
-        @keyframes slideDown {
-            from {
-                opacity: 0;
-                transform: translateY(-10px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        .animate-slide-down {
-            animation: slideDown 0.3s ease-out;
-=======
             background: rgba(239, 68, 68, 0.9) !important;
             border-color: rgba(220, 38, 38, 0.6) !important;
             color: white !important;
@@ -299,43 +138,23 @@
             background: rgba(255, 255, 255, 0.8);
             border: 1px solid rgba(226, 232, 240, 0.8);
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
->>>>>>> Stashed changes
         }
     </style>
 </head>
 
 <body class="min-h-screen flex flex-col items-center justify-center p-6">
     <div class="max-w-5xl w-full text-center space-y-8 animate-fade-in">
-
-        <!-- Updated header styling to match light theme -->
+        
         <header class="mb-12">
             <h1 class="text-5xl md:text-6xl font-extrabold main-color tracking-wide">
                 Voice Processing Suite
             </h1>
-<<<<<<< Updated upstream
-            <p class="text-slate-600 text-lg md:text-xl mt-4">
-                Experiment with audio fidelity and discover how sampling rates affect sound clarity.
-=======
             <p class="text-gray-600 text-lg md:text-xl mt-4">
                 Experiment with audio fidelity and discover how <strong>sampling rates</strong> affect sound clarity.
->>>>>>> Stashed changes
             </p>
         </header>
 
-        <!-- Updated main card to light theme with proper shadows -->
         <div class="glass-card rounded-3xl p-8 md:p-12 shadow-2xl mx-auto w-full">
-<<<<<<< Updated upstream
-            <h2 class="text-3xl font-semibold mb-8 text-slate-900">Sampling Rate Demonstrator & Analysis</h2>
-
-            <section class="mb-10">
-                <!-- Updated voice recording section styling -->
-                <div class="mb-8 p-6 rounded-2xl section-bg">
-                    <h3 class="text-xl font-semibold mb-4 text-slate-900 flex items-center justify-center gap-2">
-                        <svg class="w-6 h-6 text-red-500" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd"
-                                d="M7 4a3 3 0 016 0v4a3 3 0 11-6 0V4zm4 10.93A7.001 7.001 0 0017 8a1 1 0 10-2 0A5 5 0 015 8a1 1 0 00-2 0 7.001 7.001 0 006 6.93V17H6a1 1 0 100 2h8a1 1 0 100-2h-3v-2.07z"
-                                clip-rule="evenodd"></path>
-=======
             <h2 class="text-3xl font-semibold mb-8 text-gray-800">Sampling Rate Demonstrator & Analysis</h2>
 
             <section class="mb-10">
@@ -344,61 +163,31 @@
                     <h3 class="text-xl font-semibold mb-4 text-gray-800 flex items-center justify-center gap-2">
                         <svg class="w-6 h-6 text-red-500" fill="currentColor" viewBox="0 0 20 20">
                             <path fill-rule="evenodd" d="M7 4a3 3 0 016 0v4a3 3 0 11-6 0V4zm4 10.93A7.001 7.001 0 0017 8a1 1 0 10-2 0A5 5 0 015 8a1 1 0 00-2 0 7.001 7.001 0 006 6.93V17H6a1 1 0 100 2h8a1 1 0 100-2h-3v-2.07z" clip-rule="evenodd"></path>
->>>>>>> Stashed changes
                         </svg>
                         Record Your Voice
                     </h3>
                     <div class="flex flex-col items-center gap-4">
                         <div class="flex gap-3">
-<<<<<<< Updated upstream
-                            <button id="recordBtn"
-                                class="btn-control text-slate-900 font-bold py-3 px-8 rounded-full flex items-center gap-2 hover:bg-indigo-50">
-=======
                             <button id="recordBtn" class="btn-control font-medium py-3 px-8 rounded-full flex items-center gap-2">
->>>>>>> Stashed changes
                                 <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fill-rule="evenodd"
-                                        d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z"
-                                        clip-rule="evenodd"></path>
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path>
                                 </svg>
                                 Start Recording
                             </button>
-<<<<<<< Updated upstream
-                            <button id="stopRecordBtn"
-                                class="btn-control text-slate-900 font-bold py-3 px-8 rounded-full flex items-center gap-2 disabled:opacity-30 hover:bg-indigo-50"
-                                disabled>
-=======
                             <button id="stopRecordBtn" class="btn-control font-medium py-3 px-8 rounded-full flex items-center gap-2 disabled:opacity-30" disabled>
->>>>>>> Stashed changes
                                 <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fill-rule="evenodd"
-                                        d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1V8a1 1 0 00-1-1H8z"
-                                        clip-rule="evenodd"></path>
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1V8a1 1 0 00-1-1H8z" clip-rule="evenodd"></path>
                                 </svg>
                                 Stop Recording
                             </button>
                         </div>
-<<<<<<< Updated upstream
-                        <div id="recordingStatus" class="text-sm text-slate-500 h-6"></div>
-=======
                         <div id="recordingStatus" class="text-sm text-gray-500 h-6"></div>
->>>>>>> Stashed changes
                         <div id="recordingTimer" class="hidden text-2xl font-mono main-color">00:00</div>
                     </div>
                 </div>
 
-                <!-- Updated file upload section styling -->
+                <!-- File Upload Section -->
                 <div class="text-center mb-4">
-<<<<<<< Updated upstream
-                    <p class="text-slate-500 text-sm">OR</p>
-                </div>
-                <div id="dragDropArea" class="drag-area p-10 rounded-2xl text-center cursor-pointer hover:shadow-lg"
-                    onclick="document.getElementById('fileInput').click()">
-                    <p id="filePrompt" class="text-slate-700 font-medium">
-                        Drag & Drop an MP3/WAV audio file here, or click to upload.
-                    </p>
-                    <p id="fileNameDisplay" class="text-emerald-600 mt-3 hidden text-sm font-mono"></p>
-=======
                     <p class="text-gray-500 text-sm">OR</p>
                 </div>
                 <div id="dragDropArea" class="drag-area p-10 rounded-2xl text-center cursor-pointer hover:shadow-lg" onclick="document.getElementById('fileInput').click()">
@@ -406,41 +195,11 @@
                         <strong>Drag & Drop</strong> an MP3/WAV audio file here, or <strong>click to upload</strong>.
                     </p>
                     <p id="fileNameDisplay" class="text-green-600 mt-3 hidden text-sm font-mono"></p>
->>>>>>> Stashed changes
                     <input type="file" id="fileInput" accept="audio/*" class="hidden">
                 </div>
             </section>
 
             <section id="controls" class="space-y-10 opacity-50 pointer-events-none transition-all duration-700">
-<<<<<<< Updated upstream
-
-                <!-- Updated sampling frequency control styling -->
-                <div
-                    class="flex flex-col md:flex-row items-center justify-between gap-6 p-4 rounded-xl section-bg">
-                    <label for="samplingFrequency" class="text-slate-700 font-semibold w-full md:w-1/3 text-left">Target
-                        Sample Rate:</label>
-                    <div class="w-full md:w-2/3">
-                        <input type="range" id="samplingFrequency" min="4000" max="44100" value="44100" step="100"
-                            class="w-full h-2 bg-indigo-100 rounded-lg appearance-none cursor-pointer">
-                        <p class="text-sm text-slate-600 mt-2 text-right"><span id="currentFrequency"
-                                class="main-color font-bold">44100</span> Hz (Original Rate)</p>
-                    </div>
-                </div>
-
-                <!-- Updated anti-aliasing filter toggle styling -->
-                <div
-                    class="flex items-center justify-between p-4 rounded-xl section-bg-purple">
-                    <div class="flex items-center gap-3">
-                        <svg class="w-6 h-6 text-indigo-600" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd"
-                                d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z"
-                                clip-rule="evenodd"></path>
-                        </svg>
-                        <div>
-                            <label for="antiAliasingToggle" class="text-slate-900 font-semibold cursor-pointer">Neural
-                                Anti-Aliasing Filter</label>
-                            <p class="text-xs text-slate-600">ON: Use ML model | OFF: Use raw undersampled signal</p>
-=======
                 
                 <div class="flex flex-col md:flex-row items-center justify-between gap-6 p-4 rounded-xl section-card">
                     <label for="samplingFrequency" class="text-gray-700 font-semibold w-full md:w-1/3 text-left">Target Sample Rate:</label>
@@ -457,34 +216,10 @@
                         <div>
                             <label for="antiAliasingToggle" class="text-gray-800 font-semibold cursor-pointer">Anti-Aliasing Filter</label>
                             <p class="text-xs text-gray-600">Apply low-pass filter before downsampling</p>
->>>>>>> Stashed changes
                         </div>
                     </div>
                     <label class="relative inline-flex items-center cursor-pointer">
                         <input type="checkbox" id="antiAliasingToggle" class="sr-only peer" checked>
-<<<<<<< Updated upstream
-                        <div
-                            class="w-14 h-7 bg-slate-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[4px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-indigo-600">
-                        </div>
-                    </label>
-                </div>
-
-                <!-- Updated playback buttons styling -->
-                <div class="flex justify-center flex-wrap gap-4 pt-4 border-t border-slate-200">
-                    <button id="playOriginalBtn"
-                        class="btn-control text-slate-900 font-bold py-3 px-8 rounded-full flex items-center disabled:opacity-50 hover:bg-indigo-50"
-                        disabled>
-                        Play Original
-                    </button>
-                    <button id="pauseBtn"
-                        class="btn-control text-slate-900 font-bold py-3 px-8 rounded-full flex items-center disabled:opacity-50 hover:bg-indigo-50"
-                        disabled>
-                        Pause / Stop
-                    </button>
-                    <button id="playReconstructedBtn"
-                        class="btn-control text-slate-900 font-bold py-3 px-8 rounded-full flex items-center disabled:opacity-50 hover:bg-indigo-50"
-                        disabled>
-=======
                         <div class="w-14 h-7 bg-gray-300 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-blue-600 toggle-bg"></div>
                     </label>
                 </div>
@@ -501,61 +236,10 @@
                     </button>
                     <button id="playReconstructedBtn" class="btn-control font-medium py-3 px-8 rounded-full flex items-center disabled:opacity-50" disabled>
                         <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd"></path></svg>
->>>>>>> Stashed changes
                         Play Reconstructed
-                    </button>
-                    <button id="playSampledBtn"
-                        class="btn-control text-slate-900 font-bold py-3 px-8 rounded-full flex items-center disabled:opacity-50 hover:bg-indigo-50"
-                        disabled>
-                        Play Resampled
                     </button>
                 </div>
 
-<<<<<<< Updated upstream
-                <!-- Updated classification buttons styling -->
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 pt-6 border-t border-slate-200 mt-8">
-                    <button id="classifyOriginalBtn"
-                        class="btn-control text-slate-900 font-bold py-3 px-6 rounded-full flex items-center justify-center disabled:opacity-50 hover:bg-indigo-50"
-                        disabled>
-                        <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"></path>
-                            <path fill-rule="evenodd"
-                                d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z"
-                                clip-rule="evenodd"></path>
-                        </svg>
-                        Original
-                    </button>
-
-                    <button id="classifyResampledBtn"
-                        class="btn-control text-slate-900 font-bold py-3 px-6 rounded-full flex items-center justify-center disabled:opacity-50 hover:bg-indigo-50"
-                        disabled>
-                        <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd"
-                                d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm5 6a1 1 0 10-2 0v3.586l-1.293-1.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V8z"
-                                clip-rule="evenodd"></path>
-                        </svg>
-                        Resampled
-                    </button>
-
-                    <button id="classifyReconstructedBtn"
-                        class="btn-control text-slate-900 font-bold py-3 px-6 rounded-full flex items-center justify-center disabled:opacity-50 hover:bg-indigo-50"
-                        disabled>
-                        <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd"
-                                d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z"
-                                clip-rule="evenodd"></path>
-                        </svg>
-                        Process
-                    </button>
-
-                    <button id="resetBtn"
-                        class="btn-control text-slate-900 font-bold py-3 px-6 rounded-full flex items-center justify-center disabled:opacity-40 hover:bg-indigo-50">
-                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" stroke-width="2"
-                            viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round"
-                                d="M4 4v5h.582m15.356 2A8.001 8.001 0 0014 4H5m7 12l-4-4m0 0l-4 4m4-4V4"></path>
-                        </svg>
-=======
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-4 pt-6 border-t border-gray-200 mt-8">
                     <button id="classifyOriginalBtn" class="btn-control font-medium py-3 px-6 rounded-full flex items-center justify-center disabled:opacity-50" disabled>
                         <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"></path><path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"></path></svg>
@@ -574,142 +258,19 @@
                     
                     <button id="resetBtn" class="btn-control font-medium py-3 px-6 rounded-full flex items-center justify-center disabled:opacity-40">
                         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 0014 4H5m7 12l-4-4m0 0l-4 4m4-4V4"></path></svg>
->>>>>>> Stashed changes
                         Reset
                     </button>
                 </div>
 
-<<<<<<< Updated upstream
-                <!-- Updated original results card styling -->
-                <div id="originalResults"
-                    class="hidden mt-8 p-6 bg-white rounded-2xl border-2 border-indigo-200 transition-all duration-500 results-male">
-                    <div id="originalAccentBar" class="gender-accent-bar"></div>
-                    <h3 class="text-xl font-bold mb-4 text-slate-900 flex items-center gap-2">
-                        <svg class="w-5 h-5 text-emerald-600" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"></path>
-                            <path fill-rule="evenodd"
-                                d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z"
-                                clip-rule="evenodd"></path>
-                        </svg>
-=======
                 <!-- Original Audio Classification Results -->
                 <div id="originalResults" class="hidden mt-8 p-6 section-card rounded-2xl border-2 transition-all duration-500">
                     <div id="originalAccentBar" class="gender-accent-bar"></div>
                     <h3 class="text-xl font-bold mb-4 text-gray-800 flex items-center gap-2">
                         <svg class="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 20 20"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"></path><path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"></path></svg>
->>>>>>> Stashed changes
                         Original Audio Classification
                     </h3>
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
                         <div>
-<<<<<<< Updated upstream
-                            <p class="text-slate-600 text-sm mb-1">Gender</p>
-                            <p id="originalGender" class="text-2xl font-bold text-slate-900">N/A</p>
-                        </div>
-                        <div>
-                            <p class="text-slate-600 text-sm mb-1">Confidence</p>
-                            <p id="originalConfidence" class="text-2xl font-bold text-emerald-600">N/A</p>
-                        </div>
-                        <div>
-                            <p class="text-slate-600 text-sm mb-1">Avg Pitch (F0)</p>
-                            <p id="originalPitch" class="text-2xl font-bold text-indigo-600">N/A</p>
-                        </div>
-                    </div>
-                    <div class="mt-3 text-sm text-slate-600">
-                        Sample Rate: <span id="originalSampleRate" class="text-indigo-600 font-mono">N/A</span> Hz
-                    </div>
-                </div>
-
-                <!-- Updated resampled results card styling -->
-                <div id="resampledResults"
-                    class="hidden mt-6 p-6 bg-white rounded-2xl border-2 border-amber-200 transition-all duration-500">
-                    <div id="resampledAccentBar" class="gender-accent-bar"></div>
-                    <h3 class="text-xl font-bold mb-4 text-slate-900 flex items-center gap-2">
-                        <svg class="w-5 h-5 text-amber-600" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd"
-                                d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm5 6a1 1 0 10-2 0v3.586l-1.293-1.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V8z"
-                                clip-rule="evenodd"></path>
-                        </svg>
-                        Resampled Audio Classification (Raw Undersampled)
-                    </h3>
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
-                        <div>
-                            <p class="text-slate-600 text-sm mb-1">Gender</p>
-                            <p id="resampledGender" class="text-2xl font-bold text-slate-900">N/A</p>
-                        </div>
-                        <div>
-                            <p class="text-slate-600 text-sm mb-1">Confidence</p>
-                            <p id="resampledConfidence" class="text-2xl font-bold text-emerald-600">N/A</p>
-                        </div>
-                        <div>
-                            <p class="text-slate-600 text-sm mb-1">Avg Pitch (F0)</p>
-                            <p id="resampledPitch" class="text-2xl font-bold text-indigo-600">N/A</p>
-                        </div>
-                    </div>
-                    <div class="mt-3 text-sm text-slate-600">
-                        Sample Rate: <span id="resampledSampleRate" class="text-amber-600 font-mono">N/A</span> Hz
-                    </div>
-                </div>
-
-                <!-- Updated processed results card styling -->
-                <div id="reconstructedResults"
-                    class="hidden mt-6 p-6 bg-white rounded-2xl border-2 border-indigo-200 transition-all duration-500">
-                    <div id="reconstructedAccentBar" class="gender-accent-bar"></div>
-                    <h3 class="text-xl font-bold mb-4 text-slate-900 flex items-center gap-2">
-                        <svg class="w-5 h-5 text-indigo-600" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd"
-                                d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z"
-                                clip-rule="evenodd"></path>
-                        </svg>
-                        Processed Audio Classification
-                    </h3>
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
-                        <div>
-                            <p class="text-slate-600 text-sm mb-1">Gender</p>
-                            <p id="reconstructedGender" class="text-2xl font-bold text-slate-900">N/A</p>
-                        </div>
-                        <div>
-                            <p class="text-slate-600 text-sm mb-1">Confidence</p>
-                            <p id="reconstructedConfidence" class="text-2xl font-bold text-emerald-600">N/A</p>
-                        </div>
-                        <div>
-                            <p class="text-slate-600 text-sm mb-1">Avg Pitch (F0)</p>
-                            <p id="reconstructedPitch" class="text-2xl font-bold text-indigo-600">N/A</p>
-                        </div>
-                    </div>
-                    <div class="mt-3 text-sm text-slate-600">
-                        Sample Rate: <span id="reconstructedSampleRate" class="text-indigo-600 font-mono">N/A</span> Hz
-                    </div>
-                </div>
-
-                <!-- Updated aliasing analysis card styling -->
-                <div id="aliasingAnalysis"
-                    class="hidden mt-6 p-6 bg-indigo-50 rounded-2xl border-2 border-indigo-200">
-                    <h3 class="text-xl font-bold mb-4 text-slate-900 flex items-center gap-2">
-                        <svg class="w-5 h-5 text-indigo-600" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd"
-                                d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
-                                clip-rule="evenodd"></path>
-                        </svg>
-                        Processing Analysis
-                    </h3>
-                    <div class="space-y-3 text-sm">
-                        <div class="flex justify-between items-center p-3 bg-white rounded-lg border border-indigo-100">
-                            <span class="text-slate-700">Original vs Processed:</span>
-                            <span id="classificationMatch" class="font-bold text-lg text-slate-900">N/A</span>
-                        </div>
-                        <div class="flex justify-between items-center p-3 bg-white rounded-lg border border-indigo-100">
-                            <span class="text-slate-700">Confidence Change:</span>
-                            <span id="confidenceChange" class="font-bold text-lg text-slate-900">N/A</span>
-                        </div>
-                        <div class="flex justify-between items-center p-3 bg-white rounded-lg border border-indigo-100">
-                            <span class="text-slate-700">Pitch Recovery:</span>
-                            <span id="pitchChange" class="font-bold text-lg text-slate-900">N/A</span>
-                        </div>
-                        <div class="p-3 bg-white rounded-lg border border-indigo-100">
-                            <p class="text-slate-700 mb-1">Processing Effect:</p>
-                            <p id="aliasingEffect" class="font-semibold text-slate-900">N/A</p>
-=======
                             <p class="text-gray-600 text-sm mb-1">Gender</p>
                             <p id="originalGender" class="text-2xl font-bold">N/A</p>
                         </div>
@@ -805,25 +366,10 @@
                         <div class="p-3 bg-white bg-opacity-50 rounded-lg">
                             <p class="text-gray-700 mb-1">Aliasing Effect:</p>
                             <p id="aliasingEffect" class="font-semibold text-gray-800">N/A</p>
->>>>>>> Stashed changes
                         </div>
                     </div>
                 </div>
 
-<<<<<<< Updated upstream
-                <p id="messageBox" class="text-sm text-red-600 mt-4 h-5"></p>
-            </section>
-        </div>
-
-        <!-- Updated back button styling -->
-        <a href="/"
-            class="inline-block mt-8 text-lg bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white font-bold py-3 px-8 rounded-full transition-transform hover:scale-105 shadow-lg">
-            ← Back to Dashboard
-        </a>
-    </div>
-
-    <script src="/static/js/voice_processing.js"></script>
-=======
                 <p id="messageBox" class="text-sm text-red-500 mt-4 h-5"></p>
             </section>
         </div>
@@ -832,6 +378,7 @@
             ← Back to Dashboard
         </a>
     </div>
+
     <script>
         const API_BASE = (location.protocol === 'file:') ? 'http://127.0.0.1:5000' : '';
         const apiUrl = (path) => `${API_BASE}${path}`;
@@ -1818,7 +1365,5 @@ function reconstructSignal(downsampledRate, tempDownsampled) {
         // Initial setup on load
         document.addEventListener('DOMContentLoaded', initAudioContext);
     </script>
->>>>>>> Stashed changes
 </body>
-
 </html>

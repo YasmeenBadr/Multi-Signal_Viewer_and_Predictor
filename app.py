@@ -1,9 +1,8 @@
-<<<<<<< Updated upstream
+
 from flask import Flask, render_template, send_from_directory
-=======
+
 from flask import Flask, render_template
 from flask_cors import CORS
->>>>>>> Stashed changes
 # Added 'voice' to the imports to reflect the new module/blueprint
 from signals import eeg, ecg, radar, doppler , sar, voice
 
