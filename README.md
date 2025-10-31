@@ -31,6 +31,7 @@ This repository combines **real-time visualization**, **interactive multi-mode a
      - [Example Results](#example-results-drone)
      - [Model Performance](#model-performance-drone)
      - [Technical Details](#technical-details-drone)
+     - [Audio Downsampling & Aliasing Demo](#downsampling-demo)
    - [SAR Analysis Module](#sar-analysis-module)
      - [How It Works](#how-it-works-sar)
      - [Visualization Outputs](#visualization-outputs-sar)
@@ -394,11 +395,11 @@ When a file is uploaded, the Flask backend:
 ### **Example Results** <a id="example-results-drone"></a>
 
 #### Drone Detected
-![Drone Detected](Radar/YesDrone.png)
+![Drone Detected](Radar/YessDrone.png)
 When the model identifies drone audio with high confidence
 
 #### No Drone Detected  
-![No Drone Detected](Radar/NotDrone.png)
+![No Drone Detected](Radar/NottDrone.png)
 When the model determines no drone presence in the audio
 
 ### **Model Performance** <a id="model-performance-drone"></a>
@@ -415,6 +416,57 @@ When the model determines no drone presence in the audio
 - Inference: GPU-accelerated with torch.no_grad()
 - Output: Softmax probabilities for transparent results
 
+### **Audio Downsampling & Aliasing Demo** <a id="downsampling-demo"></a>
+
+An educational feature that demonstrates how sampling rate affects drone detection accuracy by comparing properly sampled audio against downsampled versions with aliasing artifacts.
+
+#### **How It Works**
+
+When a user uploads audio and selects a target sample rate:
+
+1. **Original Analysis Path:**
+   - Audio is properly resampled to 16 kHz using `resample_signal()` with anti-aliasing
+   - Model inference runs on the clean signal
+   - Baseline accuracy is established
+
+2. **Downsampled Analysis Path:**
+   - Audio is decimated using `decimate_with_aliasing()` to simulate poor hardware sampling
+   - Aliasing artifacts are intentionally introduced (no anti-aliasing filter)
+   - Signal is upsampled back to 16 kHz for model inference
+   - Aliasing effects from step 1 are preserved in the final prediction
+
+3. **Comparison Metrics:**
+   - Confidence drop percentage
+   - Classification change detection
+   - Nyquist frequency limits
+   - Sampling quality assessment
+
+
+
+This demo illustrates the **Nyquist-Shannon Sampling Theorem** in practice:
+- Proper sampling requires `fs ≥ 2 × f_max`
+- Undersampling causes frequency aliasing (high frequencies fold into lower bands)
+- Aliased signals can mislead ML models, reducing detection accuracy
+
+#### **Sampling Quality Levels**
+
+| Target Rate | Nyquist Limit | Status | Aliasing Level |
+|-------------|---------------|--------|----------------|
+| ≥16 kHz | ≥8 kHz | ✓ Properly Sampled | None |
+| 8-16 kHz | 4-8 kHz | ⚠️ Marginal | Light to Moderate |
+| 4-8 kHz | 2-4 kHz | ❌ Undersampled | Moderate to Heavy |
+| <4 kHz | <2 kHz | ❌ Severely Undersampled | Severe |
+
+#### **Example Results**
+
+![Downsampling Demo](Radar/downsampledDrone.png)
+*Side-by-side comparison showing how 4 kHz sampling (heavy aliasing) changes the model's prediction compared to proper 16 kHz sampling*
+
+#### **Technical Notes**
+
+- The downsampling uses simple decimation (taking every Nth sample) without low-pass filtering
+- This intentionally violates the Nyquist criterion to demonstrate aliasing effects
+- Real-world applications should always use proper resampling with anti-aliasing filters
 ---
 
 ## SAR Analysis Module <a id="sar-analysis-module"></a>
@@ -453,7 +505,7 @@ When a GeoTIFF file is uploaded, the Flask backend:
 ### **Example Results** <a id="example-results-sar"></a>
 
 #### SAR Analysis Interface
-![SAR Analysis Website](Radar/SarImage.png)
+![SAR Analysis Website](Radar/Sar.png)
 Web interface showing the three visualization panels generated from SAR data processing
 
 ---
