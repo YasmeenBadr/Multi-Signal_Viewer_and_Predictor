@@ -1,4 +1,21 @@
 <!DOCTYPE html>
+<!--
+  ECG Viewer & Predictor
+  --------------------------------------------------------------
+  Purpose:
+  - Upload WFDB ECG data (e.g., .hea + .dat), select channels, and stream chunks.
+  - Visualize the ECG in multiple modes (Time, XOR, Polar, Recurrence).
+  - Adjust effective sampling to demonstrate aliasing effects at lower rates.
+  - Run simple disease predictors (demo models) on streamed chunks and display results.
+
+  How it works (high level):
+  - Frontend uploads files and requests /ecg/config for metadata (channels, native Fs).
+  - A periodic loop calls /ecg/update to get the next chunk of samples for selected channels.
+  - The backend can decimate to a display sampling rate; the UI slider controls the requested rate.
+  - Predictions are requested separately and summarized in the side panel with brief descriptions.
+  - Each visualization highlights different aspects: raw waveform (Time), difference vs previous (XOR),
+    2D phase-like view (Polar), and point-density structure (Recurrence).
+-->
 <html lang="en">
 <head>
   <meta charset="utf-8" />
@@ -235,9 +252,7 @@
 
   .form-text { color: #475569; }
 
-  /* Remove legacy SVG-based checkmark override */
 
-  /* Heading */
   h1 {
     color: #1e293b;
     text-align: center;
@@ -297,6 +312,12 @@
           <label class="form-label">📁 file upload</label>
           <div id="dropZone">Drop files here or <a href="#" id="pickFiles">choose files</a></div>
           <input id="filePicker" type="file" accept=".hea,.dat,.xyz" multiple style="display:none;" />
+          <!--
+            Upload guidance:
+            - For WFDB records, provide the header (.hea) and data (.dat); they must share the same basename.
+            - Example: recordA.hea and recordA.dat
+            - The server parses the header to discover channels, sample rate, and durations.
+          -->
         </div>
         <div class="mb-2">
           <label class="form-label">📊 Channels</label>
@@ -325,7 +346,7 @@
             <div class="small-muted">Min:10</div>
             <div class="small-muted">Max: 500</div>
           </div>
-          <div class="form-text small-muted">Lower frequency simulates lower-sampling hardware — predictions & signal will change.</div>
+          
         </div>
         <button id="startBtn" class="btn-primary w-100" type="submit" disabled>▶ Start Streaming</button>
         <button id="stopBtn" class="btn btn-secondary w-100 mt-2" type="button">Stop</button>
@@ -336,12 +357,24 @@
       <!-- Time plot -->
       <div class="plot-container plot-card">
         <div id="timePlot" style="width:100%;height:100%;"></div>
+        <!--
+          Time Graph:
+          - Standard waveform view of the currently streamed chunk for selected channels.
+          - Use the window width control to set the visible duration.
+          - Changes in sampling are reflected by the x-axis density and waveform detail.
+        -->
       </div>
 
       <!-- XOR plot -->
       <div class="row">
         <div class="col-12 plot-container plot-card">
           <div id="xorPlot" style="width:100%; height:100%;"></div>
+          <!--
+            XOR View:
+            - Compares current chunk against the reversed previous chunk using a simple thresholded XOR.
+            - Highlights differences in shape and timing between successive windows.
+            - Useful for visual change detection and educational contrast.
+          -->
         </div>
       </div>
 
@@ -356,12 +389,22 @@
               <option value="cumulative">Cumulative</option>
             </select>
           </div>
+          <!--
+            Polar Graph:
+            - Plots the current (or cumulative) chunk in a phase-like polar space to show periodicity.
+            - Fixed mode resets each chunk, while cumulative builds over time to reveal stable patterns.
+          -->
         </div>
       </div>
 
       <!-- Recurrence plot -->
       <div class="plot-container plot-card">
         <div id="recurrenceScatterPlot" style="width:100%;height:400px;"></div>
+        <!--
+          Recurrence Plot (scatter approximation):
+          - A 2D density-like view derived from pairwise structure of the signal window.
+          - Patterns in this space can correlate with rhythm stability or irregularities.
+        -->
       </div>
     </div>
 
@@ -374,6 +417,13 @@
         <div id="recurrencePrediction" style="margin-top:6px; color:#334155; font-size:0.9rem;"></div>
         <div id="diseaseName" class="disease-name"></div>
         <div id="aliasingNote" style="margin-top:6px; color:#ffb74d; font-size:0.85rem;"></div>
+        <!--
+          Prediction panel notes:
+          - The demo models estimate conditions from short ECG chunks. Confidence is a softmax-like score.
+          - At aggressively low sampling rates, aliasing can distort morphology (e.g., R-peaks), which may
+            lower confidence or flip decisions. Use this to study robustness to sampling constraints.
+          - Recurrence analysis summarizes structure in a 2D embedding; its label is shown separately.
+        -->
         <hr style="margin:12px 0;"/>
         <h6 style="font-weight:700; color:#6366f1;">📈 Statistics</h6>
         <div class="stat-item" style="display:flex; justify-content:space-between; padding:4px 0;">
@@ -412,7 +462,7 @@
       </div>
     </div>
 
-    <!-- Removed separate XOR controls card -->
+
   </div>
 </div>
 
@@ -420,13 +470,20 @@
 // ================================================
 // ECG Frontend Orchestrator
 // --------------------------------
-// This script powers the ECG Viewer UI:
-// - Handles file upload of WFDB (.hea/.dat)
-// - Fetches config from backend to learn channels and native Fs
-// - Manages UI state: selected channels, display mode, sampling slider
-// - Requests streaming chunks from /ecg/update and renders plots:
-//     Time plot, XOR view (chunk vs previous), Polar plot, Recurrence density
-// - Coordinates sample-rate adjustments and reflects aliasing in plots
+// Purpose and dataflow
+// - After upload, we query /ecg/config to discover the native sampling rate and channel names.
+// - The frequency slider expresses a requested sampling rate. The server may clamp it to 
+//   [min, native] and uses a unified resampling utility (aliasing decimation when downsampling).
+// - The streaming loop calls /ecg/update to retrieve the next chunk for selected channels and 
+//   refreshes the current visualization. Separate requests may ask for predictions from that chunk.
+// - Each mode focuses on a specific insight:
+//     Time: morphology and amplitude over time
+//     XOR: change vs previous chunk
+//     Polar: periodic structure in polar coordinates
+//     Recurrence: density/structure of the state space
+// Tips
+// - Low sampling rates can cause aliasing which hides high-frequency content and alters morphology.
+// - Compare predictions and waveforms at different slider settings to understand robustness.
 // Structure:
 //   1) Global UI/state variables
 //   2) Channel/montage utilities and UI enabling
@@ -484,31 +541,6 @@ function renderChannelCheckboxes(channelsToShow){
   if(cc){ cc.textContent = String(document.querySelectorAll('#channelList input[name=channels]:checked').length); }
 }
 
-/**
- * Apply a montage preset by mapping human-friendly names to actual indices.
- * If 'all', shows all and pre-selects them. Otherwise filters to listed names.
- */
-function applyMontage(key){
-  const show = {};
-  let names = [];
-  if(key==='none' || key==='all'){
-    Object.assign(show, allAvailableChannels);
-  } else {
-    names = montages[key] || [];
-  }
-  if(names.length>0){
-    names.forEach(n=>{
-      const idx = channelNameMap[cleanChannelName(n)];
-      if(idx!==undefined){ show[idx] = channelIndexToOriginalName[idx]; }
-    });
-  }
-  renderChannelCheckboxes(show);
-  // select all when 'all'
-  if(key==='all'){
-    document.querySelectorAll('#channelList input[name=channels]').forEach(cb=> cb.checked = true);
-  }
-  updateStartEnable();
-}
 // Enable Start only if files uploaded and at least one channel selected
 /**
  * Return currently selected channel indices from the checkbox list (or fallback select).
@@ -548,6 +580,11 @@ function updateStartEnable(){
  * - Sets native/display Fs and slider limits
  * - Loads channel names and renders checkboxes
  * - Prepares UI to allow streaming after upload
+ * - bnghz l UI 3la hasab l settings l gaya mn l ecg(backend)
+ * - by call ecg/config we get the values of the native fs and display fs and the channels name from json file
+ * - byzbt l channels wl slider (yhot l max wl min)(UI only until fetch data sends sampling-freq)
+ * - renderChannelCheckboxes(allAvailableChannels); bt3rd l channels 
+ * - updateStartEnable(); bbt2kd an l start button atf3l bs lma l user l awl y upload file w ykhtar at least one channel
  */
 async function initConfig(){
   try{
@@ -590,17 +627,7 @@ const xorHint = document.getElementById('xorHint');
 let xorDurationSec = 10;
 let xorPeriodSec = 1.0;
 
-// XOR collapsible toggle
-const xorToggleBtn = document.getElementById('xorToggleBtn');
-const xorToggleIcon = document.getElementById('xorToggleIcon');
-const xorControlsContent = document.getElementById('xorControlsContent');
-if(xorToggleBtn && xorControlsContent && xorToggleIcon){
-  xorToggleBtn.addEventListener('click', ()=>{
-    const nowHidden = xorControlsContent.style.display !== '' && xorControlsContent.style.display !== 'block';
-    xorControlsContent.style.display = nowHidden ? 'block' : 'none';
-    xorToggleIcon.style.transform = nowHidden ? 'rotate(0deg)' : 'rotate(-90deg)';
-  });
-}
+
 
 // XOR controls listeners
 if(xorChunkPeriod){ xorChunkPeriod.addEventListener('input', (e)=>{ xorPeriodSec = parseFloat(e.target.value)||1; xorChunkPeriodLabel.textContent = `${xorPeriodSec.toFixed(1)}s`; }); }
@@ -611,7 +638,6 @@ const dropZone = document.getElementById('dropZone');
 const filePicker = document.getElementById('filePicker');
 const startBtn = document.getElementById('startBtn');
 document.getElementById('pickFiles').addEventListener('click', (e)=>{ e.preventDefault(); filePicker.click(); });
-
 ['dragenter','dragover','dragleave','drop'].forEach(evt => dropZone.addEventListener(evt, e=>e.preventDefault()));
 dropZone.addEventListener('dragover', ()=> dropZone.style.borderColor = '#88cc88');
 dropZone.addEventListener('dragleave', ()=> dropZone.style.borderColor = '#a78bfa');
@@ -622,8 +648,12 @@ dropZone.addEventListener('drop', (e)=>{
 filePicker.addEventListener('change', (e)=> handleFiles(e.target.files));
 
 /**
- * Handle dropped/selected files. Uploads as multipart to /ecg/upload.
- * On success, re-initializes config and enables Start when channels selected.
+ * when user darg and drop files -> handlefiles is triggered.
+ * front end sends post request to backend (ecg/upload).
+ * backend receives the files and save them to uploads folder.
+ * identifies files extensions(.hea/.dat) 
+ * backend responds with json .
+ * front end updates UI to allow streaming after upload.
  */
 function handleFiles(fileList){ // upload ECG files
   if(!fileList || fileList.length===0) return;
@@ -928,10 +958,11 @@ function initPlots(channels){
 }
 
 //Sends current selected channels, window size, polar mode, XOR threshold, and sampling frequency to the backend.
-//Backend returns signal data + predictions + aliasing info
+//Backend returns a JSON file containing signal data + predictions + aliasing info
 /**
- * Core streaming loop. Sends UI state to backend and dispatches render updates.
- * - Handles XOR-only mode early (single channel required)
+ * Core streaming loop. Sends UI state to backend (ecg/update).
+ * - Handles XOR-only mode early (single channel required)-> lw akhtar aktr mn one channel byzhr alert w mafesh fetch byhsl
+ * - lw kol haga tamam yb3t post request ll backend bl information
  * - Uses SignalShared.fetchAndDispatchECG to update Time/Polar/Recurrence
  * - Updates sampling label and aliases plot title when downsampled
  * - Shows predictions and recurrence results from server
@@ -1052,13 +1083,6 @@ async function fetchData(){
         }
       }
     } catch(e){}
-
-    if(selectedChannels.length===1 && (mapped === 'all')){
-      const chXOR=selectedChannels[0];
-      const xorChunk=result.xor && result.xor[String(chXOR)] || [];
-      const xvalsXOR=xorChunk.map((_,i)=>globalStart+i/plotFs);
-      try { Plotly.restyle('xorPlot',{x:[xvalsXOR],y:[xorChunk]},[0]); } catch(e){}
-    }
 
     if(filesUploaded){
       const pred=result.prediction||{};
