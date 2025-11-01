@@ -141,13 +141,18 @@
             <div class="info-section">
                 <h4>Statistics</h4>
                 <div class="stat-item"><span class="stat-label">Status</span><span class="stat-value"
-                        id="streamStatus">Idle</span></div>
+                    id="streamStatus">Idle</span></div>
                 <div class="stat-item"><span class="stat-label">Channels</span><span class="stat-value"
-                        id="channelCount">0</span></div>
+                    id="channelCount">0</span></div>
                 <div class="stat-item"><span class="stat-label">Sample Rate</span><span class="stat-value"
-                        id="sampleRate">160 Hz</span></div>
+                    id="sampleRate">160 Hz</span></div>
                 <div class="stat-item"><span class="stat-label">Window</span><span class="stat-value"
-                        id="windowSize">5s</span></div>
+                    id="windowSize">5s</span></div>
+            </div>
+
+            <div class="info-section">
+                <button id="samplingAnalysisButton" class="btn-secondary" style="width: 100%; margin-bottom: 0.5rem;" disabled>🔬 Sampling Analysis</button>
+                <div id="samplingAnalysisResult" style="font-size: 0.9rem; color: var(--text-light);"></div>
             </div>
         </div>
 
@@ -245,6 +250,8 @@
         // Prediction elements
         const predictButton = document.getElementById('predictButton');
         const predictionResults = document.getElementById('predictionResults');
+        const samplingAnalysisButton = document.getElementById('samplingAnalysisButton');
+        const samplingAnalysisResult = document.getElementById('samplingAnalysisResult');
         // COLLAPSE ELEMENTS
         const controlPanel = document.getElementById('controlPanel');
         const mainPlotWrapper = document.getElementById('mainPlotWrapper');
@@ -430,6 +437,13 @@
         widthInput.addEventListener('input', () => { width = parseFloat(widthInput.value) || width; updateWindowStat(); });
         widthInput.addEventListener('change', () => { width = parseFloat(widthInput.value) || width; updateWindowStat(); });
 
+        // --- Sampling Analysis: link to dedicated page ---
+        if (samplingAnalysisButton){
+            samplingAnalysisButton.disabled = false;
+            samplingAnalysisButton.classList.remove('opacity-50','cursor-not-allowed');
+            samplingAnalysisButton.addEventListener('click', ()=>{ window.location.href = '/eeg/sampling'; });
+        }
+
         // --- Button State Management ---
         // Enable/disable buttons based on isStreaming/isPaused and channel selection
         function updateButtonStates() {
@@ -463,6 +477,8 @@
                 predictResampledButton.classList.toggle('opacity-50', !hasChannels);
                 predictResampledButton.classList.toggle('cursor-not-allowed', !hasChannels);
             }
+            // Sampling analysis is a separate page; keep it always enabled
+            if (samplingAnalysisButton) { samplingAnalysisButton.disabled = false; }
         }
 
         // --- DYNAMIC CHANNEL LIST RENDERING ---

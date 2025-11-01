@@ -46,7 +46,6 @@ logger = logging.getLogger("eeg")
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-
 # Streaming parameters
 BASE_CHUNK_SAMPLES = 16
 INITIAL_OFFSET_SAMPLES = 0  # Will be set after file load
@@ -60,33 +59,36 @@ class EEGState:
     """Centralized state management for EEG streaming."""
     
     def __init__(self):
-        # MNE raw object
+        # MNE Raw handle (set after a successful file load)
         self.raw = None
         
-        # Signal properties
-        self.fs = 160  # Sampling frequency
-        self.n_times = 0  # Total samples
-        self.ch_names = []  # Channel names
+        # Signal properties discovered from the file
+        self.fs = 160              # Display/native sampling frequency (Hz)
+        self.n_times = 0           # Total number of samples available
+        self.ch_names = []         # Ordered list of channel labels
         
-        # Streaming state
-        self.current_index = 0  # Current playback position
-        self.initial_offset = 0  # Skip initial samples
+        # Streaming cursor state for incremental chunking
+        self.current_index = 0     # Current read head position in samples
+        self.initial_offset = 0    # Skip an initial segment to avoid headers/artifacts
         
-        # XOR mode state (server-side)
-        self.xor_buffers = {}  # Rolling buffers per channel
-        self.xor_prev_windows = {}  # Previous window per channel
+        # Server-side XOR rolling context per-channel
+        self.xor_buffers = {}      # Channel -> rolling buffer of recent samples
+        self.xor_prev_windows = {} # Channel -> last full window used for XOR diff
         
-        # File loaded flag
+        # Indicates whether a valid file is loaded and ready
         self.loaded = False
     
     def reset_streaming_state(self):
         """Reset streaming-related state."""
+        # Rewind to the initial offset for a clean restart
         self.current_index = self.initial_offset
+        # Clear XOR buffers and previous windows to avoid stale state
         self.xor_buffers = {}
         self.xor_prev_windows = {}
     
     def reset_all(self):
         """Reset all state."""
+        # Reinitialize to default values (equivalent to creating a new instance)
         self.__init__()
 
 
@@ -113,11 +115,19 @@ def calculate_xor_difference_eeg(current_buffer: List[float],
     Returns:
         XOR difference signal
     """
+<<<<<<< Updated upstream
     #Not enough data yet → Return as-is (no comparison possible) 
     if len(current_buffer) < chunk_size:
         return current_buffer
     #First iteration OR size mismatch
     # Nothing to compare against → Return current buffer
+=======
+    # Require at least one full window of data in the current buffer
+    if len(current_buffer) < chunk_size:
+        return current_buffer
+    
+    # If no valid previous window, echo the current window (no diff yet)
+>>>>>>> Stashed changes
     if not previous_window or len(previous_window) != chunk_size:
         return current_buffer
     
@@ -125,18 +135,24 @@ def calculate_xor_difference_eeg(current_buffer: List[float],
     current_window = current_buffer[-chunk_size:]
     
     # Calculate statistics for dynamic threshold
-    mean = np.mean(current_window)
+    mean = np.mean(current_window)         # Unused but illustrative for extensions
     std = np.std(current_window)
-    threshold = std * 0.1  # 10% of standard deviation
+    threshold = std * 0.1                  # 10% of standard deviation as sensitivity
     
     # Compute thresholded difference
     xor_result = []
     for i in range(chunk_size):
+<<<<<<< Updated upstream
         curr_val = current_window[i]  # Sample from current window
         prev_val = previous_window[i] # Same position in previous window
         distance = abs(curr_val - prev_val)
+=======
+        curr_val = current_window[i]       # Current sample value
+        prev_val = previous_window[i]      # Previous window's corresponding sample
+        distance = abs(curr_val - prev_val) # Absolute difference (magnitude change)
+>>>>>>> Stashed changes
         
-        # Show difference if above threshold, else 0
+        # Keep only salient differences: values over threshold
         xor_result.append(distance if distance > threshold else 0)
     
     return xor_result
@@ -145,6 +161,39 @@ def calculate_xor_difference_eeg(current_buffer: List[float],
 # ============================================================================
 # DISEASE PREDICTION MODELS
 # ============================================================================
+
+def _prepare_input_1d(eeg_data: np.ndarray, target_len: int = 1024) -> np.ndarray:
+    # Accept raw EEG data as numpy array (1D or 2D) and ensure a fixed-length 1D vector
+    arr = eeg_data  # Local reference to avoid mutating caller's object
+    # If the array is 2D (e.g., [channels, samples]), flatten to 1D sequence
+    if arr.ndim == 2:
+        arr = arr.flatten()
+    # If longer than the model input length, truncate to target_len
+    if len(arr) > target_len:
+        arr = arr[:target_len]
+    # If shorter, pad with zeros at the tail to reach target_len
+    elif len(arr) < target_len:
+        arr = np.pad(arr, (0, target_len - len(arr)))
+    # Normalize to zero-mean, unit-variance to stabilize model inputs
+    arr = normalize_signal(arr, method='zscore')
+    # Return float32 view to match torch default tensor dtype expectations
+    return arr.astype(np.float32, copy=False)
+
+def _predict_softmax2(model: nn.Module, x1d: np.ndarray, device: torch.device, class_names: List[str]) -> Tuple[int, float, str]:
+    # Convert numpy input to a torch batch tensor of shape [1, D]
+    tensor = torch.from_numpy(x1d).unsqueeze(0).to(device)
+    # Inference-only context: disable gradients for speed/memory
+    with torch.no_grad():
+        # Forward pass through the model to obtain raw logits
+        logits = model(tensor)
+        # Convert logits to probabilities across 2 classes with softmax
+        probs = torch.softmax(logits, dim=1)[0].cpu().numpy()
+        # Argmax to get predicted class index (0 or 1)
+        pred_idx = int(np.argmax(probs))
+        # Confidence is the probability of the predicted class
+        conf = float(probs[pred_idx])
+    # Map index to human-readable class name and return
+    return pred_idx, conf, class_names[pred_idx]
 
 class SimpleDiseasePredictor(nn.Module):
     """Simple neural network for disease prediction."""
@@ -169,31 +218,43 @@ class EpilepsyPredictor:
     """Epilepsy detection from EEG patterns."""
     
     def __init__(self, model_path: Optional[str] = None, device: str = 'auto'):
+        # Select computation device (CPU/GPU) based on availability or explicit choice
         self.device = self._get_device(device)
+        # Optional path to a serialized model checkpoint
         self.model_path = model_path
+        # Lazy-loaded model handle (initialized on first use)
         self.model = None
+        # Two-class names aligned with model output indices [0,1]
         self.class_names = ['Normal', 'Epilepsy']
     
     def _get_device(self, device: str) -> torch.device:
+        # Resolve 'auto' to CUDA if available, otherwise CPU
         if device == 'auto':
             device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        # Return a torch.device instance for downstream use
         return torch.device(device)
     
     def _load_model(self):
         """Load model if available."""
+        # If already loaded, no action needed
         if self.model is not None:
             return
         
-        # Try to find model
+        # Load a lightweight demo model and hydrate weights from checkpoint if provided
         if self.model_path and os.path.exists(self.model_path):
             try:
+                # Create the model architecture on the chosen device
                 self.model = SimpleDiseasePredictor().to(self.device)
+                # Load checkpoint from disk (supports raw state_dict or wrapped dict)
                 checkpoint = torch.load(self.model_path, map_location=self.device)
                 state_dict = checkpoint.get('state_dict', checkpoint)
+                # Tolerate minor key mismatches by setting strict=False
                 self.model.load_state_dict(state_dict, strict=False)
+                # Switch to eval mode for deterministic layers like Dropout
                 self.model.eval()
                 logger.info(f"Loaded epilepsy model from {self.model_path}")
             except Exception as e:
+                # On any failure, fall back to heuristic path
                 logger.warning(f"Failed to load epilepsy model: {e}")
                 self.model = None
     
@@ -207,10 +268,12 @@ class EpilepsyPredictor:
         Returns:
             Tuple of (predicted_class, confidence, class_name)
         """
+        # Ensure model is loaded once before attempting inference
         self._load_model()
         
         # Use pattern analysis if model not available
         if self.model is None:
+            # Fall back to deterministic heuristic scoring when no model is present
             epilepsy_score = self._analyze_epilepsy_patterns(eeg_data)
             
             if epilepsy_score > 0.7:
@@ -220,6 +283,7 @@ class EpilepsyPredictor:
         
         # Use model prediction
         try:
+<<<<<<< Updated upstream
             # Preprocess
             #Converts 2D EEG data (multiple channels × time) to 1D 
             #because  Neural network expects flat input vector
@@ -247,8 +311,16 @@ class EpilepsyPredictor:
                 class_name = self.class_names[predicted_class]
                 
                 return predicted_class, confidence, class_name
+=======
+            # Preprocess raw EEG into a fixed-length normalized 1D vector
+            x1d = _prepare_input_1d(eeg_data, target_len=1024)
+            # Run a two-class softmax prediction and decode to labels
+            predicted_class, confidence, class_name = _predict_softmax2(self.model, x1d, self.device, self.class_names)
+            return predicted_class, confidence, class_name
+>>>>>>> Stashed changes
         
         except Exception as e:
+            # Log and return a conservative default in case of model errors
             logger.error(f"Epilepsy prediction error: {e}")
             return 0, 0.7, "Normal"
     
@@ -302,22 +374,29 @@ class AlzheimerPredictor:
     """Alzheimer's disease detection from EEG patterns."""
     
     def __init__(self, model_path: Optional[str] = None, device: str = 'auto'):
+        # Choose device automatically if requested; otherwise respect explicit device
         self.device = torch.device('cuda' if torch.cuda.is_available() and device == 'auto' else 'cpu')
+        # Optional checkpoint path (if absent -> heuristic only)
         self.model_path = model_path
+        # Lazy-initialized model handle
         self.model = None
+        # Output label names ordered by model logit indices
         self.class_names = ['Normal', 'Alzheimer']
     
     def _load_model(self):
         """Load model if available."""
+        # Skip if already loaded
         if self.model is not None:
             return
         
         if self.model_path and os.path.exists(self.model_path):
             try:
+                # Instantiate demo classifier and hydrate from checkpoint
                 self.model = SimpleDiseasePredictor().to(self.device)
                 checkpoint = torch.load(self.model_path, map_location=self.device)
                 state_dict = checkpoint.get('state_dict', checkpoint)
                 self.model.load_state_dict(state_dict, strict=False)
+                # Switch to eval for deterministic behavior
                 self.model.eval()
                 logger.info(f"Loaded Alzheimer model from {self.model_path}")
             except Exception as e:
@@ -329,6 +408,7 @@ class AlzheimerPredictor:
         self._load_model()
         
         if self.model is None:
+            # Heuristic path: compute score from PSD/entropy patterns
             alzheimer_score = self._analyze_alzheimer_patterns(eeg_data)
             
             if alzheimer_score > 0.2:
@@ -338,26 +418,11 @@ class AlzheimerPredictor:
         
         # Model-based prediction (similar structure as epilepsy)
         try:
-            if eeg_data.ndim == 2:
-                eeg_data = eeg_data.flatten()
-            
-            if len(eeg_data) > 1024:
-                eeg_data = eeg_data[:1024]
-            elif len(eeg_data) < 1024:
-                eeg_data = np.pad(eeg_data, (0, 1024 - len(eeg_data)))
-            
-            eeg_data = normalize_signal(eeg_data, method='zscore')
-            tensor = torch.from_numpy(eeg_data.astype(np.float32)).unsqueeze(0).to(self.device)
-            
-            with torch.no_grad():
-                logits = self.model(tensor)
-                probs = torch.softmax(logits, dim=1)[0].cpu().numpy()
-                
-                predicted_class = 1 if probs[1] > 0.5 else 0
-                confidence = max(probs[0], probs[1])
-                class_name = self.class_names[predicted_class]
-                
-                return predicted_class, confidence, class_name
+            # Normalize and shape to fixed-length vector
+            x1d = _prepare_input_1d(eeg_data, target_len=1024)
+            # Softmax-based 2-class inference
+            predicted_class, confidence, class_name = _predict_softmax2(self.model, x1d, self.device, self.class_names)
+            return predicted_class, confidence, class_name
         
         except Exception as e:
             logger.error(f"Alzheimer prediction error: {e}")
@@ -423,21 +488,28 @@ class SleepDisorderPredictor:
     """Sleep disorder detection from EEG patterns."""
     
     def __init__(self, model_path: Optional[str] = None, device: str = 'auto'):
+        # Auto-select device when requested
         self.device = torch.device('cuda' if torch.cuda.is_available() and device == 'auto' else 'cpu')
+        # Optional on-disk model path
         self.model_path = model_path
+        # Lazy-loaded model
         self.model = None
+        # Two-class naming scheme
         self.class_names = ['Normal', 'Sleep Disorder']
     
     def _load_model(self):
+        # Avoid reloading repeatedly
         if self.model is not None:
             return
         
         if self.model_path and os.path.exists(self.model_path):
             try:
+                # Create simple classifier and load checkpoint
                 self.model = SimpleDiseasePredictor().to(self.device)
                 checkpoint = torch.load(self.model_path, map_location=self.device)
                 state_dict = checkpoint.get('state_dict', checkpoint)
                 self.model.load_state_dict(state_dict, strict=False)
+                # Ensure eval mode for inference
                 self.model.eval()
                 logger.info(f"Loaded sleep disorder model")
             except Exception as e:
@@ -449,6 +521,7 @@ class SleepDisorderPredictor:
         self._load_model()
         
         if self.model is None:
+            # Heuristic estimation based on band ratios and spindles
             score = self._analyze_sleep_patterns(eeg_data)
             
             if score > 0.95:
@@ -458,25 +531,10 @@ class SleepDisorderPredictor:
         
         # Model-based prediction
         try:
-            if eeg_data.ndim == 2:
-                eeg_data = eeg_data.flatten()
-            
-            if len(eeg_data) > 1024:
-                eeg_data = eeg_data[:1024]
-            elif len(eeg_data) < 1024:
-                eeg_data = np.pad(eeg_data, (0, 1024 - len(eeg_data)))
-            
-            eeg_data = normalize_signal(eeg_data, method='zscore')
-            tensor = torch.from_numpy(eeg_data.astype(np.float32)).unsqueeze(0).to(self.device)
-            
-            with torch.no_grad():
-                logits = self.model(tensor)
-                probs = torch.softmax(logits, dim=1)[0].cpu().numpy()
-                predicted_class = int(np.argmax(probs))
-                confidence = float(probs[predicted_class])
-                class_name = self.class_names[predicted_class]
-                
-                return predicted_class, confidence, class_name
+            # Standardized preprocessing + softmax inference
+            x1d = _prepare_input_1d(eeg_data, target_len=1024)
+            predicted_class, confidence, class_name = _predict_softmax2(self.model, x1d, self.device, self.class_names)
+            return predicted_class, confidence, class_name
         
         except Exception as e:
             logger.error(f"Sleep disorder prediction error: {e}")
@@ -546,21 +604,28 @@ class ParkinsonPredictor:
     """Parkinson's disease detection from EEG patterns."""
     
     def __init__(self, model_path: Optional[str] = None, device: str = 'auto'):
+        # Auto device or explicit device
         self.device = torch.device('cuda' if torch.cuda.is_available() and device == 'auto' else 'cpu')
+        # Optional checkpoint path
         self.model_path = model_path
+        # Lazy-loaded model reference
         self.model = None
+        # Order-locked label list
         self.class_names = ['Healthy', 'Parkinson']
     
     def _load_model(self):
+        # Do nothing if model already resident
         if self.model is not None:
             return
         
         if self.model_path and os.path.exists(self.model_path):
             try:
+                # Construct classifier and load weights
                 self.model = SimpleDiseasePredictor().to(self.device)
                 checkpoint = torch.load(self.model_path, map_location=self.device)
                 state_dict = checkpoint.get('state_dict', checkpoint)
                 self.model.load_state_dict(state_dict, strict=False)
+                # Switch to evaluation mode
                 self.model.eval()
                 logger.info(f"Loaded Parkinson model")
             except Exception as e:
@@ -572,6 +637,7 @@ class ParkinsonPredictor:
         self._load_model()
         
         if self.model is None:
+            # Heuristic path using band/entropy/tremor proxies
             score = self._analyze_parkinson_patterns(eeg_data)
             
             if score > 0.95:
@@ -581,25 +647,10 @@ class ParkinsonPredictor:
         
         # Model-based prediction
         try:
-            if eeg_data.ndim == 2:
-                eeg_data = eeg_data.flatten()
-            
-            if len(eeg_data) > 1024:
-                eeg_data = eeg_data[:1024]
-            elif len(eeg_data) < 1024:
-                eeg_data = np.pad(eeg_data, (0, 1024 - len(eeg_data)))
-            
-            eeg_data = normalize_signal(eeg_data, method='zscore')
-            tensor = torch.from_numpy(eeg_data.astype(np.float32)).unsqueeze(0).to(self.device)
-            
-            with torch.no_grad():
-                logits = self.model(tensor)
-                probs = torch.softmax(logits, dim=1)[0].cpu().numpy()
-                predicted_class = int(np.argmax(probs))
-                confidence = float(probs[predicted_class])
-                class_name = self.class_names[predicted_class]
-                
-                return predicted_class, confidence, class_name
+            # Use the same standardized inference path for consistency
+            x1d = _prepare_input_1d(eeg_data, target_len=1024)
+            predicted_class, confidence, class_name = _predict_softmax2(self.model, x1d, self.device, self.class_names)
+            return predicted_class, confidence, class_name
         
         except Exception as e:
             logger.error(f"Parkinson prediction error: {e}")
@@ -782,6 +833,7 @@ def load_eeg_file(filepath: str) -> bool:
     Returns:
         True if successful, False otherwise
     """
+    # Ensure MNE is available for EEG file I/O
     if mne is None:
         logger.error("MNE not available for EEG loading")
         return False
@@ -790,8 +842,12 @@ def load_eeg_file(filepath: str) -> bool:
         # Determine file type
         ext = filepath.lower().split('.')[-1]
         
+<<<<<<< Updated upstream
         #File Loading (Format-Specific) & storing the loaded data 
 
+=======
+        # Read the file with the appropriate MNE reader (preload into memory)
+>>>>>>> Stashed changes
         if ext == 'edf':
             state.raw = mne.io.read_raw_edf(filepath, preload=True, verbose=False)
         elif ext in ['fif', 'gz']:
@@ -803,22 +859,28 @@ def load_eeg_file(filepath: str) -> bool:
 
         #extract sampling rate , channel names, total samples 
         # Update state
-        state.fs = int(state.raw.info["sfreq"])
-        state.n_times = state.raw.n_times
-        state.ch_names = state.raw.ch_names
+        state.fs = int(state.raw.info["sfreq"])  # Native sampling frequency
+        state.n_times = state.raw.n_times         # Total number of samples
+        state.ch_names = state.raw.ch_names       # Channel labels
         
         # Calculate initial offset
+<<<<<<< Updated upstream
         state.initial_offset = state.fs * 10  # Skip first 10 seconds for artifact removal
+=======
+        state.initial_offset = state.fs * 10      # Skip first 10 seconds as warm-up
+>>>>>>> Stashed changes
         state.current_index = min(state.initial_offset, state.n_times)
         
-        state.loaded = True
+        state.loaded = True                        # Mark as ready
         
+        # Log a concise summary for debugging/telemetry
         logger.info(f"Loaded EEG file: {filepath}")
         logger.info(f"Channels: {len(state.ch_names)}, FS: {state.fs} Hz, Duration: {state.n_times / state.fs:.2f}s")
         
         return True
     
     except Exception as e:
+        # On I/O or parsing failures, log stack and signal failure to the caller
         logger.exception(f"Failed to load EEG file: {e}")
         return False
 
@@ -844,49 +906,63 @@ def eeg_sampling_analysis():
 
 def _get_channel_segment(channel_index: int, seconds: float = 5.0):
     """Helper: return a short recent segment for a channel as numpy array."""
+    # Safety: ensure a file is loaded before slicing from raw stream
+    # The global 'state' holds the active MNE Raw object and indices
     if state.raw is None:
         return None, 0
+    # Sampling rate (Hz) pulled from the MNE info dict, fallback to state.fs
     fs = int(state.raw.info.get("sfreq", state.fs))
+    # Compute window length in samples for the requested seconds (>=1 sample)
     win = max(1, int(seconds * fs))
+    # End index is the current playhead or the end of the file, whichever is smaller
     end = min(state.current_index if state.current_index > 0 else state.n_times, state.n_times)
+    # Start index backs off by 'win' samples but never before the recording start
     start = max(0, end - win)
     try:
+        # Read the segment for the single channel into a numpy array
         picked = state.raw.get_data(picks=[channel_index], start=start, stop=end)
+        # MNE returns shape (1, N); flatten to 1D
         seg = picked[0] if picked.ndim == 2 else picked
         return seg.astype(float), fs
     except Exception:
         return None, 0
 
-
+#default route call when opening the page 
+#show confusion matrix for different sampling rates as an example
 @bp.route("/analyze-sampling", methods=["POST"])
 def analyze_sampling():
     """Batch analyze multiple target sampling rates for a channel. Returns metrics per fs."""
     if state.raw is None:
         return jsonify({"success": False, "message": "No file loaded."}), 400
     try:
+        # Parse JSON body: channels array is expected; use first channel
         data = request.get_json() or {}
+        
         channels = data.get("channels", [])
         if not channels:
             return jsonify({"success": False, "message": "No channel provided."}), 400
         ch = int(channels[0])
+        # Extract an ~8s recent window for analysis
         seg, fs = _get_channel_segment(ch, seconds=8.0)
         if seg is None or fs == 0:
             return jsonify({"success": False, "message": "Failed to extract signal segment."}), 500
-        # Target sampling set (down to 10 Hz)
+        # Define candidate target sampling rates down to 10 Hz (inclusive)
         targets = [fs, max(10, fs//2), max(10, fs//4), max(10, fs//8)]
         results = {}
+        # Iterate unique target Fs in descending order for display
         for tfs in sorted(set(int(x) for x in targets if x >= 10), reverse=True):
-            # naive aliasing decimation for demonstration
+            # Apply aliasing decimation intentionally to visualize information loss
             dec = decimate_with_aliasing(seg, native_fs=fs, target_fs=tfs)
-            # metrics (synthetic, deterministic)
+            # Produce deterministic demo metrics for visualization
             res_len = int(len(seg) * (tfs / fs)) if fs > 0 else 0
             ratio = (fs / tfs) if tfs > 0 else 0
-            # simple signal quality
+            # Simple signal quality: SNR approximation and amplitude range
             snr = float(np.mean(seg**2) / (np.var(seg - np.mean(seg)) + 1e-8)) if len(seg) else 0.0
             results[str(tfs)] = {
                 "sampling_ratio": float(ratio),
                 "resampled_length": int(res_len),
                 "metrics": {
+                    # Synthetic classification metrics to illustrate trade-offs
                     "accuracy": max(0.0, min(1.0, 1.0 - (ratio-1)*0.1)),
                     "precision": max(0.0, min(1.0, 1.0 - (ratio-1)*0.12)),
                     "recall": max(0.0, min(1.0, 1.0 - (ratio-1)*0.08)),
@@ -907,25 +983,29 @@ def analyze_sampling():
         logger.exception("analyze-sampling failed")
         return jsonify({"success": False, "message": str(e)}), 500
 
-
+#when upload a file and analyze sampling this route is called
+#the actual sampling analysis
 @bp.route("/get-sampling-signal", methods=["POST"])
 def get_sampling_signal():
     """Return original and resampled signal/time arrays for plotting."""
     if state.raw is None:
         return jsonify({"success": False, "message": "No file loaded."}), 400
     try:
+        # Read channel selection and desired target Fs from the client
         data = request.get_json() or {}
         channels = data.get("channels", [])
         target_fs = int(data.get("target_fs", state.fs))
         if not channels:
             return jsonify({"success": False, "message": "No channel provided."}), 400
         ch = int(channels[0])
+        # Use a ~5s window for side-by-side time comparison
         seg, fs = _get_channel_segment(ch, seconds=5.0)
         if seg is None or fs == 0:
             return jsonify({"success": False, "message": "Failed to extract signal segment."}), 500
+        # Build time axes for original and resampled signals over equal duration
         duration = len(seg) / fs
         t_orig = np.linspace(0, duration, len(seg)).tolist()
-        # downsample with aliasing for demonstration
+        # Apply aliasing decimation to visualize how samples shrink with lower Fs
         res = decimate_with_aliasing(seg, native_fs=fs, target_fs=max(1, target_fs))
         t_res = np.linspace(0, duration, len(res)).tolist()
         return jsonify({
@@ -944,15 +1024,18 @@ def analyze_single_sampling():
     if state.raw is None:
         return jsonify({"success": False, "message": "No file loaded."}), 400
     try:
+        # Expect one channel and a target Fs; return metrics for that single choice
         data = request.get_json() or {}
         channels = data.get("channels", [])
         target_fs = int(data.get("target_fs", state.fs))
         if not channels:
             return jsonify({"success": False, "message": "No channel provided."}), 400
         ch = int(channels[0])
+        # Slightly longer window (~8s) for robust metric estimates
         seg, fs = _get_channel_segment(ch, seconds=8.0)
         if seg is None or fs == 0:
             return jsonify({"success": False, "message": "Failed to extract signal segment."}), 500
+        # Downsample with aliasing and compute sampling ratio vs native
         res = decimate_with_aliasing(seg, native_fs=fs, target_fs=max(1, target_fs))
         ratio = (fs / target_fs) if target_fs > 0 else 0
         result = {
@@ -969,6 +1052,7 @@ def analyze_single_sampling():
                 "true_positive": int(90 * max(0.0, min(1.0, 1.0 - (ratio-1)*0.15)))
             },
             "signal_quality": {
+                # Signal quality snapshot from the original segment
                 "snr": float(np.mean(seg**2) / (np.var(seg - np.mean(seg)) + 1e-8)) if len(seg) else 0.0,
                 "variance": float(np.var(seg)),
                 "range": float(np.max(seg) - np.min(seg))
@@ -983,26 +1067,31 @@ def analyze_single_sampling():
 @bp.route("/upload", methods=["POST"])
 def upload_file():
     """Upload EEG file."""
+    # Validate multi-part form has a 'file' field
     if 'file' not in request.files:
         return jsonify({"success": False, "message": "No file part"}), 400
     
+    # Extract the werkzeug FileStorage object
     file = request.files['file']
+    # Ensure a filename was provided (not an empty selection)
     if file.filename == '':
         return jsonify({"success": False, "message": "No selected file"}), 400
     
-    # Save file
+    # Prepare disk destination for persistent storage
     upload_dir = 'uploads'
-    os.makedirs(upload_dir, exist_ok=True)
+    os.makedirs(upload_dir, exist_ok=True)  # Create folder if missing
     filepath = os.path.join(upload_dir, file.filename)
     
     try:
+        # Save the uploaded file bytes to disk
         file.save(filepath)
         
-        # Load EEG file
+        # Attempt to parse and load EEG using MNE (supports EDF/FIF)
         if load_eeg_file(filepath):
-            # Map channels
+            # Build channel info mapping index->name for the frontend
             ch_info = {i: name for i, name in enumerate(state.ch_names)}
             
+            # Return success response with discovered metadata
             return jsonify({
                 "success": True,
                 "message": f"File {file.filename} loaded successfully.",
@@ -1010,12 +1099,14 @@ def upload_file():
                 "fs": state.fs
             })
         else:
+            # Loading failed (unsupported format or parsing error)
             return jsonify({
                 "success": False,
                 "message": "Failed to load EEG file. Check format (EDF or FIF)."
             }), 500
     
     except Exception as e:
+        # Log and surface a structured error if saving/loading throws
         logger.exception(f"Upload error: {e}")
         return jsonify({
             "success": False,
