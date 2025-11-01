@@ -37,8 +37,8 @@ This repository combines **real-time visualization**, **interactive multi-mode a
      - [Visualization Outputs](#visualization-outputs-sar)
      - [Example Results](#example-results-sar)
 8. [Voice Processing Suite](#Voice-Processing-Suite)
-     - [System Architecture](#system-architecture)
-     - [Features](#features)
+     - [System Architecture](#voice-system-architecture)
+     - [Features](#voice-features)
      - [Technical Implementation](#technical-implementation)
      - [Signal Processing Algorithms](#signal-processing-algorithms)
      - [Gender Classification](#gender-classification)
@@ -536,7 +536,7 @@ The **Voice Processing Suite** is a comprehensive web-based application for voic
 
 ---
 
-## System Architecture
+## System Architecture <a id="voice-system-architecture"></a>
 
 ### Frontend (HTML/JavaScript)
 ```
@@ -579,7 +579,7 @@ voice-gender-classifier/model.py
 
 ---
 
-## Features
+## Features <a id="voice-features"></a>
 
 ### 1. Voice Recording
 **Description**: Record voice directly from browser using microphone.
