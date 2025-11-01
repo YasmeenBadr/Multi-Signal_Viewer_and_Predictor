@@ -3,7 +3,7 @@
   ECG Viewer & Predictor
   --------------------------------------------------------------
   Purpose:
-  - Upload WFDB ECG data (e.g., .hea + .dat), select channels, and stream chunks.
+  - Upload WFDB ECG data (e.g., .hea + .dat), selectchannels, and stream chunks.
   - Visualize the ECG in multiple modes (Time, XOR, Polar, Recurrence).
   - Adjust effective sampling to demonstrate aliasing effects at lower rates.
   - Run simple disease predictors (demo models) on streamed chunks and display results.
@@ -934,19 +934,23 @@ function initPlots(channels){
     fitPlotToContainer('xorPlot');
   }
 
-  const polarTraces = channels.map(ch=>({r:[],theta:[],mode:"lines",type:"scatterpolar",name:"",showlegend:false,hoverinfo:'none'}));
-  Plotly.newPlot("polarPlot", polarTraces, {title:{ text:'Polar Plot', x:0.5, xanchor:'center' }, paper_bgcolor:"#ffffff", font:{color:"#1e293b"}, margin:{l:60,r:14,t:48,b:52}, autosize:true, polar:{bgcolor:'#ffffff', radialaxis:{gridcolor:'#e2e8f0', color:'#1e293b'}, angularaxis:{gridcolor:'#e2e8f0', color:'#1e293b'}}, showlegend:false}, {responsive:true, displayModeBar:false, displaylogo:false});
+  // Initialize Polar via shared helper
+  try{
+    const initColors = ["#A855F7","#D946EF","#7C3AED","#C084FC","#E879F9","#A78BFA","#9333EA","#E9D5FF","#C026D3","#F0ABFC"];
+    SignalShared.initPolarPlot("polarPlot", channels, nameMap, widthSec, (polarMode === 'cumulative'), initColors,
+      { title: { text: 'Polar Plot', x: 0.5, xanchor: 'center' }, paper_bgcolor: '#ffffff', plot_bgcolor: '#ffffff', font: { color: '#1e293b' }, margin: { l: 60, r: 14, t: 48, b: 52 }, polar: { bgcolor: '#ffffff', radialaxis: { gridcolor: '#e2e8f0', color: '#1e293b' }, angularaxis: { gridcolor: '#e2e8f0', color: '#1e293b' } } }
+    );
+  }catch(e){}
   fitPlotToContainer('polarPlot');
 
   if(channels.length===2){
     const names = channels.map(ch=> (nameMap && nameMap[String(ch)]) ? nameMap[String(ch)] : `Lead ${ch+1}`);
-    // Initialize as histogram2d to match SignalShared.updateRecurrencePlot
-    Plotly.newPlot("recurrenceScatterPlot", [
-      { x:[], y:[], type:"histogram2d", colorscale:colormap, showscale:true, name:'Density' }
-    ], {
-      title:{ text:'Recurrence (density)', x:0.5, xanchor:'center' }, paper_bgcolor:'#ffffff', plot_bgcolor:'#ffffff', font:{color:'#1e293b'}, margin:{l:60,r:14,t:48,b:52}, autosize:true,
-      xaxis:{title:{text:names[0], standoff:10}, color:'#1e293b', gridcolor:'#e2e8f0'}, yaxis:{title:{text:names[1], standoff:10}, color:'#1e293b', gridcolor:'#e2e8f0'}
-    }, {responsive:true, displayModeBar:false, displaylogo:false});
+    // Initialize Recurrence via shared helper
+    try{
+      SignalShared.initRecurrencePlot("recurrenceScatterPlot", names[0], names[1], colormap,
+        { title: { text: 'Recurrence (density)', x: 0.5, xanchor: 'center' }, paper_bgcolor: '#ffffff', plot_bgcolor: '#ffffff', font: { color: '#1e293b' }, margin: { l: 60, r: 14, t: 48, b: 52 }, xaxis: { title: { text: names[0], standoff: 10 }, color: '#1e293b', gridcolor: '#e2e8f0' }, yaxis: { title: { text: names[1], standoff: 10 }, color: '#1e293b', gridcolor: '#e2e8f0' } }
+      );
+    }catch(e){}
     fitPlotToContainer('recurrenceScatterPlot');
   } else {
     // Leave existing figure; fetchData gating will avoid updating until valid
