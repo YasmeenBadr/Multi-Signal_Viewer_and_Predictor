@@ -113,13 +113,15 @@ def calculate_xor_difference_eeg(current_buffer: List[float],
     Returns:
         XOR difference signal
     """
+    #Not enough data yet → Return as-is (no comparison possible) 
     if len(current_buffer) < chunk_size:
         return current_buffer
-    
+    #First iteration OR size mismatch
+    # Nothing to compare against → Return current buffer
     if not previous_window or len(previous_window) != chunk_size:
         return current_buffer
     
-    # Get current window
+    # Take last chunk_size samples from buffer
     current_window = current_buffer[-chunk_size:]
     
     # Calculate statistics for dynamic threshold
@@ -130,8 +132,8 @@ def calculate_xor_difference_eeg(current_buffer: List[float],
     # Compute thresholded difference
     xor_result = []
     for i in range(chunk_size):
-        curr_val = current_window[i]
-        prev_val = previous_window[i]
+        curr_val = current_window[i]  # Sample from current window
+        prev_val = previous_window[i] # Same position in previous window
         distance = abs(curr_val - prev_val)
         
         # Show difference if above threshold, else 0
@@ -219,10 +221,13 @@ class EpilepsyPredictor:
         # Use model prediction
         try:
             # Preprocess
+            #Converts 2D EEG data (multiple channels × time) to 1D 
+            #because  Neural network expects flat input vector
             if eeg_data.ndim == 2:
                 eeg_data = eeg_data.flatten()
-            
-            # Resize to model input
+
+
+            # Resize to model input to keep exactly 1024 input features for the neural network
             if len(eeg_data) > 1024:
                 eeg_data = eeg_data[:1024]
             elif len(eeg_data) < 1024:
@@ -251,12 +256,13 @@ class EpilepsyPredictor:
         """Analyze EEG for epilepsy-specific patterns."""
         try:
             # Statistical features
+            #Calculate standard deviation of EEG signal
             std_amp = np.std(eeg_data)
             
-            # Spike detection
+            # Spike detection ->amplitude jumps
             diff = np.diff(eeg_data)
             spike_threshold = std_amp * 2
-            spikes = np.sum(np.abs(diff) > spike_threshold)
+            spikes = np.sum(np.abs(diff) > spike_threshold) 
             spike_ratio = spikes / len(diff) if len(diff) > 0 else 0
             
             # Sharp waves
@@ -784,6 +790,8 @@ def load_eeg_file(filepath: str) -> bool:
         # Determine file type
         ext = filepath.lower().split('.')[-1]
         
+        #File Loading (Format-Specific) & storing the loaded data 
+
         if ext == 'edf':
             state.raw = mne.io.read_raw_edf(filepath, preload=True, verbose=False)
         elif ext in ['fif', 'gz']:
@@ -792,13 +800,15 @@ def load_eeg_file(filepath: str) -> bool:
             logger.error(f"Unsupported file format: {ext}")
             return False
         
+
+        #extract sampling rate , channel names, total samples 
         # Update state
         state.fs = int(state.raw.info["sfreq"])
         state.n_times = state.raw.n_times
         state.ch_names = state.raw.ch_names
         
         # Calculate initial offset
-        state.initial_offset = state.fs * 10  # Skip first 10 seconds
+        state.initial_offset = state.fs * 10  # Skip first 10 seconds for artifact removal
         state.current_index = min(state.initial_offset, state.n_times)
         
         state.loaded = True
@@ -1016,6 +1026,7 @@ def upload_file():
 @bp.route("/update", methods=["POST"])
 def update():
     """Stream EEG data update."""
+    #Validation
     if state.raw is None:
         return jsonify({
             "n_samples": 0,
@@ -1027,7 +1038,8 @@ def update():
     try:
         data = request.get_json()
         
-        # Parse parameters
+        # Get requested channel indices from frontend
+        #and Validate they exist in the loaded file
         channels = validate_channels(
             data.get("channels", []),
             max_channels=len(state.ch_names)
@@ -1040,18 +1052,18 @@ def update():
                 
             })
         
-        mode = data.get("mode", "time")
-        width = float(data.get("width", 5))
+        mode = data.get("mode", "time")   
+        width = float(data.get("width", 5))   # Window size in seconds
         downsample_factor = data.get("downsample_factor", 1)
         
         # Calculate chunk size
-        chunk_samples = BASE_CHUNK_SAMPLES
+        chunk_samples = BASE_CHUNK_SAMPLES  # Fixed: 16 samples per call
         
-        # Get data chunk
-        start = state.current_index
-        stop = start + chunk_samples
+        # Read Data Chunk from File
+        start = state.current_index # Current reading position 
+        stop = start + chunk_samples   # Read next 16 samples
         
-        # Handle wrap-around
+        # Handle  End-of-File   wrap-around
         if stop > state.n_times:
             stop = state.n_times
             chunk_samples = stop - start
@@ -1072,20 +1084,23 @@ def update():
         
         # Apply downsampling if requested
         if downsample_factor > 1:
-            picked_downsampled = []
-            for ch_idx in range(picked.shape[0]):
+            picked_downsampled = [] #Create empty list to store downsampled channels
+            #Loop through each channel
+            for ch_idx in range(picked.shape[0]): #picked.shape[0] = number of channels
                 downsampled = decimate_with_aliasing(
                     picked[ch_idx],
                     native_fs=state.fs,
                     target_fs=max(1, state.fs // downsample_factor)
                 )
                 picked_downsampled.append(downsampled)
+            #Convert list back to numpy array    
             picked = np.array(picked_downsampled)
         
         
-        # Build signals dictionary
+        # Build Response
         signals = {
-            str(ch): picked[i].tolist()
+            # Convert numpy array to JSON-friendly list
+            str(ch): picked[i].tolist() 
             for i, ch in enumerate(channels)
         }
         
@@ -1096,21 +1111,28 @@ def update():
         }
         
         # Server-side XOR computation
+
         if mode == "xor" and len(channels) == 1 and picked.shape[0] == 1:
+             # Get the selected channel number (only one channel is supported for XOR)
             ch = int(channels[0])
             new_samples = signals[str(ch)]
             
-            # Initialize buffers
+            # Initialize buffers if they don't exist yet
+            #xor_buffers[ch] → holds the rolling buffer of recent samples
+            # xor_prev_windows[ch] → stores the last full window for comparison
             if ch not in state.xor_buffers:
                 state.xor_buffers[ch] = []
             if ch not in state.xor_prev_windows:
                 state.xor_prev_windows[ch] = []
             
-            # Rolling buffer
+           # Define window size in samples (width in seconds × sampling frequency)
             chunk_size = max(1, int(width * state.fs))
             
             buf = state.xor_buffers[ch]
             buf.extend(new_samples)
+
+             # Keep only the most recent samples 
+             # so the buffer length equals chunk_size
             if len(buf) > chunk_size:
                 del buf[0:len(buf) - chunk_size]
             
@@ -1121,7 +1143,8 @@ def update():
                 chunk_size
             )
             
-            # Update previous window
+            # Update previous window 
+            # (used in the next iteration for comparison)
             if len(buf) == chunk_size:
                 state.xor_prev_windows[ch] = buf[-chunk_size:].copy()
             

@@ -122,8 +122,16 @@
       method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload)
     });
     if (result.message === 'No file loaded.') return { stop: true, globalTime };
-    if (!result.signals || typeof result.n_samples === 'undefined' || result.n_samples === 0){
-      if (!result.band_power || Object.keys(result.band_power).length === 0) return { globalTime };
+    // If not XOR mode, require signals/n_samples as before. For XOR, allow updates based on result.xor
+    if (payload.mode !== 'xor'){
+      if (!result.signals || typeof result.n_samples === 'undefined' || result.n_samples === 0){
+        if (!result.band_power || Object.keys(result.band_power).length === 0) return { globalTime };
+      }
+    } else {
+      // XOR mode: if neither xor nor signals present, nothing to do
+      const hasXor = Array.isArray(result.xor) || (result.xor && typeof result.xor === 'object' && Object.keys(result.xor).length>0);
+      const hasSignals = result.signals && Object.keys(result.signals).length>0;
+      if (!hasXor && !hasSignals) return { globalTime };
     }
 
     const fs = state.fs, nativeFs = state.nativeFs, width = state.width;
@@ -172,12 +180,55 @@
       const chX = selected[0], chY = selected[1];
       buffers.__windowSec = width; buffers.__windowPoints = Math.round(width * fs);
       SS.updateRecurrencePlot(ids.singleId, chX, chY, result.signals, nativeFs, fs, buffers, SS.resampleWithAliasing, names, globalTime);
+    } else if (payload.mode === 'xor'){
+      // XOR mode expects a single-plot target and single selected channel
+      const singleId = ids.singleId;
+      // EEG backend returns either an array or dict; normalize
+      let xorArr = [];
+      if (Array.isArray(result.xor)) xorArr = result.xor || [];
+      else if (result.xor && selected.length === 1) xorArr = result.xor[String(selected[0])] || [];
+      // Use current fs from state as plotFs for time-within-chunk
+      const plotFs = fs;
+      const opts = state && state.xorOpts ? state.xorOpts : { threshold: 0.05, periodSec: 1.0, durationSec: 10 };
+      SS.updateXorPlot(singleId, xorArr, plotFs, opts);
     }
 
     // Band power update (if present)
     
 
     return { globalTime };
+  };
+
+  // --- XOR shared helpers ---
+  SS.initXorPlot = function(targetId, layoutOverrides){
+    const traces = [{ x: [], y: [], mode: 'markers', marker: { size: 6, color: '#3b82f6' }, showlegend: false, hoverinfo: 'x+y' }];
+    const layout = {
+      title: { text: 'XOR: Chunk N vs Chunk N-1', x: 0.5, xanchor: 'center' },
+      paper_bgcolor: '#ffffff', plot_bgcolor: '#ffffff', font: { color: '#1e293b' },
+      margin: { l: 60, r: 14, t: 48, b: 52 }, autosize: true,
+      xaxis: { title: { text: 'Time within Chunk [s]', standoff: 10 }, gridcolor: '#e2e8f0' },
+      yaxis: { title: { text: 'Absolute Difference', standoff: 10 }, gridcolor: '#e2e8f0' },
+      showlegend: false
+    };
+    if (layoutOverrides && typeof layoutOverrides === 'object') Object.assign(layout, layoutOverrides);
+    Plotly.newPlot(targetId, traces, layout, { responsive: true, displayModeBar: false, displaylogo: false });
+  };
+
+  // Update XOR scatter points based on threshold, period and duration window
+  SS.updateXorPlot = function(targetId, xorArray, plotFs, { threshold = 0.05, periodSec = 1.0, durationSec = 10 } = {}){
+    try{
+      const y = []; const x = [];
+      const arr = Array.isArray(xorArray) ? xorArray : [];
+      for (let i = 0; i < arr.length; i++){
+        const v = Math.abs(arr[i]);
+        if (v > threshold){ y.push(v); x.push((i / Math.max(1, plotFs)) % Math.max(0.001, periodSec)); }
+      }
+      const maxPts = Math.max(1, Math.floor(durationSec * Math.max(1, plotFs)));
+      const xs = x.slice(-maxPts);
+      const ys = y.slice(-maxPts);
+      Plotly.restyle(targetId, { x: [xs], y: [ys], mode: ['markers'] }, [0]);
+      Plotly.relayout(targetId, { 'xaxis.range': [0, Math.max(0.001, periodSec)], 'yaxis.autorange': true });
+    }catch(e){}
   };
 
   // Safe JSON fetch with helpful error messages
