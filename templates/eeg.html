@@ -15,9 +15,9 @@
     <!-- Header: Title + Mode Switch Buttons -->
     <div class="header">
         <h1>EEG Viewer</h1>
-
         <div class="nav">
             <button id="timeModeButton" class="btn-secondary" type="button">Time Graph</button>
+            <button id="xorModeButton" class="btn-secondary" type="button">XOR Graph</button>
             <button id="polarModeButton" class="btn-secondary" type="button">Polar Graph</button>
             <button id="recurrenceModeButton" class="btn-secondary" type="button">Recurrence Graph</button>
         </div>
@@ -53,16 +53,17 @@
                 <h3>⚙️ Settings</h3>
                 <div class="form-group">
                     <label>Window (seconds)</label>
-                    <input id="width" type="number" min="0.5" step="0.5" value="5" />
+                    <input id="width" type="number" min="0.5" step="0.5" value="5"/>
                 </div>
                 <div class="form-group">
                     <label>Stream Speed (x)</label>
-                    <input id="speedMultiplier" type="number" min="0.1" max="5.0" step="0.1" value="1.0" />
+                    <input id="speedMultiplier" type="number" min="0.1" max="5.0" step="0.1" value="1.0"/>
                 </div>
                 <div class="form-group" id="graphModeGroup" style="display:none;">
                     <label>Display Mode</label>
                     <select id="graphMode">
                         <option value="time">Time Graph (Multi-Channel Stacked)</option>
+                        <option value="xor">XOR Graph (Chunk vs Previous)</option>
                         <option value="polar">Polar Graph (Multi-Channel)</option>
                         <option value="recurrence">Recurrence Graph (ChX vs ChY Density Heatmap)</option>
                     </select>
@@ -73,8 +74,7 @@
                 <h3>🔧 Advanced</h3>
                 <div class="form-group" id="fsContainer">
                     <label>Sampling Frequency (Hz) <span id="fsValue" class="form-text"></span></label>
-                    <input id="fsSlider" type="range" min="1" max="160" value="160" step="1"
-                        style="width: 100%; cursor: pointer;" />
+                    <input id="fsSlider" type="range" min="1" max="160" value="160" step="1" style="width: 100%; cursor: pointer;"/>
                 </div>
                 <div class="form-group" id="colormapContainer" style="display:none;">
                     <label>Colormap</label>
@@ -87,7 +87,23 @@
                     </select>
                 </div>
                 <div class="form-group" id="mainPolarModeContainer" style="display:none;">
-                    <label><input type="checkbox" id="mainCumulativePolarCheckbox" /> Cumulative Polar Plot</label>
+                    <label><input type="checkbox" id="mainCumulativePolarCheckbox"/> Cumulative Polar Plot</label>
+                </div>
+            </div>
+
+            <div class="sidebar-section" id="xorControls" style="display:none;">
+                <h3>⊻ XOR Settings</h3>
+                <div class="form-group">
+                    <label>Threshold: <span id="xorThresholdLabel">0.00</span></label>
+                    <input id="xorThreshold" type="range" min="0" max="1" value="0.00" step="0.01" style="width: 100%; cursor: pointer;"/>
+                </div>
+                <div class="form-group">
+                    <label>Chunk Period: <span id="xorChunkPeriodLabel">1.0s</span></label>
+                    <input id="xorChunkPeriod" type="range" min="0.2" max="5.0" value="1.0" step="0.1" style="width: 100%; cursor: pointer;"/>
+                </div>
+                <div class="form-group">
+                    <label>Display Duration: <span id="xorDurationLabel">10s</span></label>
+                    <input id="xorDuration" type="range" min="2" max="60" value="10" step="1" style="width: 100%; cursor: pointer;"/>
                 </div>
             </div>
 
@@ -96,8 +112,7 @@
                     <button id="startContinueButton" class="btn-primary" type="button">▶ Start Streaming</button>
                     <button id="pauseButton" class="btn-secondary" type="button" disabled>⏸ Pause</button>
                 </div>
-                <button id="stopButton" class="btn-secondary" type="button" style="width: 100%; margin-top: 0.75rem;"
-                    disabled>◼ Stop & Reset</button>
+                <button id="stopButton" class="btn-secondary" type="button" style="width: 100%; margin-top: 0.75rem;" disabled>◼ Stop & Reset</button>
             </div>
         </div>
 
@@ -114,18 +129,12 @@
             <div class="info-section">
                 <h4>Prediction</h4>
                 <div class="prediction-box">
-                    <button id="predictButton" class="btn-primary" style="width: 100%; margin-bottom: 0.5rem;"
-                        disabled>🧠 Run Disease Predictions</button>
-                    <button id="predictResampledButton" class="btn-secondary" style="width: 100%; margin-bottom: 1rem;"
-                        disabled>🧠 Predict at Selected FS</button>
+                    <button id="predictButton" class="btn-primary" style="width: 100%; margin-bottom: 0.5rem;" disabled>🧠 Run Disease Predictions</button>
+                    <button id="predictResampledButton" class="btn-secondary" style="width: 100%; margin-bottom: 1rem;" disabled>🧠 Predict at Selected FS</button>
 
                     <div id="predictionResults" style="font-size: 0.9rem; color: var(--text-light);">
-                        <div style="text-align: center; padding: 1rem;">Click "Run Disease Predictions" to analyze EEG
-                            data.</div>
+                        <div style="text-align: center; padding: 1rem;">Click "Run Disease Predictions" to analyze EEG data.</div>
                     </div>
-                    <a id="samplingAnalysisUnderPrediction" href="/eeg/sampling" class="btn-secondary"
-                        style="width:100%; margin-top:0.75rem; text-align:center; display:inline-block;">Sampling
-                        Analysis</a>
                 </div>
             </div>
 
@@ -211,6 +220,7 @@
         // Mode selection
         const graphModeSelector = document.getElementById('graphMode');
         const timeModeButton = document.getElementById('timeModeButton');
+        const xorModeButton = document.getElementById('xorModeButton');
         const polarModeButton = document.getElementById('polarModeButton');
         const recurrenceModeButton = document.getElementById('recurrenceModeButton');
 
@@ -222,7 +232,16 @@
         const mainCumulativePolarCheckbox = document.getElementById('mainCumulativePolarCheckbox');
         const colormapContainer = document.getElementById('colormapContainer');
         const colormapSelector = document.getElementById('colormapSelector');
-
+        // XOR controls
+        const xorControls = document.getElementById('xorControls');
+        const xorThresholdInput = document.getElementById('xorThreshold');
+        const xorThresholdLabel = document.getElementById('xorThresholdLabel');
+        const xorChunkPeriod = document.getElementById('xorChunkPeriod');
+        const xorChunkPeriodLabel = document.getElementById('xorChunkPeriodLabel');
+        const xorDuration = document.getElementById('xorDuration');
+        const xorDurationLabel = document.getElementById('xorDurationLabel');
+        let xorPeriodSec = 1.0;
+        let xorDurationSec = 10;
         // Prediction elements
         const predictButton = document.getElementById('predictButton');
         const predictionResults = document.getElementById('predictionResults');
@@ -305,7 +324,7 @@
                         updateUrl: '/eeg/update',
                         payload: { channels: selected, width, mode: graphModeSelector.value },
                         ids: { timePrefix: 'plot-ch-', singleId: 'single-plot' },
-                        state: { fs, nativeFs, width, isCumulativePolar },
+                        state: { fs, nativeFs, width, isCumulativePolar, xorOpts: { threshold: parseFloat(xorThresholdInput?.value)||0.05, periodSec: xorPeriodSec, durationSec: xorDurationSec } },
                         selected,
                         buffers: channelDataBuffers,
                         names: channelIndexToOriginalName,
@@ -361,12 +380,11 @@
                             updateUrl: '/eeg/update',
                             payload: { channels: selected, width, mode: graphModeSelector.value },
                             ids: { timePrefix: 'plot-ch-', singleId: 'single-plot', bandId: 'band-power' },
-                            state: { fs, nativeFs, width, isCumulativePolar },
+                            state: { fs, nativeFs, width, isCumulativePolar, xorOpts: { threshold: parseFloat(xorThresholdInput?.value)||0.05, periodSec: xorPeriodSec, durationSec: xorDurationSec } },
                             selected,
                             buffers: channelDataBuffers,
                             names: channelIndexToOriginalName,
                             colors,
-
                             globalTime
                         });
                         /*If the backend response (out) contains a stop flag → stop streaming entirely.
@@ -426,7 +444,6 @@
             } else {
                 startContinueButton.innerHTML = '<span class="mr-1 text-lg" style="color:#00eaff;">▶</span> <span style="color:#00eaff;">Start Streaming</span>';
             }
-
             pauseButton.disabled = !isStreaming || isPaused;
             pauseButton.classList.toggle('opacity-50', !isStreaming || isPaused);
             pauseButton.classList.toggle('cursor-not-allowed', !isStreaming || isPaused);
@@ -490,9 +507,16 @@
                 channelInstructions.classList.remove('hidden');
                 channelInstructions.innerHTML = '⚠️ **RECURRENCE GRAPH (Phase Space Density):** Please select **two channels (ChX and ChY)** to generate a density heatmap of their relationship.';
                 colormapContainer.style.display = '';
+            } else if (currentMode === 'xor') {
+                channelInstructions.classList.remove('hidden');
+                channelInstructions.innerHTML = 'ℹ️ XOR Graph compares the current chunk vs the previous for a single channel. Please select exactly one channel.';
+                if (xorControls) xorControls.style.display = '';
             } else if (currentMode === 'polar') {
                 // Show polar mode controls in main plot area
                 mainPolarModeContainer.style.display = '';
+                if (xorControls) xorControls.style.display = 'none';
+            } else {
+                if (xorControls) xorControls.style.display = 'none';
             }
 
         }
@@ -507,6 +531,7 @@
         function updateModeButtonsActive() {
             const mode = graphModeSelector.value;
             if (timeModeButton) timeModeButton.classList.toggle('active', mode === 'time');
+            if (xorModeButton) xorModeButton.classList.toggle('active', mode === 'xor');
             if (polarModeButton) polarModeButton.classList.toggle('active', mode === 'polar');
             if (recurrenceModeButton) recurrenceModeButton.classList.toggle('active', mode === 'recurrence');
         }
@@ -515,6 +540,13 @@
         if (timeModeButton) {
             timeModeButton.addEventListener('click', () => {
                 graphModeSelector.value = 'time';
+                graphModeSelector.dispatchEvent(new Event('change'));
+                if (isStreaming) { stopStreaming(); }
+            });
+        }
+        if (xorModeButton) {
+            xorModeButton.addEventListener('click', () => {
+                graphModeSelector.value = 'xor';
                 graphModeSelector.dispatchEvent(new Event('change'));
                 if (isStreaming) { stopStreaming(); }
             });
@@ -533,6 +565,11 @@
                 if (isStreaming) { stopStreaming(); }
             });
         }
+
+        // XOR controls listeners
+        if (xorThresholdInput) xorThresholdInput.addEventListener('input', (e)=>{ const v = parseFloat(e.target.value)||0.05; xorThresholdLabel.textContent = v.toFixed(2); });
+        if (xorChunkPeriod) xorChunkPeriod.addEventListener('input', (e)=>{ xorPeriodSec = parseFloat(e.target.value)||1.0; xorChunkPeriodLabel.textContent = `${xorPeriodSec.toFixed(1)}s`; });
+        if (xorDuration) xorDuration.addEventListener('input', (e)=>{ xorDurationSec = parseInt(e.target.value)||10; xorDurationLabel.textContent = `${xorDurationSec}s`; });
 
         // --- FILE UPLOAD HANDLERS ---
         // Handle EDF/FIF upload -> POST /eeg/upload and hydrate UI state
@@ -654,10 +691,18 @@
                 if (rawSelected.length != 2) {
                     Plotly.purge(plotDiv.id);
                     plotDiv.innerHTML = '<div style="width:100%;height:100%;"><div class="text-center p-10 text-xl text-red-400">Recurrence Graph requires at least **TWO** channels (ChX and ChY).</div></div>';
-                    updateButtonStates();
+                    updateButtonStates(); 
                     return;
                 }
-                selected = [rawSelected[0], rawSelected[1]];
+                selected = [rawSelected[0], rawSelected[1]]; 
+            } else if (mode === "xor") {
+                if (rawSelected.length != 1) {
+                    Plotly.purge(plotDiv.id);
+                    plotDiv.innerHTML = '<div style="width:100%;height:100%;"><div class="text-center p-10 text-xl text-red-400">XOR Graph requires exactly **ONE** channel.</div></div>';
+                    updateButtonStates(); 
+                    return;
+                }
+                selected = [rawSelected[0]]; 
             } else {
                 selected = rawSelected;
             }
@@ -766,6 +811,8 @@
                         || allAvailableChannels[String(selected[1])]
                         || `Ch ${parseInt(selected[1], 10) + 1}`);
                     SignalShared.initRecurrencePlot(singlePlotId, chX, chY, colormapSelector.value, plotLayout);
+                } else if (mode === 'xor') {
+                    SignalShared.initXorPlot(singlePlotId, plotLayout);
                 }
             }
 
@@ -785,7 +832,7 @@
                         updateUrl: '/eeg/update',
                         payload: { channels: selected, width, mode: graphModeSelector.value },
                         ids: { timePrefix: 'plot-ch-', singleId: 'single-plot', bandId: 'band-power' },
-                        state: { fs, nativeFs, width, isCumulativePolar },
+                        state: { fs, nativeFs, width, isCumulativePolar, xorOpts: { threshold: parseFloat(xorThresholdInput?.value)||0.05, periodSec: xorPeriodSec, durationSec: xorDurationSec } },
                         selected,
                         buffers: channelDataBuffers,
                         names: channelIndexToOriginalName,
