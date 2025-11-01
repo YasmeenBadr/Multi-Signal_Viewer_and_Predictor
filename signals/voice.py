@@ -143,6 +143,7 @@ def classify_gender():
                             detected_sr = int(wf.getframerate())
                 except Exception as det_err:
                     print(f"[WARN] Could not detect uploaded audio sample rate: {det_err}")
+            # Choose effective sample rate: provided or detected
 
             eff_sr_final = eff_sr if eff_sr is not None else detected_sr
 
@@ -164,7 +165,7 @@ def classify_gender():
             try:
                 audio, sr = librosa.load(filepath, sr=16000)
                 
-                # Calculate pitch (fundamental frequency)
+                # Calculate pitch (fundamental frequency) using piptrack
                 pitches, magnitudes = librosa.piptrack(y=audio, sr=sr)
                 pitch_values = []
                 for t in range(pitches.shape[1]):
@@ -207,13 +208,15 @@ def classify_gender():
             os.remove(filepath)
         except:
             pass
-        
+
+
+        # ---  Return results as JSON ---
         return jsonify({
             "gender": gender,
             "confidence": float(confidence),
             "pitch": float(avg_pitch)
         })
-    
+    # ---  Catch-all exception handler ---
     except Exception as e:
         import traceback
         error_details = traceback.format_exc()
