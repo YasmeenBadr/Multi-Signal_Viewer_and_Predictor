@@ -476,11 +476,14 @@
         document.getElementById("sarForm").addEventListener("submit", async (e) => {
             e.preventDefault();
             const sarBox = document.getElementById("sarResultBox");
+            // Show results container
             sarBox.style.display = "block";
             showLoading(sarBox, "Processing SAR image... This may take a moment.");
 
             try {
+                // Send to backend
                 const data = await fetchAnalysis("/sar/view", new FormData(e.target));
+                // Display 3 images in grid layout
                 sarBox.innerHTML = `
                     <div class="row">
                         <div class="col-md-6 col-lg-4 mb-3">
