@@ -93,7 +93,7 @@ def generate_doppler_signal(v, f0, fs, duration, d0=10.0):
     
     # Instantaneous Doppler-shifted frequency
     # Clipped to reasonable audio range [50 Hz, 20 kHz]
-    f_inst = np.clip(f0 * c / (c - v_radial), 50, 20000)
+    f_inst = np.clip(f0 * c / (c - v_radial), 50, 20000)# f0 is freq of source
     
     # === Generate Signal with Harmonics ===
     # Cumulative phase for frequency modulation (FM synthesis)

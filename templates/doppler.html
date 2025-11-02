@@ -1,31 +1,42 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <title>Doppler Viewer</title>
-    
+
     <!-- Google Fonts: Inter - Modern, clean sans-serif font -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet">
-    
+
     <!-- Bootstrap 5.3 - CSS framework for responsive layout and components -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
-    
+
     <style>
         /* ========================================
            CSS CUSTOM PROPERTIES (DESIGN TOKENS)
            ======================================== */
         :root {
             /* Color Palette - Light theme with purple accent */
-            --bg-light: #F5F7FA;        /* Page background - soft gray-blue */
-            --bg-card: #FFFFFF;         /* Card background - pure white */
-            --primary-color: #6366F1;   /* Main brand color - indigo */
-            --primary-hover: #4F46E5;   /* Darker indigo for hover states */
-            --text-dark: #1F2937;       /* Primary text - near black */
-            --text-muted: #6B7280;      /* Secondary text - gray */
-            --border-color: #E5E7EB;    /* Borders and dividers */
-            --shadow-sm: rgba(0, 0, 0, 0.05);   /* Subtle shadow */
-            --shadow-md: rgba(0, 0, 0, 0.1);    /* Medium shadow */
-            --accent-bg: #EEF2FF;       /* Light purple background for info boxes */
+            --bg-light: #F5F7FA;
+            /* Page background - soft gray-blue */
+            --bg-card: #FFFFFF;
+            /* Card background - pure white */
+            --primary-color: #6366F1;
+            /* Main brand color - indigo */
+            --primary-hover: #4F46E5;
+            /* Darker indigo for hover states */
+            --text-dark: #1F2937;
+            /* Primary text - near black */
+            --text-muted: #6B7280;
+            /* Secondary text - gray */
+            --border-color: #E5E7EB;
+            /* Borders and dividers */
+            --shadow-sm: rgba(0, 0, 0, 0.05);
+            /* Subtle shadow */
+            --shadow-md: rgba(0, 0, 0, 0.1);
+            /* Medium shadow */
+            --accent-bg: #EEF2FF;
+            /* Light purple background for info boxes */
         }
 
         /* ========================================
@@ -34,9 +45,10 @@
         body {
             /* Gradient background: light gray-blue to light purple */
             background: linear-gradient(135deg, #F5F7FA 0%, #E0E7FF 100%);
-            color: var(--text-dark); 
+            color: var(--text-dark);
             font-family: 'Inter', sans-serif;
-            min-height: 100vh;  /* Full viewport height minimum */
+            min-height: 100vh;
+            /* Full viewport height minimum */
         }
 
         /* Main heading - centered with brand color */
@@ -45,7 +57,7 @@
             font-weight: 700;
             text-align: center;
         }
-        
+
         /* Subheadings - slightly smaller and less bold */
         h2 {
             color: var(--primary-color);
@@ -61,15 +73,17 @@
             border: 1px solid var(--border-color);
             /* Layered shadows for depth effect */
             box-shadow: 0 4px 6px var(--shadow-sm), 0 2px 4px var(--shadow-sm);
-            border-radius: 16px;  /* Rounded corners */
+            border-radius: 16px;
+            /* Rounded corners */
             /* Smooth transitions for hover effects */
             transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
-            text-align: left; 
+            text-align: left;
         }
 
         /* Card hover effect - "lifts" the card */
         .card:hover {
-            transform: translateY(-3px);  /* Move up 3px */
+            transform: translateY(-3px);
+            /* Move up 3px */
             /* Enhanced shadow when hovering */
             box-shadow: 0 12px 24px var(--shadow-md), 0 6px 12px var(--shadow-sm);
         }
@@ -77,7 +91,7 @@
         /* ========================================
            BUTTON STYLES
            ======================================== */
-        
+
         /* Primary button - gradient background with shadow */
         .btn-custom {
             background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-hover) 100%);
@@ -96,13 +110,14 @@
             background: linear-gradient(135deg, var(--primary-hover) 0%, #4338CA 100%);
             color: white;
             box-shadow: 0 6px 16px rgba(99, 102, 241, 0.4);
-            transform: translateY(-2px);  /* Subtle lift effect */
+            transform: translateY(-2px);
+            /* Subtle lift effect */
         }
-        
+
         /* Outline button - purple border, transparent background */
         .btn-outline-light {
-            border-color: var(--primary-color); 
-            color: var(--primary-color);      
+            border-color: var(--primary-color);
+            color: var(--primary-color);
             transition: all 0.3s;
             border-width: 2px;
             font-weight: 500;
@@ -114,13 +129,14 @@
             border-color: var(--primary-color);
             background-color: var(--primary-color);
         }
-        
+
         /* ========================================
            FORM INPUT STYLES
            ======================================== */
-        
+
         /* Text inputs and sliders - light gray background */
-        .form-control, .form-range {
+        .form-control,
+        .form-range {
             background-color: #F9FAFB;
             border: 2px solid var(--border-color);
             color: var(--text-dark);
@@ -159,13 +175,13 @@
         /* ========================================
            TEXT UTILITY STYLES
            ======================================== */
-        
+
         /* Hint text - small, gray */
         .hint {
-            color: var(--text-muted); 
+            color: var(--text-muted);
             font-size: 0.9rem;
         }
-        
+
         /* Descriptive text - larger, muted */
         .descriptive-text {
             color: var(--text-muted) !important;
@@ -175,11 +191,13 @@
         /* ========================================
            SAMPLING INFO BOX
            ======================================== */
-        
+
         /* Info box with left accent border */
         .sampling-info {
-            background: var(--accent-bg);  /* Light purple */
-            border-left: 4px solid var(--primary-color);  /* Purple accent */
+            background: var(--accent-bg);
+            /* Light purple */
+            border-left: 4px solid var(--primary-color);
+            /* Purple accent */
             padding: 16px;
             margin: 15px 0;
             border-radius: 8px;
@@ -189,12 +207,13 @@
         /* ========================================
            STATUS BADGE STYLES
            ======================================== */
-        
+
         /* Base badge style - pill shape */
         .status-badge {
             display: inline-block;
             padding: 6px 14px;
-            border-radius: 20px;  /* Fully rounded ends */
+            border-radius: 20px;
+            /* Fully rounded ends */
             font-size: 0.85rem;
             font-weight: 600;
             margin-left: 10px;
@@ -202,29 +221,38 @@
 
         /* Good status - green (properly sampled) */
         .status-good {
-            background: #D1FAE5;  /* Light green */
-            color: #065F46;       /* Dark green */
-            border: 2px solid #10B981;  /* Medium green */
+            background: #D1FAE5;
+            /* Light green */
+            color: #065F46;
+            /* Dark green */
+            border: 2px solid #10B981;
+            /* Medium green */
         }
 
         /* Warning status - yellow (near Nyquist) */
         .status-warning {
-            background: #FEF3C7;  /* Light yellow */
-            color: #92400E;       /* Dark orange-brown */
-            border: 2px solid #F59E0B;  /* Orange */
+            background: #FEF3C7;
+            /* Light yellow */
+            color: #92400E;
+            /* Dark orange-brown */
+            border: 2px solid #F59E0B;
+            /* Orange */
         }
-        
+
         /* Danger status - red (undersampled/aliasing) */
         .status-danger {
-            background: #FEE2E2;  /* Light red */
-            color: #991B1B;       /* Dark red */
-            border: 2px solid #EF4444;  /* Red */
+            background: #FEE2E2;
+            /* Light red */
+            color: #991B1B;
+            /* Dark red */
+            border: 2px solid #EF4444;
+            /* Red */
         }
 
         /* ========================================
            MISCELLANEOUS STYLES
            ======================================== */
-        
+
         /* Horizontal rule - styled divider */
         hr {
             border-color: var(--border-color) !important;
@@ -254,6 +282,7 @@
         }
     </style>
 </head>
+
 <body>
     <!-- ========================================
          MAIN CONTAINER
@@ -271,18 +300,18 @@
         <div class="card p-4 mb-4">
             <h2><i class="bi bi-broadcast"></i> Velocity Detection</h2>
             <p>Use a trained model to estimate the speed from an uploaded audio file.</p>
-            
+
             <!-- Toggle button to show/hide upload form -->
             <button id="detect-btn" class="btn btn-custom w-100">📡 Begin Detection</button>
-            
+
             <!-- Upload form (initially hidden) -->
             <form id="detect-form" method="POST" action="upload" enctype="multipart/form-data" style="display:none;">
                 <hr class="mt-4 mb-3">
                 <p class="hint">Upload a .wav file (e.g., recorded sound of a passing object).</p>
-                
+
                 <!-- File input - only accepts .wav files -->
                 <input type="file" name="audio_file" accept=".wav" class="form-control" required>
-                
+
                 <!-- Submit button -->
                 <button type="submit" class="btn btn-custom mt-3 w-100">Upload & Detect Speed</button>
             </form>
@@ -294,8 +323,10 @@
         <div class="card p-4 mt-4">
             <h2><i class="bi bi-soundwave"></i> Generate Doppler Sound</h2>
             <p>Simulate the Doppler effect and experiment with sampling rates</p>
-            
-            <!-- Form to generate synthetic Doppler signal -->
+
+            <!-- Form to generate synthetic Doppler signal
+              route to doppler/generate POST -->
+
             <form method="POST" action="generate" class="mt-4" id="generateForm">
                 <!-- Two-column layout for velocity and frequency -->
                 <div class="row">
@@ -303,20 +334,20 @@
                     <div class="col-md-6 mb-3">
                         <label class="form-label">Velocity (m/s)</label>
                         <input type="number" step="1" min="5" max="50" name="velocity" id="velocityInput"
-                               class="form-control" placeholder="e.g. 20" value="20" required>
+                            class="form-control" placeholder="e.g. 20" value="20" required>
                     </div>
-                    
+
                     <!-- Base frequency input -->
                     <div class="col-md-6 mb-3">
                         <label class="form-label">Source Frequency (Hz)</label>
                         <input type="number" step="10" min="200" max="1000" name="frequency" id="frequencyInput"
-                               class="form-control" placeholder="e.g. 440" value="440" required>
+                            class="form-control" placeholder="e.g. 440" value="440" required>
                     </div>
                 </div>
 
                 <!-- Hidden fields with default values -->
-                <input type="hidden" name="distance" value="10">      <!-- Closest approach distance -->
-                <input type="hidden" name="duration" value="6">       <!-- Signal duration in seconds -->
+                <input type="hidden" name="distance" value="10"> <!-- Closest approach distance -->
+                <input type="hidden" name="duration" value="6"> <!-- Signal duration in seconds -->
 
                 <!-- ========================================
                      SAMPLING FREQUENCY SLIDER
@@ -327,11 +358,11 @@
                         Sampling Frequency (Hz)
                         <span id="samplingStatus" class="status-badge status-danger">❌ Undersampled</span>
                     </label>
-                    
+
                     <!-- Range slider: 500 Hz to 12000 Hz -->
-                    <input type="range" class="form-range" id="samplingSlider" name="sampling_freq" 
-                           min="500" max="12000" step="100" value="1500">
-                    
+                    <input type="range" class="form-range" id="samplingSlider" name="sampling_freq" min="500"
+                        max="12000" step="100" value="1500">
+
                     <!-- Display min, current, and max values -->
                     <div class="d-flex justify-content-between mt-2">
                         <small>500 Hz</small>
@@ -344,11 +375,11 @@
                         <strong>🎯 Aliasing Demonstration:</strong><br>
                         <span id="nyquistInfo">Set sampling rate below Nyquist to hear aliasing effects</span>
                     </div>
-                    
+
                     <!-- Browser compatibility note -->
                     <div class="mt-2">
                         <small class="text-warning">
-                            <strong>Note:</strong> Audio will be resampled to at least 8000Hz for browser compatibility, 
+                            <strong>Note:</strong> Audio will be resampled to at least 8000Hz for browser compatibility,
                             but aliasing effects will be preserved in the sound.
                         </small>
                     </div>
@@ -364,23 +395,23 @@
             <a href="/" class="btn btn-outline-light">⬅️ Back to Home</a>
         </div>
     </div>
-    
+
     <!-- Bootstrap JavaScript bundle (includes Popper for tooltips/dropdowns) -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    
+
     <script>
         /* ========================================
            JAVASCRIPT INTERACTIVITY
            ======================================== */
-        
+
         // ===== TOGGLE DETECTION FORM VISIBILITY =====
-        document.getElementById("detect-btn").addEventListener("click", function() {
+        document.getElementById("detect-btn").addEventListener("click", function () {
             const form = document.getElementById("detect-form");
             const isVisible = form.style.display === "block";
-            
+
             // Toggle display between 'block' (visible) and 'none' (hidden)
             form.style.display = isVisible ? "none" : "block";
-            
+
             // Update button text to reflect state
             this.textContent = isVisible ? '📡 Begin Detection' : 'Hide Upload Form';
         });
@@ -409,25 +440,25 @@
             const f0 = parseFloat(frequencyInput.value) || 440;  // Base frequency (Hz)
             const v = parseFloat(velocityInput.value) || 20;     // Velocity (m/s)
             const fs = parseFloat(samplingSlider.value);         // Sampling frequency (Hz)
-            
+
             const c = 343; // Speed of sound in air (m/s)
-            
+
             // Calculate maximum Doppler-shifted frequency (when source approaches)
             // Formula: f_observed = f_source * c / (c - v_radial)
             const maxDopplerFreq = f0 * c / (c - v);
-            
+
             // Account for 3 harmonics in the signal (realistic car horn)
             const maxFreq = Math.ceil(maxDopplerFreq * 3);
-            
+
             // Nyquist frequency: minimum sampling rate to avoid aliasing
             const nyquistFreq = maxFreq * 2;
-            
+
             // Ratio of actual sampling to Nyquist rate
             const ratio = fs / nyquistFreq;
-            
+
             // Display current sampling frequency
             samplingValue.textContent = fs.toFixed(0) + ' Hz';
-            
+
             // ===== UPDATE STATUS BADGE =====
             if (fs >= nyquistFreq) {
                 // Properly sampled - no aliasing
@@ -442,7 +473,7 @@
                 samplingStatus.textContent = '❌ Undersampled';
                 samplingStatus.className = 'status-badge status-danger';
             }
-            
+
             // ===== UPDATE DETAILED INFO BOX =====
             nyquistInfo.innerHTML = `
                 Base frequency: <strong>${f0.toFixed(0)} Hz</strong><br>
@@ -450,8 +481,8 @@
                 With harmonics (×3): <strong>${maxFreq.toFixed(0)} Hz</strong><br>
                 <strong>Nyquist rate: ${nyquistFreq.toFixed(0)} Hz</strong><br>
                 Current sampling: <strong>${fs.toFixed(0)} Hz</strong> (${ratio.toFixed(2)}× Nyquist)<br>
-                ${fs < nyquistFreq ? 
-                    '<span style="color:#DC2626; font-weight:bold;">⚠️ ALIASING WILL OCCUR!</span>' : 
+                ${fs < nyquistFreq ?
+                    '<span style="color:#DC2626; font-weight:bold;">⚠️ ALIASING WILL OCCUR!</span>' :
                     '<span style="color:#059669; font-weight:bold;">✓ No aliasing</span>'}
             `;
         }
@@ -467,4 +498,5 @@
         updateSamplingStatus();
     </script>
 </body>
+
 </html>
