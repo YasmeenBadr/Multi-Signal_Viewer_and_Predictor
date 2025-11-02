@@ -22,26 +22,31 @@ def resample_signal(signal: np.ndarray, original_fs: float,
     Returns:
         Resampled signal
     """
-    if original_fs == target_fs:
+    if original_fs == target_fs:# If original and target sampling frequencies are the same, return signal as is
         return signal
     
     is_1d = signal.ndim == 1
     if is_1d:
-        signal = signal[:, np.newaxis]
+        signal = signal[:, np.newaxis]# Convert to 2D for consistent processing
     
     n_samples, n_channels = signal.shape
-    duration = n_samples / original_fs
-    n_samples_target = int(duration * target_fs)
+    duration = n_samples / original_fs # Calculate total duration of the signal in seconds
+    n_samples_target = int(duration * target_fs)# Calculate number of samples required for target sampling frequency
     
-    # Create time arrays
+    # Create time arrays for original and target sampling points
     time_original = np.linspace(0, duration, n_samples)
     time_target = np.linspace(0, duration, n_samples_target)
     
-    # Resample each channel
+    # Initialize array to store resampled signal
     resampled = np.zeros((n_samples_target, n_channels))
-    for ch in range(n_channels):
+    for ch in range(n_channels):  # Resample each channel individually using linear interpolation
         resampled[:, ch] = np.interp(time_target, time_original, signal[:, ch])
-    
+         # - np.interp computes the value at each target timestamp by linearly
+         #   interpolating between the two nearest original points
+
+
+
+
     if is_1d:
         return resampled[:, 0]
     return resampled
@@ -70,16 +75,16 @@ def decimate_with_aliasing(signal: np.ndarray, native_fs: float,
     
     # Handle 1D vs 2D signals
     is_1d = signal.ndim == 1
-    if is_1d:
+    if is_1d:    # shape becomes (samples, 1)
         signal = signal[:, np.newaxis]
     
     n_samples, n_channels = signal.shape
-    decimation_factor = native_fs / target_fs
+    decimation_factor = native_fs / target_fs  # Factor to skip samples: how many native samples correspond to 1 target sample
     
     # Retrieve or initialize phase for continuous streaming
     if phase_state is not None:
         phase_key = f"{target_fs}"
-        phase = phase_state.get(phase_key, 0.0)
+        phase = phase_state.get(phase_key, 0.0)# start from stored phase or 0.0 if first chunk
     else:
         phase = 0.0
     
@@ -103,7 +108,7 @@ def decimate_with_aliasing(signal: np.ndarray, native_fs: float,
     # Extract decimated samples
     decimated = signal[indices, :]
     
-    if is_1d:
+    if is_1d: # Convert back to 1D if original signal was 1D
         return decimated[:, 0]
     return decimated
 
