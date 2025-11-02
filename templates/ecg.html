@@ -3,7 +3,7 @@
   ECG Viewer & Predictor
   --------------------------------------------------------------
   Purpose:
-  - Upload WFDB ECG data (e.g., .hea + .dat), selectchannels, and stream chunks.
+  - Upload WFDB ECG data (e.g., .hea + .dat), select channels, and stream chunks.
   - Visualize the ECG in multiple modes (Time, XOR, Polar, Recurrence).
   - Adjust effective sampling to demonstrate aliasing effects at lower rates.
   - Run simple disease predictors (demo models) on streamed chunks and display results.
@@ -17,431 +17,769 @@
     2D phase-like view (Polar), and point-density structure (Recurrence).
 -->
 <html lang="en">
+
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Real-Time ECG Viewer</title>
   <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"/>
-  <link rel="stylesheet" href="/static/shared_styles.css"/>
- 
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" />
+  <link rel="stylesheet" href="/static/shared_styles.css" />
+
   <script src="/static/js/signal_shared.js"></script>
-<style>
-  /* General body and sidebar */
-  body {
-    background: #f8fafc;
-    color: #1e293b;
-    font-family: Inter, sans-serif;
-  }
+  <style>
+    /* General body and sidebar */
+    body {
+      background: #f8fafc;
+      color: #1e293b;
+      font-family: Inter, sans-serif;
+    }
 
-  .sidebar {
-    background: #ffffff;
-    padding: 18px;
-    border-radius: 10px;
-    max-height: 95vh;
-    overflow-y: auto; /* scrollable sidebar */
-    
-  }
-  .mx-auto {
-    margin-right: 0px;
-    margin-left: 0px;
-}
+    .sidebar {
+      background: #ffffff;
+      padding: 18px;
+      border-radius: 10px;
+      max-height: 95vh;
+      overflow-y: auto;
+      /* scrollable sidebar */
 
-  .plot-container {
-    background: transparent;
-    padding: 0;
-    margin-bottom: 16px;
-  }
+    }
 
-  .prediction-box {
-    background: #f9fafb;
-    padding: 12px;
-    border-radius: 10px;
-    text-align: center;
-  }
+    .mx-auto {
+      margin-right: 0px;
+      margin-left: 0px;
+    }
 
-  .prediction-result { font-weight: 700; color: #1e293b; }
+    .plot-container {
+      background: transparent;
+      padding: 0;
+      margin-bottom: 16px;
+    }
 
-  .disease-name {
-    color: #ec4899;
-    font-weight: 600;
-    margin-top: 6px;
-  }
+    .prediction-box {
+      background: #f9fafb;
+      padding: 12px;
+      border-radius: 10px;
+      text-align: center;
+    }
 
-  /* Buttons */
-  .btn-primary {
-    background: linear-gradient(135deg, #6366f1 0%, #ec4899 100%);
-    border: none;
-    font-weight: 600;
-    color: #fff;
-  }
-  .btn-primary:hover { filter: brightness(1.05); }
-  .btn-secondary {
-    background: #f8fafc;
-    border: 2px solid #e2e8f0;
-    color:#1e293b;
-    font-weight: 600;
-  }
-  .btn-secondary:hover { border-color:#6366f1; color:#6366f1; }
+    .prediction-result {
+      font-weight: 700;
+      color: #1e293b;
+    }
 
-  /* Override any legacy dark secondary button styles */
-  .btn-secondary { background: #f8fafc; border: 2px solid #e2e8f0; color:#1e293b; }
-  .btn-secondary:hover { background:#ffffff; border-color:#6366f1; color:#6366f1; }
+    .disease-name {
+      color: #ec4899;
+      font-weight: 600;
+      margin-top: 6px;
+    }
 
-  
-  .header { background: linear-gradient(135deg, #b244b4 0%, #c338cf 35%, #ab5bb6 70%, #fa8bf1 100%); color: #fff; padding: 1rem 1.5rem; box-shadow: 0 8px 24px rgba(99,102,241,0.2); display:flex; justify-content:space-between; align-items:center; border-radius: 8px; margin: 0; }
-  .header h1 { font-size: 1.25rem; font-weight: 800; margin: 0; }
-  .nav { display:flex; gap:.5rem; }
-  .nav .btn-secondary { background: rgba(255,255,255,0.12); color:#ffffff; border:2px solid rgba(255,255,255,0.28); }
-  .nav .btn-secondary:hover { background: rgba(255,255,255,0.22); color:#ffffff; border-color: rgba(255,255,255,0.38); }
-  .nav .btn-secondary.active { background: linear-gradient(135deg, #9250a4 0%, #d0a7cd 100%); color:#ffffff; border-color: rgba(255,255,255,0.0); box-shadow: 0 6px 16px rgba(139,92,246,0.45); }
+    /* Buttons */
+    .btn-primary {
+      background: linear-gradient(135deg, #6366f1 0%, #ec4899 100%);
+      border: none;
+      font-weight: 600;
+      color: #fff;
+    }
 
-  /* Plot cards */
-  .plot-card { background:#ffffff; border:1px solid #e2e8f0; border-radius: 10px; padding: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.06); }
-  .info-panel { margin-left: 8px; }
-  .plots-col { padding-left: 4px; padding-right: 4px; }
-  /* Force plots to stack vertically, not side-by-side */
-  .plots-grid { display: block !important; }
-  .plots-grid > .row { width: 100%; margin: 0; display:block; }
-  .plots-grid .row .col-12 { width: 100%; float: none; display:block; }
-  .plots-grid .plot-container { width: 100%; display:block; }
-  .plot-container { position: relative; overflow: visible; margin-bottom: 8px; }
-  /* Let relayout set exact pixel height; keep width flexible */
-  .plot-container > div[id$='Plot']{ width: 100% !important; }
-  body{ margin:0 !important; padding:0 !important; }
-  .container, .container-fluid{ padding-left:0 !important; padding-right:0 !important; }
-  .row{ margin-left:0 !important; margin-right:0 !important; --bs-gutter-x: 0; }
+    .btn-primary:hover {
+      filter: brightness(1.05);
+    }
 
-  /* Animations  */
-  @keyframes slideDown { from { opacity: 0; transform: translateY(-20px);} to { opacity: 1; transform: translateY(0);} }
-  @keyframes slideUp { from { opacity: 0; transform: translateY(20px);} to { opacity: 1; transform: translateY(0);} }
-  .header { animation: slideDown 0.6s ease-out; }
-  .sidebar, .plots-col, .info-panel { animation: slideUp 0.6s ease-out 0.1s both; }
+    .btn-secondary {
+      background: #f8fafc;
+      border: 2px solid #e2e8f0;
+      color: #1e293b;
+      font-weight: 600;
+    }
 
-  /* Prettier sliders and buttons */
-  input[type=range] { appearance: none; width:100%; height:6px; border-radius:999px; background: linear-gradient(90deg, #ede9fe 0%, #ddd6fe 50%, #c4b5fd 100%); outline:none; }
-  input[type=range]::-webkit-slider-runnable-track{ height:6px; border-radius:999px; background: linear-gradient(90deg, #ede9fe 0%, #ddd6fe 50%, #c4b5fd 100%); }
-  input[type=range]::-moz-range-track{ height:6px; border-radius:999px; background: linear-gradient(90deg, #ede9fe 0%, #ddd6fe 50%, #c4b5fd 100%); }
-  input[type=range]::-webkit-slider-thumb { appearance:none; width:16px; height:16px; border-radius:50%; background:#8b5cf6; box-shadow:0 0 0 3px rgba(139,92,246,.25); cursor:pointer; margin-top:-5px; }
-  input[type=range]::-moz-range-thumb { width:16px; height:16px; border-radius:50%; background:#8b5cf6; border:none; box-shadow:0 0 0 3px rgba(139,92,246,.25); cursor:pointer; }
-  .btn-primary, .btn-secondary { border-radius:999px; }
-  
-  .btn-primary { background: #00eaff; border: 0; color: #0b1220; }
-  .btn-primary:hover { filter: brightness(0.95); }
-  .btn-secondary { background:#f8fafc; border:2px solid #e2e8f0; color:#1e293b; }
-  .btn-secondary:hover { background:#ffffff; border-color:#6366f1; color:#6366f1; }
+    .btn-secondary:hover {
+      border-color: #6366f1;
+      color: #6366f1;
+    }
 
-  
-  @media (max-width: 1400px) {
-    .main-container { grid-template-columns: 250px 1fr 280px; gap: 1rem; padding: 1rem; }
-  }
-  @media (max-width: 1024px) {
-    .main-container { grid-template-columns: 1fr; gap: 1.5rem; }
-    .sidebar { max-height: auto; }
-    .info-panel { max-height: auto; }
-    .plots-grid { grid-template-columns: 1fr; }
-  }
+    /* Override any legacy dark secondary button styles */
+    .btn-secondary {
+      background: #f8fafc;
+      border: 2px solid #e2e8f0;
+      color: #1e293b;
+    }
 
-  /* Drop zone */
-  #dropZone {
-    border: 2px dashed #8b5cf6;
-    padding: 12px;
-    border-radius: 8px;
-    background: #eef2ff;
-    color: #1e293b;
-    text-align: center;
-  }
-  #pickFiles {
-    color:#8b5cf6;
-    text-decoration: underline;
-    cursor: pointer;
-  }
-  #pickFiles:hover {
-    color: #ccddd7;
-  }
-
-  /* Form inputs and selects */
-  input.form-control, select.form-select {
-    background: #f8fafc;
-    color:#1e293b;
-    border: 1px solid #e2e8f0;
-  }
-
-  input.form-control:focus, select.form-select:focus {
-    border-color: #6366f1;
-    box-shadow: 0 0 0 3px rgba(99,102,241,0.2);
-  }
-
-  /* Labels */
-  label.form-label {
-    color:#1e293b;
-    font-weight: 600;
-  }
-
-  .form-check-label {
-    color: #1e293b;
-    cursor: pointer;
-  }
-  .form-check-input { cursor: pointer; accent-color:#babbe474; }
- 
-  #channelList { max-height: 240px; overflow-y: auto; padding: 0.5rem 0; }
-  #channelList .form-check { display:flex; align-items:center; gap:.5rem; margin-bottom: .35rem; }
-  #channelList .form-check-input { width: 18px; height: 18px; }
-  #channelList .form-check-label { font-size: 0.9rem; font-weight: 500; }
-  /* Emphasize label when selected */
-  .form-check-input:checked + .form-check-label { font-weight:700; color:#1f2937; }
-  /* Stronger visible state for checked boxes (generic) */
-  .form-check-input:checked { background-color:#6d7685 !important; border-color: #6d7685 !important; box-shadow: 0 0 0 2px rgba(208, 92, 246, 0.15); }
-  .form-check-input:focus { border-color:#6d7685; box-shadow: 0 0 0 0.15rem rgba(172, 157, 205, 0.25); }
-  
-  #channelList .form-check-input {
-    appearance: none;
-    -webkit-appearance: none;
-    -moz-appearance: none;
-    width: 18px; height: 18px;
-    border: 2px solid #babbe464; /* slate-400 */
-    border-radius: 4px;
-    background-color: #ffffff;
-    position: relative;
-    display: inline-block;
-    vertical-align: middle;
-    transition: border-color .15s ease, box-shadow .15s ease;
-  }
-  #channelList .form-check-input:hover { border-color: #babbe4e1; }
-  #channelList .form-check-input:focus { outline: none; border-color: #babbe4e1; box-shadow: 0 0 0 2px rgba(203,124,222,0.25); }
-  #channelList .form-check-input:checked {
-    border-color: #babbe4e1;
-    background-color: #ffffff; /* keep white box */
-    box-shadow: 0 0 0 2px rgba(206, 166, 236, 0.15);
-  }
-  #channelList .form-check-input:checked::after {
-    content: "";
-    position: absolute;
-    left: 4px;
-    top: 0px;
-    width: 6px;
-    height: 12px;
-    border-right: 3px solid #ffffff;
-    border-bottom: 3px solid #ffffff;
-    transform: rotate(45deg);
-  }
-  /* Keep 'choose files' link color consistent */
-  #pickFiles { color:#8016c2; text-decoration: underline; cursor: pointer; }
-  #pickFiles:hover, #pickFiles:active, #pickFiles:focus { color:#8b5cf6; outline:none; }
-  /* Keep drop zone background stable (no red on click) */
-  #dropZone {
-    border: 2px dashed #8b5cf6;
-    background: #ffffff;
-    border-radius: 8px;
-    padding: 1rem;
-    text-align: center;
-    transition: border-color .15s ease, box-shadow .15s ease;
-  }
-  #dropZone:hover, #dropZone:active, #dropZone:focus {
-    background: #ffffff;
-    border-color: #8b5cf6;
-    box-shadow: 0 0 0 2px rgba(99,102,241,0.12);
-    outline: none;
-  }
-  
-
-.form-check-input:checked {
-    background-color: #bf63f1; 
-    border-color: #f163ea;
-}
-
-  .form-text { color: #475569; }
+    .btn-secondary:hover {
+      background: #ffffff;
+      border-color: #6366f1;
+      color: #6366f1;
+    }
 
 
-  h1 {
-    color: #1e293b;
-    text-align: center;
-    font-weight: 800;
-    margin-bottom: 24px;
-  }
+    .header {
+      background: linear-gradient(135deg, #b244b4 0%, #c338cf 35%, #ab5bb6 70%, #fa8bf1 100%);
+      color: #fff;
+      padding: 1rem 1.5rem;
+      box-shadow: 0 8px 24px rgba(99, 102, 241, 0.2);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-radius: 8px;
+      margin: 0;
+    }
 
-  /* frequency slider */
-  #freqLabel { color: #1e293b; font-weight:700; margin-bottom:6px; }
-  #freqValue { color: #334155; font-weight:700; }
-  #freqSlider { width:100%; accent-color:#8016c2; margin-bottom:6px; }
+    .header h1 {
+      font-size: 1.25rem;
+      font-weight: 800;
+      margin: 0;
+    }
 
-  /* Header/Nav  */
-  .header { background: linear-gradient(135deg, #8016c2 0%, #e754c2 100%); color: #fff; padding: 1rem 1.5rem; box-shadow: 0 8px 24px rgba(99,102,241,0.2); display:flex; justify-content:space-between; align-items:center; border-radius: 4px; margin: 4px; }
-  .header h1 { color: #fff; margin: 0; font-size: 1.5rem; }
-  .status-indicator { display:flex; align-items:center; gap:.5rem; background: rgba(255,255,255,0.2); padding:.35rem .75rem; border-radius: 20px; font-weight:600; }
-  .status-dot { width:10px; height:10px; border-radius:50%; background:#ef4444; }
-  .status-dot.active { background:#10b981; }
-  .header-controls { display:flex; gap: .75rem; align-items:center; }
-  /* XOR controls: blend into the info panel (no separate card look) */
-  #xorControls {
-    position: static;
-    top: auto;
-    background: transparent;
-    border: none;
-    border-radius: 0;
-    padding: 8px 0 0 0;
-    box-shadow: none;
-  }
-</style>
+    .nav {
+      display: flex;
+      gap: .5rem;
+    }
+
+    .nav .btn-secondary {
+      background: rgba(255, 255, 255, 0.12);
+      color: #ffffff;
+      border: 2px solid rgba(255, 255, 255, 0.28);
+    }
+
+    .nav .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.22);
+      color: #ffffff;
+      border-color: rgba(255, 255, 255, 0.38);
+    }
+
+    .nav .btn-secondary.active {
+      background: linear-gradient(135deg, #9250a4 0%, #d0a7cd 100%);
+      color: #ffffff;
+      border-color: rgba(255, 255, 255, 0.0);
+      box-shadow: 0 6px 16px rgba(139, 92, 246, 0.45);
+    }
+
+    /* Plot cards */
+    .plot-card {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 8px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+    }
+
+    .info-panel {
+      margin-left: 8px;
+    }
+
+    .plots-col {
+      padding-left: 4px;
+      padding-right: 4px;
+    }
+
+    /* Force plots to stack vertically, not side-by-side */
+    .plots-grid {
+      display: block !important;
+    }
+
+    .plots-grid>.row {
+      width: 100%;
+      margin: 0;
+      display: block;
+    }
+
+    .plots-grid .row .col-12 {
+      width: 100%;
+      float: none;
+      display: block;
+    }
+
+    .plots-grid .plot-container {
+      width: 100%;
+      display: block;
+    }
+
+    .plot-container {
+      position: relative;
+      overflow: visible;
+      margin-bottom: 8px;
+    }
+
+    /* Let relayout set exact pixel height; keep width flexible */
+    .plot-container>div[id$='Plot'] {
+      width: 100% !important;
+    }
+
+    body {
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+
+    .container,
+    .container-fluid {
+      padding-left: 0 !important;
+      padding-right: 0 !important;
+    }
+
+    .row {
+      margin-left: 0 !important;
+      margin-right: 0 !important;
+      --bs-gutter-x: 0;
+    }
+
+    /* Animations  */
+    @keyframes slideDown {
+      from {
+        opacity: 0;
+        transform: translateY(-20px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes slideUp {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .header {
+      animation: slideDown 0.6s ease-out;
+    }
+
+    .sidebar,
+    .plots-col,
+    .info-panel {
+      animation: slideUp 0.6s ease-out 0.1s both;
+    }
+
+    /* Prettier sliders and buttons */
+    input[type=range] {
+      appearance: none;
+      width: 100%;
+      height: 6px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #ede9fe 0%, #ddd6fe 50%, #c4b5fd 100%);
+      outline: none;
+    }
+
+    input[type=range]::-webkit-slider-runnable-track {
+      height: 6px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #ede9fe 0%, #ddd6fe 50%, #c4b5fd 100%);
+    }
+
+    input[type=range]::-moz-range-track {
+      height: 6px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #ede9fe 0%, #ddd6fe 50%, #c4b5fd 100%);
+    }
+
+    input[type=range]::-webkit-slider-thumb {
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #8b5cf6;
+      box-shadow: 0 0 0 3px rgba(139, 92, 246, .25);
+      cursor: pointer;
+      margin-top: -5px;
+    }
+
+    input[type=range]::-moz-range-thumb {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #8b5cf6;
+      border: none;
+      box-shadow: 0 0 0 3px rgba(139, 92, 246, .25);
+      cursor: pointer;
+    }
+
+    .btn-primary,
+    .btn-secondary {
+      border-radius: 999px;
+    }
+
+    .btn-primary {
+      background: #00eaff;
+      border: 0;
+      color: #0b1220;
+    }
+
+    .btn-primary:hover {
+      filter: brightness(0.95);
+    }
+
+    .btn-secondary {
+      background: #f8fafc;
+      border: 2px solid #e2e8f0;
+      color: #1e293b;
+    }
+
+    .btn-secondary:hover {
+      background: #ffffff;
+      border-color: #6366f1;
+      color: #6366f1;
+    }
+
+
+    @media (max-width: 1400px) {
+      .main-container {
+        grid-template-columns: 250px 1fr 280px;
+        gap: 1rem;
+        padding: 1rem;
+      }
+    }
+
+    @media (max-width: 1024px) {
+      .main-container {
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+      }
+
+      .sidebar {
+        max-height: auto;
+      }
+
+      .info-panel {
+        max-height: auto;
+      }
+
+      .plots-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Drop zone */
+    #dropZone {
+      border: 2px dashed #8b5cf6;
+      padding: 12px;
+      border-radius: 8px;
+      background: #eef2ff;
+      color: #1e293b;
+      text-align: center;
+    }
+
+    #pickFiles {
+      color: #8b5cf6;
+      text-decoration: underline;
+      cursor: pointer;
+    }
+
+    #pickFiles:hover {
+      color: #ccddd7;
+    }
+
+    /* Form inputs and selects */
+    input.form-control,
+    select.form-select {
+      background: #f8fafc;
+      color: #1e293b;
+      border: 1px solid #e2e8f0;
+    }
+
+    input.form-control:focus,
+    select.form-select:focus {
+      border-color: #6366f1;
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+    }
+
+    /* Labels */
+    label.form-label {
+      color: #1e293b;
+      font-weight: 600;
+    }
+
+    .form-check-label {
+      color: #1e293b;
+      cursor: pointer;
+    }
+
+    .form-check-input {
+      cursor: pointer;
+      accent-color: #babbe474;
+    }
+
+    #channelList {
+      max-height: 240px;
+      overflow-y: auto;
+      padding: 0.5rem 0;
+    }
+
+    #channelList .form-check {
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+      margin-bottom: .35rem;
+    }
+
+    #channelList .form-check-input {
+      width: 18px;
+      height: 18px;
+    }
+
+    #channelList .form-check-label {
+      font-size: 0.9rem;
+      font-weight: 500;
+    }
+
+    /* Emphasize label when selected */
+    .form-check-input:checked+.form-check-label {
+      font-weight: 700;
+      color: #1f2937;
+    }
+
+    /* Stronger visible state for checked boxes (generic) */
+    .form-check-input:checked {
+      background-color: #6d7685 !important;
+      border-color: #6d7685 !important;
+      box-shadow: 0 0 0 2px rgba(208, 92, 246, 0.15);
+    }
+
+    .form-check-input:focus {
+      border-color: #6d7685;
+      box-shadow: 0 0 0 0.15rem rgba(172, 157, 205, 0.25);
+    }
+
+    #channelList .form-check-input {
+      appearance: none;
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      width: 18px;
+      height: 18px;
+      border: 2px solid #babbe464;
+      /* slate-400 */
+      border-radius: 4px;
+      background-color: #ffffff;
+      position: relative;
+      display: inline-block;
+      vertical-align: middle;
+      transition: border-color .15s ease, box-shadow .15s ease;
+    }
+
+    #channelList .form-check-input:hover {
+      border-color: #babbe4e1;
+    }
+
+    #channelList .form-check-input:focus {
+      outline: none;
+      border-color: #babbe4e1;
+      box-shadow: 0 0 0 2px rgba(203, 124, 222, 0.25);
+    }
+
+    #channelList .form-check-input:checked {
+      border-color: #babbe4e1;
+      background-color: #ffffff;
+      /* keep white box */
+      box-shadow: 0 0 0 2px rgba(206, 166, 236, 0.15);
+    }
+
+    #channelList .form-check-input:checked::after {
+      content: "";
+      position: absolute;
+      left: 4px;
+      top: 0px;
+      width: 6px;
+      height: 12px;
+      border-right: 3px solid #ffffff;
+      border-bottom: 3px solid #ffffff;
+      transform: rotate(45deg);
+    }
+
+    /* Keep 'choose files' link color consistent */
+    #pickFiles {
+      color: #8016c2;
+      text-decoration: underline;
+      cursor: pointer;
+    }
+
+    #pickFiles:hover,
+    #pickFiles:active,
+    #pickFiles:focus {
+      color: #8b5cf6;
+      outline: none;
+    }
+
+    /* Keep drop zone background stable (no red on click) */
+    #dropZone {
+      border: 2px dashed #8b5cf6;
+      background: #ffffff;
+      border-radius: 8px;
+      padding: 1rem;
+      text-align: center;
+      transition: border-color .15s ease, box-shadow .15s ease;
+    }
+
+    #dropZone:hover,
+    #dropZone:active,
+    #dropZone:focus {
+      background: #ffffff;
+      border-color: #8b5cf6;
+      box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.12);
+      outline: none;
+    }
+
+
+    .form-check-input:checked {
+      background-color: #bf63f1;
+      border-color: #f163ea;
+    }
+
+    .form-text {
+      color: #475569;
+    }
+
+
+    h1 {
+      color: #1e293b;
+      text-align: center;
+      font-weight: 800;
+      margin-bottom: 24px;
+    }
+
+    /* frequency slider */
+    #freqLabel {
+      color: #1e293b;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    #freqValue {
+      color: #334155;
+      font-weight: 700;
+    }
+
+    #freqSlider {
+      width: 100%;
+      accent-color: #8016c2;
+      margin-bottom: 6px;
+    }
+
+    /* Header/Nav  */
+    .header {
+      background: linear-gradient(135deg, #8016c2 0%, #e754c2 100%);
+      color: #fff;
+      padding: 1rem 1.5rem;
+      box-shadow: 0 8px 24px rgba(99, 102, 241, 0.2);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-radius: 4px;
+      margin: 4px;
+    }
+
+    .header h1 {
+      color: #fff;
+      margin: 0;
+      font-size: 1.5rem;
+    }
+
+    .status-indicator {
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+      background: rgba(255, 255, 255, 0.2);
+      padding: .35rem .75rem;
+      border-radius: 20px;
+      font-weight: 600;
+    }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #ef4444;
+    }
+
+    .status-dot.active {
+      background: #10b981;
+    }
+
+    .header-controls {
+      display: flex;
+      gap: .75rem;
+      align-items: center;
+    }
+
+    /* XOR controls: blend into the info panel (no separate card look) */
+    #xorControls {
+      position: static;
+      top: auto;
+      background: transparent;
+      border: none;
+      border-radius: 0;
+      padding: 8px 0 0 0;
+      box-shadow: none;
+    }
+  </style>
 </head>
+
 <body class="min-h-screen bg-primary-bg text-text-light">
-  
-<div class="header">
-  <h1>ECG Viewer</h1>
-  <div class="nav">
-    <button id="timeModeButton" class="btn-secondary" type="button">Time Graph</button>
-    <button id="polarModeButton" class="btn-secondary" type="button">Polar Graph</button>
-    <button id="recurrenceModeButton" class="btn-secondary" type="button">Recurrence Graph</button>
-    <button id="xorModeButton" class="btn-secondary" type="button">XOR</button>
+
+  <div class="header">
+    <h1>ECG Viewer</h1>
+    <div class="nav">
+      <button id="timeModeButton" class="btn-secondary" type="button">Time Graph</button>
+      <button id="polarModeButton" class="btn-secondary" type="button">Polar Graph</button>
+      <button id="recurrenceModeButton" class="btn-secondary" type="button">Recurrence Graph</button>
+      <button id="xorModeButton" class="btn-secondary" type="button">XOR</button>
+    </div>
   </div>
-</div>
-<div class="container-fluid">
-  <div class="row">
-    <div class="col-md-2 col-lg-2 col-xl-2 sidebar">
-      <h5>ECG Controls</h5>
-      <form id="channelForm">
-        <div class="mb-2">
-          <label class="form-label">Speed (updates/sec)</label>
-          <input id="speedControl" class="form-control" type="number" min="0.5" max="5" step="0.1" value="1" />
-        </div>
-        <div class="mb-2">
-          <label class="form-label">Window width (seconds)</label>
-          <input id="width" class="form-control" type="number" min="0.5" step="0.5" value="5"/>
-        </div>
-        <div class="mb-2">
-          <label class="form-label">📁 file upload</label>
-          <div id="dropZone">Drop files here or <a href="#" id="pickFiles">choose files</a></div>
-          <input id="filePicker" type="file" accept=".hea,.dat,.xyz" multiple style="display:none;" />
-          <!--
+  <div class="container-fluid">
+    <div class="row">
+      <div class="col-md-2 col-lg-2 col-xl-2 sidebar">
+        <h5>ECG Controls</h5>
+        <form id="channelForm">
+          <div class="mb-2">
+            <label class="form-label">Speed (updates/sec)</label>
+            <input id="speedControl" class="form-control" type="number" min="0.5" max="5" step="0.1" value="1" />
+          </div>
+          <div class="mb-2">
+            <label class="form-label">Window width (seconds)</label>
+            <input id="width" class="form-control" type="number" min="0.5" step="0.5" value="5" />
+          </div>
+          <div class="mb-2">
+            <label class="form-label">📁 file upload</label>
+            <div id="dropZone">Drop files here or <a href="#" id="pickFiles">choose files</a></div>
+            <input id="filePicker" type="file" accept=".hea,.dat,.xyz" multiple style="display:none;" />
+            <!--
             Upload guidance:
             - For WFDB records, provide the header (.hea) and data (.dat); they must share the same basename.
             - Example: recordA.hea and recordA.dat
             - The server parses the header to discover channels, sample rate, and durations.
           -->
-        </div>
-        <div class="mb-2">
-          <label class="form-label">📊 Channels</label>
-          <div id="channelSelectionContainer">
-            <div id="channelInstructions" class="form-text" style="display:none;">Channels load after file upload.</div>
-            <div id="channelList" style="max-height:240px; overflow:auto; padding:.25rem 0;">Channels load after file upload.</div>
           </div>
-        </div>
-        <div class="mb-2">
-          <label class="form-label">Recurrence Colormap</label>
-          <select id="colormapSelect" class="form-select">
-            <option value="Jet">Jet</option>
-            <option value="Viridis">Viridis</option>
-            <option value="Hot">Hot</option>
-            <option value="Rainbow">Rainbow</option>
-          </select>
-        </div>
-        
-
-        
-
-        <div class="mb-3">
-          <label id="freqLabel" class="form-label">Sampling Frequency (Hz) <span id="freqValue" style="margin-left:8px;color:#8b5cf6;">500 Hz</span></label>
-          <input id="freqSlider" type="range" min="10" max="500" step="10" value="500" />
-          <div style="display:flex; justify-content:space-between; align-items:center;">
-            <div class="small-muted">Min:10</div>
-            <div class="small-muted">Max: 500</div>
+          <div class="mb-2">
+            <label class="form-label">📊 Channels</label>
+            <div id="channelSelectionContainer">
+              <div id="channelInstructions" class="form-text" style="display:none;">Channels load after file upload.
+              </div>
+              <div id="channelList" style="max-height:240px; overflow:auto; padding:.25rem 0;">Channels load after file
+                upload.</div>
+            </div>
           </div>
-          
-        </div>
-        <button id="startBtn" class="btn-primary w-100" type="submit" disabled>▶ Start Streaming</button>
-        <button id="stopBtn" class="btn btn-secondary w-100 mt-2" type="button">Stop</button>
-      </form>
-    </div>
+          <div class="mb-2">
+            <label class="form-label">Recurrence Colormap</label>
+            <select id="colormapSelect" class="form-select">
+              <option value="Jet">Jet</option>
+              <option value="Viridis">Viridis</option>
+              <option value="Hot">Hot</option>
+              <option value="Rainbow">Rainbow</option>
+            </select>
+          </div>
 
-    <div class="col-md-8 col-lg-7 col-xl-8 plots-col plots-grid">
-      <!-- Time plot -->
-      <div class="plot-container plot-card">
-        <div id="timePlot" style="width:100%;height:100%;"></div>
-        <!--
+
+
+
+          <div class="mb-3">
+            <label id="freqLabel" class="form-label">Sampling Frequency (Hz) <span id="freqValue"
+                style="margin-left:8px;color:#8b5cf6;">500 Hz</span></label>
+            <input id="freqSlider" type="range" min="10" max="500" step="10" value="500" />
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <div class="small-muted">Min:10</div>
+              <div class="small-muted">Max: 500</div>
+            </div>
+
+          </div>
+          <button id="startBtn" class="btn-primary w-100" type="submit" disabled>▶ Start Streaming</button>
+          <button id="stopBtn" class="btn btn-secondary w-100 mt-2" type="button">Stop</button>
+        </form>
+      </div>
+
+      <div class="col-md-8 col-lg-7 col-xl-8 plots-col plots-grid">
+        <!-- Time plot -->
+        <div class="plot-container plot-card">
+          <div id="timePlot" style="width:100%;height:100%;"></div>
+          <!--
           Time Graph:
           - Standard waveform view of the currently streamed chunk for selected channels.
           - Use the window width control to set the visible duration.
           - Changes in sampling are reflected by the x-axis density and waveform detail.
         -->
-      </div>
+        </div>
 
-      <!-- XOR plot -->
-      <div class="row">
-        <div class="col-12 plot-container plot-card">
-          <div id="xorPlot" style="width:100%; height:100%;"></div>
-          <!--
+        <!-- XOR plot -->
+        <div class="row">
+          <div class="col-12 plot-container plot-card">
+            <div id="xorPlot" style="width:100%; height:100%;"></div>
+            <!--
             XOR View:
             - Compares current chunk against the reversed previous chunk using a simple thresholded XOR.
             - Highlights differences in shape and timing between successive windows.
             - Useful for visual change detection and educational contrast.
           -->
-        </div>
-      </div>
-
-      <!-- Polar plot -->
-      <div class="row">
-        <div class="col-12 plot-container plot-card">
-          <div id="polarPlot" style="width:100%; height:100%;"></div>
-          <div style="margin-top:8px; max-width:260px;">
-            <label class="form-label">Polar Mode</label>
-            <select id="polarModeSelect" class="form-select">
-              <option value="fixed">Fixed (current chunk)</option>
-              <option value="cumulative">Cumulative</option>
-            </select>
           </div>
-          <!--
+        </div>
+
+        <!-- Polar plot -->
+        <div class="row">
+          <div class="col-12 plot-container plot-card">
+            <div id="polarPlot" style="width:100%; height:100%;"></div>
+            <div style="margin-top:8px; max-width:260px;">
+              <label class="form-label">Polar Mode</label>
+              <select id="polarModeSelect" class="form-select">
+                <option value="fixed">Fixed (current chunk)</option>
+                <option value="cumulative">Cumulative</option>
+              </select>
+            </div>
+            <!--
             Polar Graph:
             - Plots the current (or cumulative) chunk in a phase-like polar space to show periodicity.
             - Fixed mode resets each chunk, while cumulative builds over time to reveal stable patterns.
           -->
+          </div>
         </div>
-      </div>
 
-      <!-- Recurrence plot -->
-      <div class="plot-container plot-card">
-        <div id="recurrenceScatterPlot" style="width:100%;height:400px;"></div>
-        <!--
+        <!-- Recurrence plot -->
+        <div class="plot-container plot-card">
+          <div id="recurrenceScatterPlot" style="width:100%;height:400px;"></div>
+          <!--
           Recurrence Plot (scatter approximation):
           - A 2D density-like view derived from pairwise structure of the signal window.
           - Patterns in this space can correlate with rhythm stability or irregularities.
         -->
+        </div>
       </div>
-    </div>
 
-    
-    <div class="col-md-2 col-lg-3 col-xl-2">
-      <div class="plot-card info-panel" style="position:sticky; top:0.75rem;">
-        <h6 style="font-weight:700; color:#6366f1;">❤️ Predictions</h6>
-        <div id="predictionResult" class="prediction-result">Waiting for data...</div>
-        <div id="predictionDescription" style="margin-top:8px; color:#475569; font-size:0.9rem;"></div>
-        <div id="recurrencePrediction" style="margin-top:6px; color:#334155; font-size:0.9rem;"></div>
-        <div id="diseaseName" class="disease-name"></div>
-        <div id="aliasingNote" style="margin-top:6px; color:#ffb74d; font-size:0.85rem;"></div>
-        <!--
+
+      <div class="col-md-2 col-lg-3 col-xl-2">
+        <div class="plot-card info-panel" style="position:sticky; top:0.75rem;">
+          <h6 style="font-weight:700; color:#6366f1;">❤️ Predictions</h6>
+          <div id="predictionResult" class="prediction-result">Waiting for data...</div>
+          <div id="predictionDescription" style="margin-top:8px; color:#475569; font-size:0.9rem;"></div>
+          <div id="recurrencePrediction" style="margin-top:6px; color:#334155; font-size:0.9rem;"></div>
+          <div id="diseaseName" class="disease-name"></div>
+          <div id="aliasingNote" style="margin-top:6px; color:#ffb74d; font-size:0.85rem;"></div>
+          <!--
           Prediction panel notes:
           - The demo models estimate conditions from short ECG chunks. Confidence is a softmax-like score.
           - At aggressively low sampling rates, aliasing can distort morphology (e.g., R-peaks), which may
             lower confidence or flip decisions. Use this to study robustness to sampling constraints.
           - Recurrence analysis summarizes structure in a 2D embedding; its label is shown separately.
         -->
-        <hr style="margin:12px 0;"/>
-        <h6 style="font-weight:700; color:#6366f1;">📈 Statistics</h6>
-        <div class="stat-item" style="display:flex; justify-content:space-between; padding:4px 0;">
-          <span>Status</span><span id="ecgStatus">Idle</span>
-        </div>
-        <div class="stat-item" style="display:flex; justify-content:space-between; padding:4px 0;">
-          <span>Channels</span><span id="ecgChannelCount">0</span>
-        </div>
-        <div class="stat-item" style="display:flex; justify-content:space-between; padding:4px 0;">
-          <span>Sample Rate</span><span id="ecgSampleRate">500 Hz</span>
-        </div>
-        <div class="stat-item" style="display:flex; justify-content:space-between; padding:4px 0;">
-          <span>Window</span><span id="ecgWindowSize">5s</span>
-        </div>
-        <hr style="margin:12px 0;"/>
-        <h6 style="font-weight:700; color:#6366f1;">⚙️ XOR Control</h6>
+          <hr style="margin:12px 0;" />
+          <h6 style="font-weight:700; color:#6366f1;">📈 Statistics</h6>
+          <div class="stat-item" style="display:flex; justify-content:space-between; padding:4px 0;">
+            <span>Status</span><span id="ecgStatus">Idle</span>
+          </div>
+          <div class="stat-item" style="display:flex; justify-content:space-between; padding:4px 0;">
+            <span>Channels</span><span id="ecgChannelCount">0</span>
+          </div>
+          <div class="stat-item" style="display:flex; justify-content:space-between; padding:4px 0;">
+            <span>Sample Rate</span><span id="ecgSampleRate">500 Hz</span>
+          </div>
+          <div class="stat-item" style="display:flex; justify-content:space-between; padding:4px 0;">
+            <span>Window</span><span id="ecgWindowSize">5s</span>
+          </div>
+          <hr style="margin:12px 0;" />
+          <h6 style="font-weight:700; color:#6366f1;">⚙️ XOR Control</h6>
           <div style="display:flex; align-items:center; justify-content:space-between;">
-        
+
           </div>
           <div id="xorControlsContent" style="margin-top:8px;">
             <div class="mb-2">
@@ -464,653 +802,670 @@
 
 
   </div>
-</div>
+  </div>
 
-<script>
-// ================================================
-// ECG Frontend Orchestrator
-// --------------------------------
-// Purpose and dataflow
-// - After upload, we query /ecg/config to discover the native sampling rate and channel names.
-// - The frequency slider expresses a requested sampling rate. The server may clamp it to 
-//   [min, native] and uses a unified resampling utility (aliasing decimation when downsampling).
-// - The streaming loop calls /ecg/update to retrieve the next chunk for selected channels and 
-//   refreshes the current visualization. Separate requests may ask for predictions from that chunk.
-// - Each mode focuses on a specific insight:
-//     Time: morphology and amplitude over time
-//     XOR: change vs previous chunk
-//     Polar: periodic structure in polar coordinates
-//     Recurrence: density/structure of the state space
-// Tips
-// - Low sampling rates can cause aliasing which hides high-frequency content and alters morphology.
-// - Compare predictions and waveforms at different slider settings to understand robustness.
-// Structure:
-//   1) Global UI/state variables
-//   2) Channel/montage utilities and UI enabling
-//   3) Config initialization from backend
-//   4) File upload handlers
-//   5) Plot sizing utilities
-//   6) Display mode switching and status
-//   7) Plot initialization
-//   8) Streaming loop (fetchData) -> delegates drawing to SignalShared
-// ================================================
-let streaming=false, intervalId=null;
-let updateSpeed=1, allChannels=[], selectedChannels=[], widthSec=5;
-let nativeFs=500, displayFs=200;
-let channelData={}, globalStart=0;
-let colormap="Jet";
-let polarMode = "fixed";
-let currentDisplay = 'Time';
-let filesUploaded = false;
-let requestedSampling = null; // value applied via Apply Sampling
+  <script>
+    // ================================================
+    // ECG Frontend Orchestrator
+    // --------------------------------
+    // Purpose and dataflow
+    // - After upload, we query /ecg/config to discover the native sampling rate and channel names.
+    // - The frequency slider expresses a requested sampling rate. The server may clamp it to 
+    //   [min, native] and uses a unified resampling utility (aliasing decimation when downsampling).
+    // - The streaming loop calls /ecg/update to retrieve the next chunk for selected channels and 
+    //   refreshes the current visualization. Separate requests may ask for predictions from that chunk.
+    // - Each mode focuses on a specific insight:
+    //     Time: morphology and amplitude over time
+    //     XOR: change vs previous chunk
+    //     Polar: periodic structure in polar coordinates
+    //     Recurrence: density/structure of the state space
+    // Tips
+    // - Low sampling rates can cause aliasing which hides high-frequency content and alters morphology.
+    // - Compare predictions and waveforms at different slider settings to understand robustness.
+    // Structure:
+    //   1) Global UI/state variables
+    //   2) Channel/montage utilities and UI enabling
+    //   3) Config initialization from backend
+    //   4) File upload handlers
+    //   5) Plot sizing utilities
+    //   6) Display mode switching and status
+    //   7) Plot initialization
+    //   8) Streaming loop (fetchData) -> delegates drawing to SignalShared
+    // ================================================
+    let streaming = false, intervalId = null;
+    let updateSpeed = 1, allChannels = [], selectedChannels = [], widthSec = 5;
+    let nativeFs = 500, displayFs = 200;
+    let channelData = {}, globalStart = 0;
+    let colormap = "Jet";
+    let polarMode = "fixed";
+    let currentDisplay = 'Time';
+    let filesUploaded = false;
+    let requestedSampling = null; // value applied via Apply Sampling
 
-// Shared orchestrator state
-let ssBuffers = {}; // { chIndex: {data:[], time:[]} }
-let nameMap = {};   // { "0": "Lead 1", ... }
-let ssGlobalTime = 0;
-
-
+    // Shared orchestrator state
+    let ssBuffers = {}; // { chIndex: {data:[], time:[]} }
+    let nameMap = {};   // { "0": "Lead 1", ... }
+    let ssGlobalTime = 0;
 
 
 
-function cleanChannelName(name){
-  return String(name).trim().toUpperCase().split(/[-_/\s().]/)[0].replace(/[^A-Z0-9]/g, '');
-}
-
-/**
- * Render the list of channel checkboxes based on provided map {index -> label}.
- * Also wires change listener to keep selectedChannels in sync and updates counts.
- */
-function renderChannelCheckboxes(channelsToShow){
-  const channelListDiv = document.getElementById('channelList');
-  if(!channelListDiv) return;
-  channelListDiv.innerHTML = '';
-  const indices = Object.keys(channelsToShow).sort((a,b)=>parseInt(a)-parseInt(b));
-  if(indices.length===0){ channelListDiv.innerHTML = '<p class="text-center text-gray-500">Channels load after file upload.</p>'; return; }
-  indices.forEach(idx=>{
-    const id = `ch_${idx}`;
-    const div = document.createElement('div');
-    div.className = 'form-check';
-    const label = channelsToShow[idx];
-    div.innerHTML = `<input class="form-check-input" type="checkbox" name="channels" value="${idx}" id="${id}"> <label class="form-check-label" for="${id}">${label}</label>`;
-    channelListDiv.appendChild(div);
-  });
-  channelListDiv.addEventListener('change', ()=>{ selectedChannels = getSelectedChannels(); updateStartEnable(); applyDisplaySelection(currentDisplay); });
-  // reflect count
-  const cc = document.getElementById('ecgChannelCount');
-  if(cc){ cc.textContent = String(document.querySelectorAll('#channelList input[name=channels]:checked').length); }
-}
-
-// Enable Start only if files uploaded and at least one channel selected
-/**
- * Return currently selected channel indices from the checkbox list (or fallback select).
- */
-function getSelectedChannels(){
-  //checkboxes inside #channelList
-  const boxes = document.querySelectorAll('#channelList input[name=channels]:checked');
-  if(boxes && boxes.length){
-    return Array.from(boxes).map(cb=>parseInt(cb.value)).filter(v=>!isNaN(v));
-  }
-  // fallback to multi-select if present
-  const sel = document.getElementById('channelSelect');
-  if(sel){
-    return Array.from(sel.selectedOptions).map(o=>parseInt(o.value)).filter(v=>!isNaN(v));
-  }
-  return [];
-}
-
-/**
- * Enable the Start button only when files are uploaded AND at least one channel is selected.
- * Also reflects the live count in the stats panel.
- */
-function updateStartEnable(){
-  try{
-    const anySelected = getSelectedChannels().length>0;
-    const canStart = filesUploaded && anySelected;
-    if(startBtn){ startBtn.disabled = !canStart; }
-    const cc = document.getElementById('ecgChannelCount');
-    if(cc){ cc.textContent = String(getSelectedChannels().length); }
-  }catch(e){}
-}
 
 
-// Init config
-/**
- * Fetch initial configuration from /ecg/config.
- * - Sets native/display Fs and slider limits
- * - Loads channel names and renders checkboxes
- * - Prepares UI to allow streaming after upload
- * - bnghz l UI 3la hasab l settings l gaya mn l ecg(backend)
- * - by call ecg/config we get the values of the native fs and display fs and the channels name from json file
- * - byzbt l channels wl slider (yhot l max wl min)(UI only until fetch data sends sampling-freq)
- * - renderChannelCheckboxes(allAvailableChannels); bt3rd l channels 
- * - updateStartEnable(); bbt2kd an l start button atf3l bs lma l user l awl y upload file w ykhtar at least one channel
- */
-async function initConfig(){
-  try{
-    const cfg = await fetch("/ecg/config").then(r=>r.json());
-    nativeFs = cfg.fs_native || cfg.fs || nativeFs;
-    displayFs = cfg.display_fs || displayFs;
-    // Default UI to a safe cap of 500 Hz (or native if lower) 
-    requestedSampling = Math.min(500, nativeFs);
-    const sliderEl = document.getElementById("freqSlider");
-    sliderEl.max = Math.min(500, nativeFs);
-    sliderEl.value = requestedSampling;
-    // IMPORTANT: The slider is UI-only until fetchData sends sampling_freq.
-    // The backend may clamp further (<= nativeFs, <= 500). We then read back
-    // the actually used sampling in responses and mirror it into the label.
-    document.getElementById("freqValue").innerText = requestedSampling + " Hz";
-    // Build channel maps from server channels or fallback to Lead 1..N.
-    // cleanChannelName() lets montage name lists map to actual indices.
-    allChannels = cfg.channels || Array.from({length:12}, (_,i)=>`Lead ${i+1}`);
-    channelNameMap = {}; channelIndexToOriginalName = {}; allAvailableChannels = {};
-    allChannels.forEach((nm,i)=>{ channelIndexToOriginalName[i]=nm; channelNameMap[cleanChannelName(nm)] = i; allAvailableChannels[i]=nm; });
-    // Render the checkbox list and gate Start by file-upload + selection.
-    renderChannelCheckboxes(allAvailableChannels);
-    updateStartEnable();
-  }catch(e){ console.warn("Config fetch failed", e); }
-}
-initConfig();
-
-// UI wiring
-document.getElementById("colormapSelect").addEventListener("change",(ev)=>{ colormap=ev.target.value; });
-document.getElementById("polarModeSelect").addEventListener("change", (ev)=>{ polarMode = ev.target.value; });
-const xorThresholdInput = document.getElementById('xorThreshold');
-const xorControls = document.getElementById('xorControls');
-const xorChannelSelect = document.getElementById('xorChannel');
-const xorChunkPeriod = document.getElementById('xorChunkPeriod');
-const xorChunkPeriodLabel = document.getElementById('xorChunkPeriodLabel');
-const xorDuration = document.getElementById('xorDuration');
-const xorDurationLabel = document.getElementById('xorDurationLabel');
-const xorThresholdLabel = document.getElementById('xorThresholdLabel');
-const xorHint = document.getElementById('xorHint');
-let xorDurationSec = 10;
-let xorPeriodSec = 1.0;
-
-
-
-// XOR controls listeners
-if(xorChunkPeriod){ xorChunkPeriod.addEventListener('input', (e)=>{ xorPeriodSec = parseFloat(e.target.value)||1; xorChunkPeriodLabel.textContent = `${xorPeriodSec.toFixed(1)}s`; }); }
-if(xorDuration){ xorDuration.addEventListener('input', (e)=>{ xorDurationSec = parseFloat(e.target.value)||10; xorDurationLabel.textContent = `${xorDurationSec}s`; }); }
-if(xorThresholdInput){ xorThresholdInput.addEventListener('input', (e)=>{ xorThresholdLabel.textContent = `${parseFloat(e.target.value).toFixed(2)}`; }); }
-
-const dropZone = document.getElementById('dropZone');
-const filePicker = document.getElementById('filePicker');
-const startBtn = document.getElementById('startBtn');
-document.getElementById('pickFiles').addEventListener('click', (e)=>{ e.preventDefault(); filePicker.click(); });
-['dragenter','dragover','dragleave','drop'].forEach(evt => dropZone.addEventListener(evt, e=>e.preventDefault()));
-dropZone.addEventListener('dragover', ()=> dropZone.style.borderColor = '#88cc88');
-dropZone.addEventListener('dragleave', ()=> dropZone.style.borderColor = '#a78bfa');
-dropZone.addEventListener('drop', (e)=>{
-  dropZone.style.borderColor='#a78bfa';
-  handleFiles(e.dataTransfer.files);
-});
-filePicker.addEventListener('change', (e)=> handleFiles(e.target.files));
-
-/**
- * when user darg and drop files -> handlefiles is triggered.
- * front end sends post request to backend (ecg/upload).
- * backend receives the files and save them to uploads folder.
- * identifies files extensions(.hea/.dat) 
- * backend responds with json .
- * front end updates UI to allow streaming after upload.
- */
-function handleFiles(fileList){ // upload ECG files
-  if(!fileList || fileList.length===0) return;
-  const fd = new FormData();
-  for(const f of fileList){ fd.append('files', f, f.name); }
-  dropZone.innerText = 'Uploading...';
-  fetch('/ecg/upload', { method:'POST', body: fd })
-    .then(r=>r.json())
-    .then(j=>{
-      if(j && j.success){
-        filesUploaded = true;
-        dropZone.innerText = 'Upload successful';
-        updateStartEnable();
-        setTimeout(()=>{ initConfig(); dropZone.innerText = 'Drop files here or choose files'; }, 800);
-      } else {
-        filesUploaded = false;
-        dropZone.innerText = 'Upload failed';
-        alert('Upload failed: ' + (j && j.error ? j.error : JSON.stringify(j)));
-        setTimeout(()=> dropZone.innerText = 'Drop files here or choose files', 1200);
-        updateStartEnable();
-      }
-    }).catch(err=>{
-      console.error(err);
-      filesUploaded = false;
-      dropZone.innerText = 'Upload error';
-      setTimeout(()=> dropZone.innerText = 'Drop files here or choose files', 1200);
-      updateStartEnable();
-    });
-  resizeVisiblePlots();
-}
-
-// Resize helper to fit container width for visible plot
-/**
- * Resize the currently visible plot to match its container card dimensions.
- * Invoked on window resize and after display mode changes.
- */
-function resizeVisiblePlots(){
-  const active = currentDisplay||'Time';
-  const map = { 'Time':'timePlot', 'XOR':'xorPlot', 'Polar':'polarPlot', 'Recurrence':'recurrenceScatterPlot' };
-  const pid = map[active];
-  fitPlotToContainer(pid);
-}
-
-window.addEventListener('resize', resizeVisiblePlots);
-
-// Force a plot to exactly match its closest .plot-container dimensions
-/**
- * Compute inner content size of the surrounding .plot-container and force Plotly
- * to adopt that exact width/height so the card looks crisp and responsive.
- */
-function fitPlotToContainer(plotId){
-  if(!plotId) return;
-  const plotDiv = document.getElementById(plotId);
-  if(!plotDiv) return;
-  const container = plotDiv.closest('.plot-container') || plotDiv.parentElement;
-  if(!container) return;
-  try{
-    const cs = getComputedStyle(container);
-    const padX = parseFloat(cs.paddingLeft||'0') + parseFloat(cs.paddingRight||'0');
-    const padY = parseFloat(cs.paddingTop||'0') + parseFloat(cs.paddingBottom||'0');
-    const w = Math.max(0, container.clientWidth - padX);
-    const h = Math.max(0, container.clientHeight - padY);
-    if(w>0 && h>0){
-      // Ensure the inner plot DIV matches the content height exactly
-      plotDiv.style.height = h + 'px';
-      plotDiv.style.width = w + 'px';
-      Plotly.relayout(plotId, { width: w, height: h, autosize: false });
-    } else {
-      Plotly.Plots.resize(plotDiv);
+    function cleanChannelName(name) {
+      return String(name).trim().toUpperCase().split(/[-_/\s().]/)[0].replace(/[^A-Z0-9]/g, '');
     }
-  }catch(e){}
-}
 
-// Display selection
-const containers = {
-  'Time': document.getElementById('timePlot').closest('.plot-container'),
-  'XOR': document.getElementById('xorPlot').closest('.plot-container'),
-  'Polar': document.getElementById('polarPlot').closest('.plot-container'),
-  'Recurrence': document.getElementById('recurrenceScatterPlot').closest('.plot-container')
-};
-const statusDot = document.getElementById('statusDot');
-const statusText = document.getElementById('statusText');
-const timeModeButton = document.getElementById('timeModeButton');
-const xorModeButton = document.getElementById('xorModeButton');
-const polarModeButton = document.getElementById('polarModeButton');
-const recurrenceModeButton = document.getElementById('recurrenceModeButton');
+    /**
+     * Render the list of channel checkboxes based on provided map {index -> label}.
+     * Also wires change listener to keep selectedChannels in sync and updates counts.
+     */
+    function renderChannelCheckboxes(channelsToShow) {
+      const channelListDiv = document.getElementById('channelList');
+      if (!channelListDiv) return;
+      channelListDiv.innerHTML = '';
+      const indices = Object.keys(channelsToShow).sort((a, b) => parseInt(a) - parseInt(b));
+      if (indices.length === 0) { channelListDiv.innerHTML = '<p class="text-center text-gray-500">Channels load after file upload.</p>'; return; }
+      indices.forEach(idx => {
+        const id = `ch_${idx}`;
+        const div = document.createElement('div');
+        div.className = 'form-check';
+        const label = channelsToShow[idx];
+        div.innerHTML = `<input class="form-check-input" type="checkbox" name="channels" value="${idx}" id="${id}"> <label class="form-check-label" for="${id}">${label}</label>`;
+        channelListDiv.appendChild(div);
+      });
+      channelListDiv.addEventListener('change', () => { selectedChannels = getSelectedChannels(); updateStartEnable(); applyDisplaySelection(currentDisplay); });
+      // reflect count
+      const cc = document.getElementById('ecgChannelCount');
+      if (cc) { cc.textContent = String(document.querySelectorAll('#channelList input[name=channels]:checked').length); }
+    }
 
-function syncNavActive(){
-  const map = { 'Time': timeModeButton, 'XOR': xorModeButton, 'Polar': polarModeButton, 'Recurrence': recurrenceModeButton };
-  ['Time','XOR','Polar','Recurrence'].forEach(k=>{
-    const btn = map[k]; if(!btn) return;
-    if(currentDisplay===k){ btn.classList.add('active'); } else { btn.classList.remove('active'); }
-  });
-}
-function setStatus(active, text){
-  if(statusDot){
-    statusDot.classList.toggle('active', !!active);
-  }
-  if(statusText){ statusText.textContent = text || (active ? 'Streaming' : 'Ready'); }
-  const st = document.getElementById('ecgStatus');
-  if(st){ st.textContent = active ? 'Streaming' : 'Idle'; }
-}
+    // Enable Start only if files uploaded and at least one channel selected
+    /**
+     * Return currently selected channel indices from the checkbox list (or fallback select).
+     */
+    function getSelectedChannels() {
+      //checkboxes inside #channelList
+      const boxes = document.querySelectorAll('#channelList input[name=channels]:checked');
+      if (boxes && boxes.length) {
+        return Array.from(boxes).map(cb => parseInt(cb.value)).filter(v => !isNaN(v));
+      }
+      // fallback to multi-select if present
+      const sel = document.getElementById('channelSelect');
+      if (sel) {
+        return Array.from(sel.selectedOptions).map(o => parseInt(o.value)).filter(v => !isNaN(v));
+      }
+      return [];
+    }
+
+    /**
+     * Enable the Start button only when files are uploaded AND at least one channel is selected.
+     * Also reflects the live count in the stats panel.
+     */
+    function updateStartEnable() {
+      try {
+        const anySelected = getSelectedChannels().length > 0;
+        const canStart = filesUploaded && anySelected;
+        if (startBtn) { startBtn.disabled = !canStart; }
+        const cc = document.getElementById('ecgChannelCount');
+        if (cc) { cc.textContent = String(getSelectedChannels().length); }
+      } catch (e) { }
+    }
 
 
-function applyDisplaySelection(val){
-  currentDisplay = val;
-  // Use viewport-based heights to keep plots fully visible and consistent
-  const vh = Math.max(420, Math.floor(window.innerHeight * 0.75));
-  const sizes = {
-    'Time': `${vh}px`,
-    'XOR': `${Math.max(440, Math.floor(vh * 0.85))}px`,
-    'Polar': `${vh}px`,
-    'Recurrence': `${Math.max(420, Math.floor(vh * 0.8))}px`
-  };
-  Object.keys(containers).forEach(k=>{
-    const plotId = (k==='Time')?'timePlot':(k==='XOR')?'xorPlot':(k==='Polar')?'polarPlot':'recurrenceScatterPlot';
-    const plotDiv = document.getElementById(plotId);
-    if(k===currentDisplay){
-      containers[k].style.display='block';
-      // Set the container card height, then force Plotly div to exact px
-      const targetH = sizes[k] || `${vh}px`;
-      containers[k].style.height = targetH;
-      // Do not set an inline height on plotDiv; relayout will set exact pixels
-      try{
-        if(plotDiv){
-          // Compute numeric height/width and relayout to exact pixels
-          const container = containers[k];
-          const cs = getComputedStyle(container);
-          const padX = parseFloat(cs.paddingLeft||'0') + parseFloat(cs.paddingRight||'0');
-          const padY = parseFloat(cs.paddingTop||'0') + parseFloat(cs.paddingBottom||'0');
-          const w = Math.max(0, container.clientWidth - padX);
-          const h = Math.max(0, container.clientHeight - padY);
-          Plotly.relayout(plotId,{width:w, height:h, autosize:false});
+    // Init config
+    /**
+     * Fetch initial configuration from /ecg/config.
+     * - Sets native/display Fs and slider limits
+     * - Loads channel names and renders checkboxes
+     * - Prepares UI to allow streaming after upload
+     * - bnghz l UI 3la hasab l settings l gaya mn l ecg(backend)
+     * - by call ecg/config we get the values of the native fs and display fs and the channels name from json file
+     * - byzbt l channels wl slider (yhot l max wl min)(UI only until fetch data sends sampling-freq)
+     * - renderChannelCheckboxes(allAvailableChannels); bt3rd l channels 
+     * - updateStartEnable(); bbt2kd an l start button atf3l bs lma l user l awl y upload file w ykhtar at least one channel
+     */
+    async function initConfig() {
+      try {
+        const cfg = await fetch("/ecg/config").then(r => r.json());
+        nativeFs = cfg.fs_native || cfg.fs || nativeFs;
+        displayFs = cfg.display_fs || displayFs;
+        // Default UI to a safe cap of 500 Hz (or native if lower) 
+        requestedSampling = Math.min(500, nativeFs);
+        const sliderEl = document.getElementById("freqSlider");
+        sliderEl.max = Math.min(500, nativeFs);
+        sliderEl.value = requestedSampling;
+        // IMPORTANT: The slider is UI-only until fetchData sends sampling_freq.
+        // The backend may clamp further (<= nativeFs, <= 500). We then read back
+        // the actually used sampling in responses and mirror it into the label.
+        document.getElementById("freqValue").innerText = requestedSampling + " Hz";
+        // Build channel maps from server channels or fallback to Lead 1..N.
+        // cleanChannelName() lets montage name lists map to actual indices.
+        allChannels = cfg.channels || Array.from({ length: 12 }, (_, i) => `Lead ${i + 1}`);
+        channelNameMap = {}; channelIndexToOriginalName = {}; allAvailableChannels = {};
+        allChannels.forEach((nm, i) => { channelIndexToOriginalName[i] = nm; channelNameMap[cleanChannelName(nm)] = i; allAvailableChannels[i] = nm; });
+        // Render the checkbox list and gate Start by file-upload + selection.
+        renderChannelCheckboxes(allAvailableChannels);
+        updateStartEnable();
+      } catch (e) { console.warn("Config fetch failed", e); }
+    }
+    initConfig();
+
+    // UI wiring
+    document.getElementById("colormapSelect").addEventListener("change", (ev) => { colormap = ev.target.value; });
+    document.getElementById("polarModeSelect").addEventListener("change", (ev) => { polarMode = ev.target.value; });
+    const xorThresholdInput = document.getElementById('xorThreshold');
+    const xorControls = document.getElementById('xorControls');
+    const xorChannelSelect = document.getElementById('xorChannel');
+    const xorChunkPeriod = document.getElementById('xorChunkPeriod');
+    const xorChunkPeriodLabel = document.getElementById('xorChunkPeriodLabel');
+    const xorDuration = document.getElementById('xorDuration');
+    const xorDurationLabel = document.getElementById('xorDurationLabel');
+    const xorThresholdLabel = document.getElementById('xorThresholdLabel');
+    const xorHint = document.getElementById('xorHint');
+    let xorDurationSec = 10;
+    let xorPeriodSec = 1.0;
+
+
+
+    // XOR controls listeners
+    if (xorChunkPeriod) { xorChunkPeriod.addEventListener('input', (e) => { xorPeriodSec = parseFloat(e.target.value) || 1; xorChunkPeriodLabel.textContent = `${xorPeriodSec.toFixed(1)}s`; }); }
+    if (xorDuration) { xorDuration.addEventListener('input', (e) => { xorDurationSec = parseFloat(e.target.value) || 10; xorDurationLabel.textContent = `${xorDurationSec}s`; }); }
+    if (xorThresholdInput) { xorThresholdInput.addEventListener('input', (e) => { xorThresholdLabel.textContent = `${parseFloat(e.target.value).toFixed(2)}`; }); }
+
+    const dropZone = document.getElementById('dropZone');
+    const filePicker = document.getElementById('filePicker');
+    const startBtn = document.getElementById('startBtn');
+    document.getElementById('pickFiles').addEventListener('click', (e) => { e.preventDefault(); filePicker.click(); });
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(evt => dropZone.addEventListener(evt, e => e.preventDefault()));
+    dropZone.addEventListener('dragover', () => dropZone.style.borderColor = '#88cc88');
+    dropZone.addEventListener('dragleave', () => dropZone.style.borderColor = '#a78bfa');
+    dropZone.addEventListener('drop', (e) => {
+      dropZone.style.borderColor = '#a78bfa';
+      handleFiles(e.dataTransfer.files);
+    });
+    filePicker.addEventListener('change', (e) => handleFiles(e.target.files));
+
+    /**
+     * when user darg and drop files -> handlefiles is triggered.
+     * front end sends post request to backend (ecg/upload).
+     * backend receives the files and save them to uploads folder.
+     * identifies files extensions(.hea/.dat) 
+     * backend responds with json .
+     * front end updates UI to allow streaming after upload.
+     */
+    function handleFiles(fileList) { // upload ECG files
+      if (!fileList || fileList.length === 0) return;
+      const fd = new FormData();
+      for (const f of fileList) { fd.append('files', f, f.name); }
+      dropZone.innerText = 'Uploading...';
+      fetch('/ecg/upload', { method: 'POST', body: fd })
+        .then(r => r.json())
+        .then(j => {
+          if (j && j.success) {
+            filesUploaded = true;
+            dropZone.innerText = 'Upload successful';
+            updateStartEnable();
+            setTimeout(() => { initConfig(); dropZone.innerText = 'Drop files here or choose files'; }, 800);
+          } else {
+            filesUploaded = false;
+            dropZone.innerText = 'Upload failed';
+            alert('Upload failed: ' + (j && j.error ? j.error : JSON.stringify(j)));
+            setTimeout(() => dropZone.innerText = 'Drop files here or choose files', 1200);
+            updateStartEnable();
+          }
+        }).catch(err => {
+          console.error(err);
+          filesUploaded = false;
+          dropZone.innerText = 'Upload error';
+          setTimeout(() => dropZone.innerText = 'Drop files here or choose files', 1200);
+          updateStartEnable();
+        });
+      resizeVisiblePlots();
+    }
+
+    // Resize helper to fit container width for visible plot
+    /**
+     * Resize the currently visible plot to match its container card dimensions.
+     * Invoked on window resize and after display mode changes.
+     */
+    function resizeVisiblePlots() {
+      const active = currentDisplay || 'Time';
+      const map = { 'Time': 'timePlot', 'XOR': 'xorPlot', 'Polar': 'polarPlot', 'Recurrence': 'recurrenceScatterPlot' };
+      const pid = map[active];
+      fitPlotToContainer(pid);
+    }
+
+    window.addEventListener('resize', resizeVisiblePlots);
+
+    // Force a plot to exactly match its closest .plot-container dimensions
+    /**
+     * Compute inner content size of the surrounding .plot-container and force Plotly
+     * to adopt that exact width/height so the card looks crisp and responsive.
+     */
+    function fitPlotToContainer(plotId) {
+      if (!plotId) return;
+      const plotDiv = document.getElementById(plotId);
+      if (!plotDiv) return;
+      const container = plotDiv.closest('.plot-container') || plotDiv.parentElement;
+      if (!container) return;
+      try {
+        const cs = getComputedStyle(container);
+        const padX = parseFloat(cs.paddingLeft || '0') + parseFloat(cs.paddingRight || '0');
+        const padY = parseFloat(cs.paddingTop || '0') + parseFloat(cs.paddingBottom || '0');
+        const w = Math.max(0, container.clientWidth - padX);
+        const h = Math.max(0, container.clientHeight - padY);
+        if (w > 0 && h > 0) {
+          // Ensure the inner plot DIV matches the content height exactly
+          plotDiv.style.height = h + 'px';
+          plotDiv.style.width = w + 'px';
+          Plotly.relayout(plotId, { width: w, height: h, autosize: false });
+        } else {
           Plotly.Plots.resize(plotDiv);
         }
-      }catch(e){}
-    } else { containers[k].style.display='none'; }
-  });
-  // Resize visible plot once more after layout shifts
-  resizeVisiblePlots();
-  syncNavActive();
-  // Run a double-fit on next two frames to ensure final dimensions stick
-  try{
-    const map = { 'Time':'timePlot', 'XOR':'xorPlot', 'Polar':'polarPlot', 'Recurrence':'recurrenceScatterPlot' };
-    const pid = map[currentDisplay||'Time'];
-    if(pid){
-      requestAnimationFrame(()=>{
-        fitPlotToContainer(pid);
-        requestAnimationFrame(()=>{ fitPlotToContainer(pid); });
+      } catch (e) { }
+    }
+
+    // Display selection
+    const containers = {
+      'Time': document.getElementById('timePlot').closest('.plot-container'),
+      'XOR': document.getElementById('xorPlot').closest('.plot-container'),
+      'Polar': document.getElementById('polarPlot').closest('.plot-container'),
+      'Recurrence': document.getElementById('recurrenceScatterPlot').closest('.plot-container')
+    };
+    const statusDot = document.getElementById('statusDot');
+    const statusText = document.getElementById('statusText');
+    const timeModeButton = document.getElementById('timeModeButton');
+    const xorModeButton = document.getElementById('xorModeButton');
+    const polarModeButton = document.getElementById('polarModeButton');
+    const recurrenceModeButton = document.getElementById('recurrenceModeButton');
+
+    function syncNavActive() {
+      const map = { 'Time': timeModeButton, 'XOR': xorModeButton, 'Polar': polarModeButton, 'Recurrence': recurrenceModeButton };
+      ['Time', 'XOR', 'Polar', 'Recurrence'].forEach(k => {
+        const btn = map[k]; if (!btn) return;
+        if (currentDisplay === k) { btn.classList.add('active'); } else { btn.classList.remove('active'); }
       });
     }
-  }catch(e){}
-  // XOR controls visibility + channel dropdown sync
-  if(currentDisplay==='XOR'){
-    const one = selectedChannels.length===1;
-    if(xorControls) xorControls.style.display = one ? 'block' : 'none';
-    if(xorHint) xorHint.style.display = one ? 'none' : 'block';
-    if(one && xorChannelSelect){
-      xorChannelSelect.innerHTML = '';
-      const ch = selectedChannels[0];
-      const opt = document.createElement('option');
-      opt.value = String(ch);
-      opt.textContent = nameMap[String(ch)] || `Lead ${ch+1}`;
-      xorChannelSelect.appendChild(opt);
-      xorChannelSelect.value = String(ch);
+    function setStatus(active, text) {
+      if (statusDot) {
+        statusDot.classList.toggle('active', !!active);
+      }
+      if (statusText) { statusText.textContent = text || (active ? 'Streaming' : 'Ready'); }
+      const st = document.getElementById('ecgStatus');
+      if (st) { st.textContent = active ? 'Streaming' : 'Idle'; }
     }
-  } else if(currentDisplay==='Recurrence'){
-    const two = selectedChannels.length===2;
-    const recHint = document.getElementById('recHint');
-    if(recHint) recHint.style.display = two ? 'none' : 'block';
-    if(xorControls) xorControls.style.display = 'none';
-    if(xorHint) xorHint.style.display = 'none';
-  } else {
-    if(xorControls) xorControls.style.display = 'none';
-    if(xorHint) xorHint.style.display = 'none';
-    const recHint = document.getElementById('recHint');
-    if(recHint) recHint.style.display = 'none';
-  }
-}
-
-// Wire header nav buttons
-if(timeModeButton) timeModeButton.addEventListener('click', ()=> applyDisplaySelection('Time'));
-if(xorModeButton) xorModeButton.addEventListener('click', ()=> applyDisplaySelection('XOR'));
-if(polarModeButton) polarModeButton.addEventListener('click', ()=> applyDisplaySelection('Polar'));
-if(recurrenceModeButton) recurrenceModeButton.addEventListener('click', ()=> applyDisplaySelection('Recurrence'));
-
-// Initial mode
-applyDisplaySelection('Time');
-
-// Frequency slider
-const freqSlider = document.getElementById('freqSlider');
-const freqValue = document.getElementById('freqValue');
-let __freqDebounce = null;
-freqSlider.addEventListener('input', (e)=>{
-  const val = parseFloat(e.target.value)||requestedSampling||nativeFs;
-  freqValue.innerText = val + " Hz";
-  if(__freqDebounce) clearTimeout(__freqDebounce);
-  __freqDebounce = setTimeout(async ()=>{
-    try{
-      const res = await fetch('/ecg/set_sampling', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ sampling_freq: val }) });
-      const j = await res.json();
-      if(j && j.success){
-        requestedSampling = j.current_sampling;
-        const sr = document.getElementById('ecgSampleRate');
-        if(sr) sr.textContent = requestedSampling + ' Hz';
-      }
-    }catch(err){}
-  }, 200);
-});
 
 
-// Form submit (start)  
-document.getElementById("channelForm").addEventListener("submit", ev=>{
-  ev.preventDefault();
-  if(!filesUploaded){ alert("Please upload files first."); return; }
-  selectedChannels = Array.from(document.querySelectorAll("input[name=channels]:checked")).map(n=>parseInt(n.value));
-  widthSec = parseFloat(document.getElementById("width").value)||5;
-  updateSpeed = parseFloat(document.getElementById("speedControl").value)||1;
-  if(selectedChannels.length===0){ alert("Select channel(s)"); return; }
-
-  channelData={}; globalStart=0; ssGlobalTime = 0;
-  // reset shared buffers for selected channels
-  ssBuffers = {};
-  selectedChannels.forEach(ch=>{ ssBuffers[ch] = { data: [], time: [] }; });
-  // build name map for shared plots
-  nameMap = {};
-  allChannels.forEach((nm, i)=>{ nameMap[String(i)] = nm; });
-  selectedChannels.forEach(ch=>channelData[ch]=[]);
-  initPlots(selectedChannels);
-  streaming=true;
-  setStatus(true, 'Streaming');
-  if(intervalId) clearInterval(intervalId);
-  intervalId=setInterval(fetchData,1000/updateSpeed);
-});
-
-document.getElementById("stopBtn").addEventListener("click", ()=>{
-  streaming=false;
-  if(intervalId) clearInterval(intervalId);
-  setStatus(false, 'Stopped');
-});
-
-// Update speed change
-document.getElementById("speedControl").addEventListener("change", ev=>{
-  updateSpeed = parseFloat(ev.target.value)||1;
-  if(streaming){
-    if(intervalId) clearInterval(intervalId);
-    intervalId=setInterval(fetchData,1000/updateSpeed);
-  }
-});
-
-/**
- * Initialize empty Plotly figures for all modes using selected channels.
- * Time: one line per channel.
- * XOR: if 1 ch, scatter of abs(diff) over time-within-chunk.
- * Polar: per-channel scatterpolar (fixed or cumulative per fetchData state).
- * Recurrence: if 2 ch, histogram2d density (SignalShared fills data later).
- */
-function initPlots(channels){
-  if(!filesUploaded) return;
-  const timeTraces = channels.map(ch=>({
-    x:[],y:[],mode:"lines",name:"",
-    line:{width:1.4, shape:'spline', smoothing:1.15},
-    showlegend:false, hoverinfo:'none'
-  }));
-  Plotly.newPlot("timePlot", timeTraces, {
-    title:{ text:'Real-time ECG (time domain)', x:0.5, xanchor:'center' },
-    paper_bgcolor:"#ffffff", plot_bgcolor:"#ffffff", font:{color:"#1e293b"},
-    margin:{l:60,r:14,t:56,b:52}, autosize:true,
-    xaxis:{title:{text:"Time (s)", standoff:10}, range:[0,widthSec], gridcolor:"#e2e8f0", dtick:2},
-    yaxis:{title:{text:"Amplitude", standoff:10}, gridcolor:"#e2e8f0", autorange:true},
-    showlegend:false
-  }, {responsive:true, displayModeBar:false, displaylogo:false});
-  fitPlotToContainer('timePlot');
-
-  if(channels.length===1){
-    try{ SignalShared.initXorPlot('xorPlot', { paper_bgcolor:'#ffffff', plot_bgcolor:'#ffffff', font:{color:'#1e293b'}, margin:{l:60,r:14,t:48,b:52} }); }catch(e){}
-    try{ Plotly.Plots.resize(document.getElementById('xorPlot')); }catch(e){}
-    fitPlotToContainer('xorPlot');
-  }
-
-  // Initialize Polar via shared helper
-  try{
-    const initColors = ["#A855F7","#D946EF","#7C3AED","#C084FC","#E879F9","#A78BFA","#9333EA","#E9D5FF","#C026D3","#F0ABFC"];
-    SignalShared.initPolarPlot("polarPlot", channels, nameMap, widthSec, (polarMode === 'cumulative'), initColors,
-      { title: { text: 'Polar Plot', x: 0.5, xanchor: 'center' }, paper_bgcolor: '#ffffff', plot_bgcolor: '#ffffff', font: { color: '#1e293b' }, margin: { l: 60, r: 14, t: 48, b: 52 }, polar: { bgcolor: '#ffffff', radialaxis: { gridcolor: '#e2e8f0', color: '#1e293b' }, angularaxis: { gridcolor: '#e2e8f0', color: '#1e293b' } } }
-    );
-  }catch(e){}
-  fitPlotToContainer('polarPlot');
-
-  if(channels.length===2){
-    const names = channels.map(ch=> (nameMap && nameMap[String(ch)]) ? nameMap[String(ch)] : `Lead ${ch+1}`);
-    // Initialize Recurrence via shared helper
-    try{
-      SignalShared.initRecurrencePlot("recurrenceScatterPlot", names[0], names[1], colormap,
-        { title: { text: 'Recurrence (density)', x: 0.5, xanchor: 'center' }, paper_bgcolor: '#ffffff', plot_bgcolor: '#ffffff', font: { color: '#1e293b' }, margin: { l: 60, r: 14, t: 48, b: 52 }, xaxis: { title: { text: names[0], standoff: 10 }, color: '#1e293b', gridcolor: '#e2e8f0' }, yaxis: { title: { text: names[1], standoff: 10 }, color: '#1e293b', gridcolor: '#e2e8f0' } }
-      );
-    }catch(e){}
-    fitPlotToContainer('recurrenceScatterPlot');
-  } else {
-    // Leave existing figure; fetchData gating will avoid updating until valid
-  }
-}
-
-//Sends current selected channels, window size, polar mode, XOR threshold, and sampling frequency to the backend.
-//Backend returns a JSON file containing signal data + predictions + aliasing info
-/**
- * Core streaming loop. Sends UI state to backend (ecg/update).
- * - Handles XOR-only mode early (single channel required)-> lw akhtar aktr mn one channel byzhr alert w mafesh fetch byhsl
- * - lw kol haga tamam yb3t post request ll backend bl information
- * - Uses SignalShared.fetchAndDispatchECG to update Time/Polar/Recurrence
- * - Updates sampling label and aliases plot title when downsampled
- * - Shows predictions and recurrence results from server
- */
-async function fetchData(){
-  if(!streaming) return;
-  try{
-    const xorThresholdVal = xorThresholdInput ? parseFloat(xorThresholdInput.value)||0.05 : 0.05;
-    const displayMode = (currentDisplay||'Time');
-    const mapped = displayMode.toLowerCase(); // 'time','xor','polar','recurrence','all'
-    // IMPORTANT: sampling_freq communicates the slider choice to the server.
-    // The server can still cap it. We always reflect the server-reported
-    // used_sampling_freq back into the label to avoid UI drift.
-    const payload = { channels: selectedChannels, width: widthSec, polar_mode: polarMode, xor_threshold: xorThresholdVal, sampling_freq: requestedSampling };
-
-    if(mapped === 'xor'){
-      if(selectedChannels.length!==1){
-        // show hint, do not fetch
-        if(xorControls) xorControls.style.display='none';
-        if(xorHint) xorHint.style.display='block';
-        return;
-      }
-      const result = await SignalShared.fetchJson('/ecg/update', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
-      const plotFs = result.display_fs || displayFs;
-      const usedFsRaw = (result && result.used_sampling_freq!=null) ? result.used_sampling_freq : (requestedSampling!=null ? requestedSampling : nativeFs);
-      const usedFs = Math.min(500, usedFsRaw);
-      document.getElementById('freqValue').innerText = usedFs + ' Hz';
-      const chXOR=selectedChannels[0];
-      const xorChunk=result.xor[String(chXOR)]||[];
-      const thr = parseFloat(xorThresholdInput?.value)||0.05;
-      try{ SignalShared.updateXorPlot('xorPlot', xorChunk, plotFs, { threshold: thr, periodSec: xorPeriodSec, durationSec: xorDurationSec }); }catch(e){}
+    function applyDisplaySelection(val) {
+      currentDisplay = val;
+      // Use viewport-based heights to keep plots fully visible and consistent
+      const vh = Math.max(420, Math.floor(window.innerHeight * 0.75));
+      const sizes = {
+        'Time': `${vh}px`,
+        'XOR': `${Math.max(440, Math.floor(vh * 0.85))}px`,
+        'Polar': `${vh}px`,
+        'Recurrence': `${Math.max(420, Math.floor(vh * 0.8))}px`
+      };
+      Object.keys(containers).forEach(k => {
+        const plotId = (k === 'Time') ? 'timePlot' : (k === 'XOR') ? 'xorPlot' : (k === 'Polar') ? 'polarPlot' : 'recurrenceScatterPlot';
+        const plotDiv = document.getElementById(plotId);
+        if (k === currentDisplay) {
+          containers[k].style.display = 'block';
+          // Set the container card height, then force Plotly div to exact px
+          const targetH = sizes[k] || `${vh}px`;
+          containers[k].style.height = targetH;
+          // Do not set an inline height on plotDiv; relayout will set exact pixels
+          try {
+            if (plotDiv) {
+              // Compute numeric height/width and relayout to exact pixels
+              const container = containers[k];
+              const cs = getComputedStyle(container);
+              const padX = parseFloat(cs.paddingLeft || '0') + parseFloat(cs.paddingRight || '0');
+              const padY = parseFloat(cs.paddingTop || '0') + parseFloat(cs.paddingBottom || '0');
+              const w = Math.max(0, container.clientWidth - padX);
+              const h = Math.max(0, container.clientHeight - padY);
+              Plotly.relayout(plotId, { width: w, height: h, autosize: false });
+              Plotly.Plots.resize(plotDiv);
+            }
+          } catch (e) { }
+        } else { containers[k].style.display = 'none'; }
+      });
+      // Resize visible plot once more after layout shifts
       resizeVisiblePlots();
-      if(xorControls) xorControls.style.display='block';
-      if(xorHint) xorHint.style.display='none';
-      return;
-    }
-
-    // Recurrence gating: require exactly two channels
-    if(mapped === 'recurrence' && selectedChannels.length !== 2){
-      const recHint = document.getElementById('recHint');
-      if(recHint) recHint.style.display = 'block';
-      return;
-    } else {
-      const recHint = document.getElementById('recHint');
-      if(recHint) recHint.style.display = 'none';
-    }
-
-    // IMPORTANT: Delegates rendering to SignalShared. It keeps per-plot
-    // buffers, applies widths, and updates traces. We pass ids/state here.
-    const out = await SignalShared.fetchAndDispatchECG({
-      updateUrl: '/ecg/update',
-      payload,
-      ids: { timeId: 'timePlot', polarId: 'polarPlot', recurrenceId: 'recurrenceScatterPlot' },
-      state: { fs: nativeFs, viewFs: displayFs, width: widthSec, isCumulativePolar: (polarMode === 'cumulative') },
-      selected: selectedChannels,
-      buffers: ssBuffers,
-      names: nameMap,
-      colors: ["#A855F7","#D946EF","#7C3AED","#C084FC","#E879F9","#A78BFA","#9333EA","#E9D5FF","#C026D3","#F0ABFC"],
-      colormap: colormap,
-      globalTime: ssGlobalTime,
-      display: mapped
-    });
-    if(out && typeof out.globalTime === 'number' && !Number.isNaN(out.globalTime)){
-      ssGlobalTime = out.globalTime;
-    }
-
-    const result = out && out.result ? out.result : {};
-    const plotFs = result.display_fs || displayFs;
-    const usedFsRaw = (result && result.used_sampling_freq!=null) ? result.used_sampling_freq : (requestedSampling!=null ? requestedSampling : nativeFs);
-    const usedFs = Math.min(500, usedFsRaw);
-    document.getElementById('freqValue').innerText = usedFs + ' Hz';
-    // IMPORTANT: Always trust server-reported sampling going forward so
-    // the UI timebases and aliasing notation stay consistent with backend.
-    displayFs = usedFs;
-    if(result && result.native_fs){ nativeFs = result.native_fs; }
-    // Annotate time plot title with aliasing indicator when downsampled
-    try {
-      const aliasing = (usedFs < nativeFs);
-      // IMPORTANT: Title tag is a visual cue only; no logic changes.
-      const aliasTag = aliasing ? ' (WITH ALIASING)' : '';
-      Plotly.relayout('timePlot', { title: `Real-time ECG (time domain)${aliasTag}` });
-    } catch(e){}
-
-    // Force a final fit so the inner graph height matches the visible card
-    try {
-      const active = currentDisplay || 'Time';
-      const map = { 'Time':'timePlot', 'XOR':'xorPlot', 'Polar':'polarPlot', 'Recurrence':'recurrenceScatterPlot' };
-      const pid = map[active];
-      // Compute and apply exact width/height to the active plot
-      fitPlotToContainer(pid);
-      // Tighten margins a bit to reclaim vertical space
-      const plotDiv = document.getElementById(pid);
-      if (plotDiv) {
-        const container = plotDiv.closest('.plot-container') || plotDiv.parentElement;
-        if (container) {
-          const cs = getComputedStyle(container);
-          const padX = parseFloat(cs.paddingLeft||'0') + parseFloat(cs.paddingRight||'0');
-          const padY = parseFloat(cs.paddingTop||'0') + parseFloat(cs.paddingBottom||'0');
-          const w = Math.max(0, container.clientWidth - padX);
-          const h = Math.max(0, container.clientHeight - padY);
-          if (w>0 && h>0) {
-            Plotly.relayout(pid, { width: w, height: h, autosize: false, margin: { t: 48, r: 10, b: 48, l: 54 } });
-          }
+      syncNavActive();
+      // Run a double-fit on next two frames to ensure final dimensions stick
+      try {
+        const map = { 'Time': 'timePlot', 'XOR': 'xorPlot', 'Polar': 'polarPlot', 'Recurrence': 'recurrenceScatterPlot' };
+        const pid = map[currentDisplay || 'Time'];
+        if (pid) {
+          requestAnimationFrame(() => {
+            fitPlotToContainer(pid);
+            requestAnimationFrame(() => { fitPlotToContainer(pid); });
+          });
         }
+      } catch (e) { }
+      // XOR controls visibility + channel dropdown sync
+      if (currentDisplay === 'XOR') {
+        const one = selectedChannels.length === 1;
+        if (xorControls) xorControls.style.display = one ? 'block' : 'none';
+        if (xorHint) xorHint.style.display = one ? 'none' : 'block';
+        if (one && xorChannelSelect) {
+          xorChannelSelect.innerHTML = '';
+          const ch = selectedChannels[0];
+          const opt = document.createElement('option');
+          opt.value = String(ch);
+          opt.textContent = nameMap[String(ch)] || `Lead ${ch + 1}`;
+          xorChannelSelect.appendChild(opt);
+          xorChannelSelect.value = String(ch);
+        }
+      } else if (currentDisplay === 'Recurrence') {
+        const two = selectedChannels.length === 2;
+        const recHint = document.getElementById('recHint');
+        if (recHint) recHint.style.display = two ? 'none' : 'block';
+        if (xorControls) xorControls.style.display = 'none';
+        if (xorHint) xorHint.style.display = 'none';
+      } else {
+        if (xorControls) xorControls.style.display = 'none';
+        if (xorHint) xorHint.style.display = 'none';
+        const recHint = document.getElementById('recHint');
+        if (recHint) recHint.style.display = 'none';
       }
-    } catch(e){}
-
-    if(filesUploaded){
-      const pred=result.prediction||{};
-      const rec=result.recurrence_prediction||{};
-      const alias=result.aliasing||{};
-      const predRes=document.getElementById('predictionResult');
-      const predDesc=document.getElementById('predictionDescription');
-      const recEl=document.getElementById('recurrencePrediction');
-      const diseaseEl=document.getElementById('diseaseName');
-      const aliasEl=document.getElementById('aliasingNote');
-
-      let disp=(pred&&typeof pred==='object')?(pred.smoothed||pred.raw||pred):null;
-      if(!disp||!disp.label){
-        predRes.innerText='N/A';
-        predDesc.innerText='';
-        diseaseEl.innerText='';
-      }else{
-        predRes.innerText=disp.label||'N/A';
-        predDesc.innerText=disp.description||'';
-        diseaseEl.innerText=disp.disease_name||'';
-      }
-
-      if(rec&&rec.label){
-        const conf=rec.confidence!==undefined?` (Confidence: ${(rec.confidence*100).toFixed(1)}%)`:'';
-        recEl.innerText=`Recurrence Prediction: ${rec.label}${conf}`;
-      }else{
-        recEl.innerText='';
-      }
-
-      // Aliasing notice removed as requested (no moderate/severe alerting)
-      aliasEl.innerText = '';
-      aliasEl.removeAttribute('style');
     }
 
-  }catch(err){
-    console.error(err);
-    streaming=false;
-    if(intervalId) clearInterval(intervalId);
-    setStatus(false, 'Error');
-    alert('Connection lost or server error — check console.');
-  }
-}
-</script>
+    // Wire header nav buttons
+    if (timeModeButton) timeModeButton.addEventListener('click', () => applyDisplaySelection('Time'));
+    if (xorModeButton) xorModeButton.addEventListener('click', () => applyDisplaySelection('XOR'));
+    if (polarModeButton) polarModeButton.addEventListener('click', () => applyDisplaySelection('Polar'));
+    if (recurrenceModeButton) recurrenceModeButton.addEventListener('click', () => applyDisplaySelection('Recurrence'));
+
+    // Initial mode
+    applyDisplaySelection('Time');
+
+    // Frequency slider
+    const freqSlider = document.getElementById('freqSlider');
+    const freqValue = document.getElementById('freqValue');
+    let __freqDebounce = null;
+    freqSlider.addEventListener('input', (e) => {
+      const val = parseFloat(e.target.value) || requestedSampling || nativeFs;
+      freqValue.innerText = val + " Hz";
+      if (__freqDebounce) clearTimeout(__freqDebounce);
+      __freqDebounce = setTimeout(async () => {
+        try {
+          const res = await fetch('/ecg/set_sampling', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sampling_freq: val }) });
+          const j = await res.json();
+          if (j && j.success) {
+            requestedSampling = j.current_sampling;
+            const sr = document.getElementById('ecgSampleRate');
+            if (sr) sr.textContent = requestedSampling + ' Hz';
+          }
+        } catch (err) { }
+      }, 200);
+    });
+
+
+    // Form submit (start)  
+    document.getElementById("channelForm").addEventListener("submit", ev => {
+      ev.preventDefault();
+      if (!filesUploaded) { alert("Please upload files first."); return; }
+      selectedChannels = Array.from(document.querySelectorAll("input[name=channels]:checked")).map(n => parseInt(n.value));
+      widthSec = parseFloat(document.getElementById("width").value) || 5;
+      updateSpeed = parseFloat(document.getElementById("speedControl").value) || 1;
+      if (selectedChannels.length === 0) { alert("Select channel(s)"); return; }
+
+      channelData = {}; globalStart = 0; ssGlobalTime = 0;
+      // reset shared buffers for selected channels
+      ssBuffers = {};
+      selectedChannels.forEach(ch => { ssBuffers[ch] = { data: [], time: [] }; });
+      // build name map for shared plots
+      nameMap = {};
+      allChannels.forEach((nm, i) => { nameMap[String(i)] = nm; });
+      selectedChannels.forEach(ch => channelData[ch] = []);
+      initPlots(selectedChannels);
+      streaming = true;
+      setStatus(true, 'Streaming');
+      if (intervalId) clearInterval(intervalId);
+      intervalId = setInterval(fetchData, 1000 / updateSpeed);
+    });
+
+    document.getElementById("stopBtn").addEventListener("click", () => {
+      streaming = false;
+      if (intervalId) clearInterval(intervalId);
+      setStatus(false, 'Stopped');
+    });
+
+    // Update speed change
+    document.getElementById("speedControl").addEventListener("change", ev => {
+      updateSpeed = parseFloat(ev.target.value) || 1;
+      if (streaming) {
+        if (intervalId) clearInterval(intervalId);
+        intervalId = setInterval(fetchData, 1000 / updateSpeed);
+      }
+    });
+
+    /**
+     * Initialize empty Plotly figures for all modes using selected channels.
+     * Time: one line per channel.
+     * XOR: if 1 ch, scatter of abs(diff) over time-within-chunk.
+     * Polar: per-channel scatterpolar (fixed or cumulative per fetchData state).
+     * Recurrence: if 2 ch, histogram2d density (SignalShared fills data later).
+     */
+    function initPlots(channels) {
+      if (!filesUploaded) return;
+      const timeTraces = channels.map(ch => ({
+        x: [], y: [], mode: "lines", name: "",
+        line: { width: 1.4, shape: 'spline', smoothing: 1.15 },
+        showlegend: false, hoverinfo: 'none'
+      }));
+      Plotly.newPlot("timePlot", timeTraces, {
+        title: { text: 'Real-time ECG (time domain)', x: 0.5, xanchor: 'center' },
+        paper_bgcolor: "#ffffff", plot_bgcolor: "#ffffff", font: { color: "#1e293b" },
+        margin: { l: 60, r: 14, t: 56, b: 52 }, autosize: true,
+        xaxis: { title: { text: "Time (s)", standoff: 10 }, range: [0, widthSec], gridcolor: "#e2e8f0", dtick: 2 },
+        yaxis: { title: { text: "Amplitude", standoff: 10 }, gridcolor: "#e2e8f0", autorange: true },
+        showlegend: false
+      }, { responsive: true, displayModeBar: false, displaylogo: false });
+      fitPlotToContainer('timePlot');
+
+      if (channels.length === 1) {
+        Plotly.newPlot("xorPlot", [{ x: [], y: [], mode: "markers", marker: { size: 6, color: '#3b82f6' }, showlegend: false, hoverinfo: 'x+y' }],
+          {
+            title: { text: 'XOR: Chunk N vs Chunk N-1', x: 0.5, xanchor: 'center' }, paper_bgcolor: "#ffffff", plot_bgcolor: "#ffffff", font: { color: "#1e293b" },
+            margin: { l: 60, r: 14, t: 48, b: 52 }, autosize: true,
+            xaxis: { title: { text: 'Time within Chunk [s]', standoff: 10 }, gridcolor: '#e2e8f0' }, yaxis: { title: { text: 'Absolute Difference', standoff: 10 }, gridcolor: '#e2e8f0' }, showlegend: false
+          }, { responsive: true });
+        Plotly.relayout("xorPlot", {}); // noop to ensure init
+        Plotly.Plots.resize(document.getElementById('xorPlot'));
+        fitPlotToContainer('xorPlot');
+      }
+
+      const polarTraces = channels.map(ch => ({ r: [], theta: [], mode: "lines", type: "scatterpolar", name: "", showlegend: false, hoverinfo: 'none' }));
+      Plotly.newPlot("polarPlot", polarTraces, { title: { text: 'Polar Plot', x: 0.5, xanchor: 'center' }, paper_bgcolor: "#ffffff", font: { color: "#1e293b" }, margin: { l: 60, r: 14, t: 48, b: 52 }, autosize: true, polar: { bgcolor: '#ffffff', radialaxis: { gridcolor: '#e2e8f0', color: '#1e293b' }, angularaxis: { gridcolor: '#e2e8f0', color: '#1e293b' } }, showlegend: false }, { responsive: true, displayModeBar: false, displaylogo: false });
+      fitPlotToContainer('polarPlot');
+
+      if (channels.length === 2) {
+        const names = channels.map(ch => (nameMap && nameMap[String(ch)]) ? nameMap[String(ch)] : `Lead ${ch + 1}`);
+        // Initialize as histogram2d to match SignalShared.updateRecurrencePlot
+        Plotly.newPlot("recurrenceScatterPlot", [
+          { x: [], y: [], type: "histogram2d", colorscale: colormap, showscale: true, name: 'Density' }
+        ], {
+          title: { text: 'Recurrence (density)', x: 0.5, xanchor: 'center' }, paper_bgcolor: '#ffffff', plot_bgcolor: '#ffffff', font: { color: '#1e293b' }, margin: { l: 60, r: 14, t: 48, b: 52 }, autosize: true,
+          xaxis: { title: { text: names[0], standoff: 10 }, color: '#1e293b', gridcolor: '#e2e8f0' }, yaxis: { title: { text: names[1], standoff: 10 }, color: '#1e293b', gridcolor: '#e2e8f0' }
+        }, { responsive: true, displayModeBar: false, displaylogo: false });
+        fitPlotToContainer('recurrenceScatterPlot');
+      } else {
+        // Leave existing figure; fetchData gating will avoid updating until valid
+      }
+    }
+
+    //Sends current selected channels, window size, polar mode, XOR threshold, and sampling frequency to the backend.
+    //Backend returns a JSON file containing signal data + predictions + aliasing info
+    /**
+     * Core streaming loop. Sends UI state to backend (ecg/update).
+     * - Handles XOR-only mode early (single channel required)-> lw akhtar aktr mn one channel byzhr alert w mafesh fetch byhsl
+     * - lw kol haga tamam yb3t post request ll backend bl information
+     * - Uses SignalShared.fetchAndDispatchECG to update Time/Polar/Recurrence
+     * - Updates sampling label and aliases plot title when downsampled
+     * - Shows predictions and recurrence results from server
+     */
+    async function fetchData() {
+      if (!streaming) return;
+      try {
+        const xorThresholdVal = xorThresholdInput ? parseFloat(xorThresholdInput.value) || 0.05 : 0.05;
+        const displayMode = (currentDisplay || 'Time');
+        const mapped = displayMode.toLowerCase(); // 'time','xor','polar','recurrence','all'
+        // IMPORTANT: sampling_freq communicates the slider choice to the server.
+        // The server can still cap it. We always reflect the server-reported
+        // used_sampling_freq back into the label to avoid UI drift.
+        const payload = { channels: selectedChannels, width: widthSec, polar_mode: polarMode, xor_threshold: xorThresholdVal, sampling_freq: requestedSampling };
+
+        if (mapped === 'xor') {
+          if (selectedChannels.length !== 1) {
+            // show hint, do not fetch
+            if (xorControls) xorControls.style.display = 'none';
+            if (xorHint) xorHint.style.display = 'block';
+            return;
+          }
+          const result = await SignalShared.fetchJson('/ecg/update', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+          const plotFs = result.display_fs || displayFs;
+          const usedFsRaw = (result && result.used_sampling_freq != null) ? result.used_sampling_freq : (requestedSampling != null ? requestedSampling : nativeFs);
+          const usedFs = Math.min(500, usedFsRaw);
+          document.getElementById('freqValue').innerText = usedFs + ' Hz';
+          const chXOR = selectedChannels[0];
+          const xorChunk = result.xor[String(chXOR)] || [];
+          // Build scatter: abs(diff) for points exceeding threshold
+          const thr = parseFloat(xorThresholdInput?.value) || 0.05;
+          const y = [];
+          const x = [];
+          for (let i = 0; i < xorChunk.length; i++) {
+            const v = Math.abs(xorChunk[i]);
+            if (v > thr) { y.push(v); x.push((i / plotFs) % xorPeriodSec); }
+          }
+          // NOTE: We visualize only a fixed time horizon via xorDurationSec.
+          // This prevents unbounded growth and keeps UI responsive.
+          // Limit to chosen duration window
+          const maxPts = Math.max(1, Math.floor(xorDurationSec * plotFs));
+          const xs = x.slice(-maxPts);
+          const ys = y.slice(-maxPts);
+          Plotly.restyle('xorPlot', { x: [xs], y: [ys], mode: ['markers'] }, [0]);
+          Plotly.relayout('xorPlot', { 'xaxis.range': [0, xorPeriodSec], 'yaxis.autorange': true });
+          resizeVisiblePlots();
+          if (xorControls) xorControls.style.display = 'block';
+          if (xorHint) xorHint.style.display = 'none';
+          return;
+        }
+
+        // Recurrence gating: require exactly two channels
+        if (mapped === 'recurrence' && selectedChannels.length !== 2) {
+          const recHint = document.getElementById('recHint');
+          if (recHint) recHint.style.display = 'block';
+          return;
+        } else {
+          const recHint = document.getElementById('recHint');
+          if (recHint) recHint.style.display = 'none';
+        }
+
+        // IMPORTANT: Delegates rendering to SignalShared. It keeps per-plot
+        // buffers, applies widths, and updates traces. We pass ids/state here.
+        const out = await SignalShared.fetchAndDispatchECG({
+          updateUrl: '/ecg/update',
+          payload,
+          ids: { timeId: 'timePlot', polarId: 'polarPlot', recurrenceId: 'recurrenceScatterPlot' },
+          state: { fs: nativeFs, viewFs: displayFs, width: widthSec, isCumulativePolar: (polarMode === 'cumulative') },
+          selected: selectedChannels,
+          buffers: ssBuffers,
+          names: nameMap,
+          colors: ["#A855F7", "#D946EF", "#7C3AED", "#C084FC", "#E879F9", "#A78BFA", "#9333EA", "#E9D5FF", "#C026D3", "#F0ABFC"],
+          colormap: colormap,
+          globalTime: ssGlobalTime,
+          display: mapped
+        });
+        if (out && typeof out.globalTime === 'number' && !Number.isNaN(out.globalTime)) {
+          ssGlobalTime = out.globalTime;
+        }
+
+        const result = out && out.result ? out.result : {};
+        const plotFs = result.display_fs || displayFs;
+        const usedFsRaw = (result && result.used_sampling_freq != null) ? result.used_sampling_freq : (requestedSampling != null ? requestedSampling : nativeFs);
+        const usedFs = Math.min(500, usedFsRaw);
+        document.getElementById('freqValue').innerText = usedFs + ' Hz';
+        // IMPORTANT: Always trust server-reported sampling going forward so
+        // the UI timebases and aliasing notation stay consistent with backend.
+        displayFs = usedFs;
+        if (result && result.native_fs) { nativeFs = result.native_fs; }
+        // Annotate time plot title with aliasing indicator when downsampled
+        try {
+          const aliasing = (usedFs < nativeFs);
+          // IMPORTANT: Title tag is a visual cue only; no logic changes.
+          const aliasTag = aliasing ? ' (WITH ALIASING)' : '';
+          Plotly.relayout('timePlot', { title: `Real-time ECG (time domain)${aliasTag}` });
+        } catch (e) { }
+
+        // Force a final fit so the inner graph height matches the visible card
+        try {
+          const active = currentDisplay || 'Time';
+          const map = { 'Time': 'timePlot', 'XOR': 'xorPlot', 'Polar': 'polarPlot', 'Recurrence': 'recurrenceScatterPlot' };
+          const pid = map[active];
+          // Compute and apply exact width/height to the active plot
+          fitPlotToContainer(pid);
+          // Tighten margins a bit to reclaim vertical space
+          const plotDiv = document.getElementById(pid);
+          if (plotDiv) {
+            const container = plotDiv.closest('.plot-container') || plotDiv.parentElement;
+            if (container) {
+              const cs = getComputedStyle(container);
+              const padX = parseFloat(cs.paddingLeft || '0') + parseFloat(cs.paddingRight || '0');
+              const padY = parseFloat(cs.paddingTop || '0') + parseFloat(cs.paddingBottom || '0');
+              const w = Math.max(0, container.clientWidth - padX);
+              const h = Math.max(0, container.clientHeight - padY);
+              if (w > 0 && h > 0) {
+                Plotly.relayout(pid, { width: w, height: h, autosize: false, margin: { t: 48, r: 10, b: 48, l: 54 } });
+              }
+            }
+          }
+        } catch (e) { }
+
+        if (filesUploaded) {
+          const pred = result.prediction || {};
+          const rec = result.recurrence_prediction || {};
+          const alias = result.aliasing || {};
+          const predRes = document.getElementById('predictionResult');
+          const predDesc = document.getElementById('predictionDescription');
+          const recEl = document.getElementById('recurrencePrediction');
+          const diseaseEl = document.getElementById('diseaseName');
+          const aliasEl = document.getElementById('aliasingNote');
+
+          let disp = (pred && typeof pred === 'object') ? (pred.smoothed || pred.raw || pred) : null;
+          if (!disp || !disp.label) {
+            predRes.innerText = 'N/A';
+            predDesc.innerText = '';
+            diseaseEl.innerText = '';
+          } else {
+            predRes.innerText = disp.label || 'N/A';
+            predDesc.innerText = disp.description || '';
+            diseaseEl.innerText = disp.disease_name || '';
+          }
+
+          if (rec && rec.label) {
+            const conf = rec.confidence !== undefined ? ` (Confidence: ${(rec.confidence * 100).toFixed(1)}%)` : '';
+            recEl.innerText = `Recurrence Prediction: ${rec.label}${conf}`;
+          } else {
+            recEl.innerText = '';
+          }
+
+          // Aliasing notice removed as requested (no moderate/severe alerting)
+          aliasEl.innerText = '';
+          aliasEl.removeAttribute('style');
+        }
+
+      } catch (err) {
+        console.error(err);
+        streaming = false;
+        if (intervalId) clearInterval(intervalId);
+        setStatus(false, 'Error');
+        alert('Connection lost or server error — check console.');
+      }
+    }
+  </script>
 </body>
+
 </html>

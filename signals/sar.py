@@ -82,7 +82,7 @@ def view_sar():
                 new_width = int(width * scale_factor)
                 print(f"Downsampling from {height}x{width} to {new_height}x{new_width}")
                 
-                # Read with downsampling
+                # Read with minimizing the dimensions
                 data = src.read(1, 
                                out_shape=(new_height, new_width),
                                resampling=rasterio.enums.Resampling.average)

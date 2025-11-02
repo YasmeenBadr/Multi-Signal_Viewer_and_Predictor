@@ -117,21 +117,21 @@ class SimpleECG(nn.Module):
         )
         
         with torch.no_grad():
-            dummy_input = torch.zeros(1, 1, input_length) # Create a dummy input tensor: shape (batch_size=1, channels=1, signal_length)
-            dummy_output = self.conv_net(dummy_input) # Pass dummy input through conv layers to see output shape
-            linear_input_size = dummy_output.numel()  # Get total number of elements after conv layers (needed for Linear layer input)
+            dummy_input = torch.zeros(1, 1, input_length)
+            dummy_output = self.conv_net(dummy_input)
+            linear_input_size = dummy_output.numel()
         
         self.classifier = nn.Sequential(
             nn.Flatten(),
             nn.Linear(linear_input_size, 64),
             nn.ReLU(),
-            nn.Linear(64, 2) # Final layer: 2 outputs (Normal / Abnormal classification)
+            nn.Linear(64, 2)
         )
 
     def forward(self, x):
-        x = self.conv_net(x)# Pass input through 1D convolutional layers to extract features
-        x = self.classifier(x)# Pass extracted features through the classifier to get class scores
-        return x    # Return the logits for each class
+        x = self.conv_net(x)
+        x = self.classifier(x)
+        return x
 
 # Initialize model
 model = SimpleECG(input_length=_model_seq_len).to(DEVICE)
@@ -155,10 +155,10 @@ class Simple2DCNN(nn.Module):
     def __init__(self):
         super().__init__()
         self.net = nn.Sequential(
-            nn.Conv2d(1, 8, kernel_size=3, padding=1),# 1D convolution: 1 input channel (single-lead ECG), 16 filters, kernel size 5, padding 2 to keep length
-            nn.ReLU(), # Activation function: introduce non-linearity
-            nn.MaxPool2d(2),# Max pooling: reduce signal length by half (downsampling)
-            nn.Conv2d(8, 16, kernel_size=3, padding=1),# 1D convolution: 16 input channels, 32 filters, kernel size 5 samples, padding 2
+            nn.Conv2d(1, 8, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(2),
+            nn.Conv2d(8, 16, kernel_size=3, padding=1),
             nn.ReLU(),
             nn.MaxPool2d(2),
             nn.Flatten(),
@@ -195,124 +195,86 @@ def build_recurrence_image(x, y, size=128):
     Returns a size x size float32 array.
     """
     try:
-         # Convert inputs to float32 numpy arrays and flatten
         x = np.asarray(x, dtype=np.float32).flatten()
         y = np.asarray(y, dtype=np.float32).flatten()
-
-        # If either signal is empty, return a zero image
         if len(x) == 0 or len(y) == 0:
             return np.zeros((size, size), dtype=np.float32)
-        
-        # Find min and max of each signal to define histogram ranges
         xmin, xmax = np.min(x), np.max(x)
         ymin, ymax = np.min(y), np.max(y)
         if xmin == xmax:
             xmin -= 1e-3; xmax += 1e-3
         if ymin == ymax:
             ymin -= 1e-3; ymax += 1e-3
-        # Compute a 2D histogram over x and y with given number of bins
         H, xedges, yedges = np.histogram2d(x, y, bins=size, range=[[xmin, xmax], [ymin, ymax]])
-
-        # Apply log scaling to compress the dynamic range of histogram counts
         H = np.log1p(H)
-        H = (H - H.mean()) / (H.std() + 1e-6)   #normalization
+        H = (H - H.mean()) / (H.std() + 1e-6)
         return H.astype(np.float32)
     except Exception as e:
         logger.debug("build_recurrence_image failed: %s", e)
         return np.zeros((size, size), dtype=np.float32)
 
-
-
 def extract_diagnosis_from_hea(record_base: Optional[str]):
+    """Best-effort extraction of diagnosis/free-text from a WFDB .hea file.
+
+    Given the base path to a record, tries to open the corresponding .hea and
+    look for keywords like diagnosis, reason, infarct, etc. Returns a lowercase
+    string such as 'healthy control' if found, else None.
     """
-    Best-effort extraction of diagnosis/free-text from a WFDB .hea file.
-
-    Args:
-        record_base (str or None): base path to the ECG record (without extension)
-
-    Returns:
-        str or None: extracted diagnosis text in lowercase, or 'healthy' if indicated,
-                     or None if not found.
-    """
-
-    # If no record path provided, return None
     if not record_base:
         return None
-
-    # Try to get the .hea file path by replacing .dat with .hea
+    # EDITED: Corrected path assumption for uploaded files
     hea_path = record_base.replace(".dat", ".hea")
-
-    # Fallback: if that file doesn't exist, append .hea
     if not os.path.exists(hea_path):
-        hea_path = record_base + ".hea" 
+        hea_path = record_base + ".hea" # fallback to original path logic
         if not os.path.exists(hea_path):
-            return None  # No .hea file found, return None
-
-    # Try to read the contents of the .hea file
+            return None
     try:
         with open(hea_path, "r", encoding="latin-1") as f:
             text = f.read()
     except Exception:
-        return None  # If reading fails, return None
-
-    # Convert all text to lowercase for easier keyword matching
+        return None
     low = text.lower()
-
-    # Quick check: if file mentions healthy/normal/control, return 'healthy'
     if "healthy" in low or "control" in low or "normal" in low:
         return "healthy"
-
-    # Otherwise, try to extract diagnosis from lines containing key terms
     try:
-        for line in text.splitlines():  # Go line by line
+        for line in text.splitlines():
             l = line.lower()
-            # Look for diagnosis-related keywords
-            if "diagnosis" in l or "reason" in l or "infarct" in l or "mi" in l: 
-                parts = line.split(":", 1)  # Split on first colon
+            if "diagnosis" in l or "reason" in l or "infarct" in l or "mi" in l: # ADDED keywords
+                parts = line.split(":", 1)
                 if len(parts) > 1:
-                    return parts[1].strip()  # Return text after colon
-                return parts[0].strip()  # Otherwise return whole line
+                    return parts[1].strip()
+                return parts[0].strip()
     except Exception:
-        pass  # Ignore any errors and fall through
-
-    # If nothing found, return None
+        pass
     return None
-
 
 def train_model2d_on_record(signals, chan_names, record_base, max_windows=200, window_s=2.0, epochs=6):
     """Background training of the 2D CNN from recurrence windows.
 
-    Steps:
-    - Derive binary label from .hea file (healthy/normal -> 0, else 1)
-    - Slice rolling windows across two ECG channels
-    - Build recurrence plot images
-    - Train a small 2D CNN for a few epochs
-    - Save CSV of the two channels for inspection
+    - Derives a binary label from .hea text (healthy/normal -> 0, else 1)
+    - Slices rolling windows across two channels, builds recurrence images
+    - Trains a very small CNN for a few epochs and persists to disk
+    - Saves a CSV of the two channels to results/ for inspection
     """
     try:
-        # 1. Extract text diagnosis from .hea file
         rec_label_text = extract_diagnosis_from_hea(record_base) if record_base else None
         if not rec_label_text:
             logger.info("No diagnosis in .hea; skipping 2D training.")
             return
-
-        # 2. Convert text to lowercase and define binary label
         ltxt = rec_label_text.lower()
         label = 0 if ("healthy" in ltxt or "healthy control" in ltxt or "normal" in ltxt) else 1
 
-        # 3. Define window length and step size
-        fs_local = _stream.get("fs", FREQ_DEFAULT)          # get sampling rate
-        win = max(4, int(window_s * fs_local))             # window length in samples
-        step = max(1, win // 2)                            # step size (50% overlap)
-        N = signals.shape[0]                               # total signal length
-        ch_count = signals.shape[1]                        # number of channels
-        ch0 = 0                                            # channel 0
-        ch1 = 1 if ch_count > 1 else 0                     # channel 1 or 0 if single channel
+        fs_local = _stream.get("fs", FREQ_DEFAULT)
+        win = max(4, int(window_s * fs_local))
+        step = max(1, win // 2)
+        N = signals.shape[0]
+        ch_count = signals.shape[1]
+        ch0 = 0
+        ch1 = 1 if ch_count > 1 else 0
 
-        # 4. Save the two channels to CSV for inspection
         try:
             outdir = os.path.join(os.getcwd(), 'results', 'recurrence_data')
-            os.makedirs(outdir, exist_ok=True)             # create folder if not exists
+            os.makedirs(outdir, exist_ok=True)
             base = os.path.basename(record_base) if record_base else f'record_{int(time.time())}'
             csv_path = os.path.join(outdir, f"{base}_ch{ch0}_ch{ch1}_recurrence.csv")
             twoch = np.stack([signals[:, ch0], signals[:, ch1]], axis=1)
@@ -322,40 +284,34 @@ def train_model2d_on_record(signals, chan_names, record_base, max_windows=200, w
         except Exception as e:
             logger.debug("Failed to save recurrence CSV: %s", e)
 
-        # 5. Slice windows and build recurrence images
         images = []
         labels = []
         count = 0
         for start in range(0, N - win + 1, step):
             if count >= max_windows:
                 break
-            x = signals[start:start+win, ch0]               # slice window for channel 0
-            y = signals[start:start+win, ch1]               # slice window for channel 1
-            img = build_recurrence_image(x, y, size=128)   # build recurrence plot image
+            x = signals[start:start+win, ch0]
+            y = signals[start:start+win, ch1]
+            img = build_recurrence_image(x, y, size=128)
             images.append(img)
             labels.append(label)
             count += 1
 
-        # 6. Skip training if not enough windows
         if len(images) < 4:
             logger.info("Not enough windows for training 2D model; found %d", len(images))
             return
 
-        # 7. Convert images and labels to numpy arrays and add channel dimension
-        X = np.stack(images, axis=0)[:, None, :, :].astype(np.float32)  # shape: [N, 1, H, W]
+        X = np.stack(images, axis=0)[:, None, :, :].astype(np.float32)
         y_arr = np.array(labels, dtype=np.int64)
 
-        # 8. Convert to PyTorch tensors and create DataLoader
         tX = torch.from_numpy(X)
         ty = torch.from_numpy(y_arr)
         dataset = TensorDataset(tX, ty)
         loader = DataLoader(dataset, batch_size=16, shuffle=True)
 
-        # 9. Define loss function and optimizer
-        criterion = torch.nn.CrossEntropyLoss()             # classification loss
+        criterion = torch.nn.CrossEntropyLoss()
         optim = torch.optim.Adam(model2d.parameters(), lr=1e-3)
 
-        # 10. Train the 2D CNN
         model2d.train()
         logger.info("Starting 2D training on %d samples, label=%d", len(dataset), label)
         for ep in range(epochs):
@@ -363,31 +319,29 @@ def train_model2d_on_record(signals, chan_names, record_base, max_windows=200, w
             correct = 0
             total = 0
             for xb, yb in loader:
-                xb = xb.to(DEVICE)                            # move batch to GPU/CPU
+                xb = xb.to(DEVICE)
                 yb = yb.to(DEVICE)
-                optim.zero_grad()                             # reset gradients
-                logits = model2d(xb)                          # forward pass
-                loss = criterion(logits, yb)                  # compute loss
-                loss.backward()                               # backpropagation
-                optim.step()                                  # update weights
+                optim.zero_grad()
+                logits = model2d(xb)
+                loss = criterion(logits, yb)
+                loss.backward()
+                optim.step()
                 total_loss += loss.item() * xb.size(0)
-                preds = logits.argmax(dim=1)                  # predicted class
+                preds = logits.argmax(dim=1)
                 correct += (preds == yb).sum().item()
                 total += xb.size(0)
             if total > 0:
                 logger.info("2D train epoch %d/%d loss=%.4f acc=%.3f", ep+1, epochs, total_loss/total, correct/total)
 
-        # 11. Save the trained 2D model to disk
         try:
             torch.save(model2d.state_dict(), MODEL2D_PATH)
             logger.info("Saved 2D model to %s", MODEL2D_PATH)
         except Exception as e:
             logger.warning("Failed to save 2D model: %s", e)
 
-        model2d.eval()  # set model to evaluation mode
+        model2d.eval()
     except Exception as e:
         logger.exception("2D training failed: %s", e)
-
 
 def predict_recurrence_pair(x, y):
     """Run the 2D CNN on a recurrence image built from x and y.
@@ -416,16 +370,11 @@ def load_wfdb_record(record_base):
     """
     if wfdb is None:
         raise RuntimeError("wfdb package not available in environment")
-    #  Read the record using wfdb
     rec = wfdb.rdrecord(record_base)
-    # Extract the ECG signals as float32 numpy array
     signals = rec.p_signal.astype(np.float32)
-    #Get the signal (channel) names
     sig_names = rec.sig_name
-     #Get sampling frequency (fs), fallback to default if not present
     fs = int(rec.fs) if hasattr(rec, "fs") else _stream.get("fs", FREQ_DEFAULT)
     return signals, sig_names, fs
-
 
 def setup_simulated_record():
     """Initialize a synthetic 12-lead ECG-like signal for demo purposes.
@@ -457,47 +406,29 @@ def setup_simulated_record():
         "hea_diagnosis": "Simulated Signal" # ADDED: Default diagnosis
     })
 
-
 # Load initial record (WFDB or simulated)
-# Try to load a real WFDB record first, fallback to simulated ECG if not available
 if wfdb is not None and DATA_PATH and os.path.exists(DATA_PATH + ".dat"):
     try:
-        # Load signals, channel names, and sampling rate from the WFDB record
         s, names, sr = load_wfdb_record(DATA_PATH)
-
-        # Extract diagnosis/free-text from the corresponding .hea file
         hea_diag = extract_diagnosis_from_hea(DATA_PATH)
-
-        # Update the global _stream dictionary with the loaded data
         _stream.update({
-            "signals": s,                  # Loaded ECG signals (num_samples x num_channels)
-            "signals_raw": s.copy(),       # Raw copy for reference
-            "channels": names,             # Channel names (e.g., Lead I, Lead II, etc.)
-            "fs": sr,                      # Sampling rate of the record
-            "pos": 0,                       # Current streaming position (start)
-            "loaded": True,                # Flag indicating signals are loaded
-            "record_path": DATA_PATH,      # Path to the WFDB record
-            "hea_diagnosis": hea_diag      # Diagnosis extracted from .hea
+            "signals": s,
+            "signals_raw": s.copy(),
+            "channels": names,
+            "fs": sr,
+            "pos": 0,
+            "loaded": True,
+            "record_path": DATA_PATH,
+            "hea_diagnosis": hea_diag # ADDED: Initial diagnosis
         })
-
         try:
-            # Start background training of the 2D CNN using recurrence images
-            # Run in a separate thread so it doesn't block the main program
-            threading.Thread(
-                target=train_model2d_on_record, 
-                args=(s, names, DATA_PATH), 
-                daemon=True
-            ).start()
+            threading.Thread(target=train_model2d_on_record, args=(s, names, DATA_PATH), daemon=True).start()
         except Exception:
-            # Ignore errors in background training
             pass
-
     except Exception as e:
-        # Log a warning if loading the WFDB record fails
         logger.warning("Failed to load specified record: %s", e)
-        _stream["loaded"] = False  # Mark as not loaded
+        _stream["loaded"] = False
 
-# If loading the WFDB record failed, set up a simulated 12-lead ECG
 if not _stream["loaded"]:
     setup_simulated_record()
 
@@ -522,21 +453,19 @@ def get_stream_chunk(duration_s=1.0):
 
     Uses circular indexing to loop seamlessly when reaching the end.
     """
-    # Check if a signal has been loaded; if not, return None
     if not _stream["loaded"]:
         return None
     fs_cur = _stream["fs"]
     fs_native = _stream.get("fs_native", fs_cur)
     pos_n = _stream.get("pos_native", 0)
     raw = _stream["signals_raw"]
-     # Number of samples to take for this chunk
     chunk_n = int(duration_s * fs_native)
-    if pos_n + chunk_n > raw.shape[0]:# Handle circular indexing if we reach the end of the signal
-        part1 = raw[pos_n:, :]# Part from current position to the end
-        part2 = raw[:(pos_n + chunk_n) % raw.shape[0], :]  # Part from start to cover remaining samples
-        chunk_native = np.vstack([part1, part2])#concatunation to form full chunk
+    if pos_n + chunk_n > raw.shape[0]:
+        part1 = raw[pos_n:, :]
+        part2 = raw[:(pos_n + chunk_n) % raw.shape[0], :]
+        chunk_native = np.vstack([part1, part2])
     else:
-        chunk_native = raw[pos_n:pos_n+chunk_n, :]  # Simply take a slice of the raw signal
+        chunk_native = raw[pos_n:pos_n+chunk_n, :]
     _stream["pos_native"] = (pos_n + chunk_n) % raw.shape[0]
     # Downsample to display fs from native
     chunk_ds = resample_with_aliasing(chunk_native, fs_native, DISPLAY_FS, pos_native=pos_n)
@@ -582,14 +511,13 @@ def set_freq():
         data = request.get_json(silent=True) or {}
         # Accept both keys for compatibility with frontend
         new_fs = float(data.get("frequency", data.get("sampling_freq", FREQ_DEFAULT)))
-        raw_native_fs = _stream.get("fs_native", _stream.get("fs", FREQ_DEFAULT)) # Get true native FS from _stream
+        raw_native_fs = _stream.get("fs_native", _stream.get("fs", FREQ_DEFAULT)) # Get true native FS
         MAX_FREQ_LIMIT = 500 
-        # Clamp the requested frequency to a safe range
         new_fs = max(FREQ_MIN, min(new_fs, raw_native_fs, MAX_FREQ_LIMIT))
         # No-op if requested sampling equals current fs (avoid unnecessary resampling and state changes)
         try:
             cur_fs = float(_stream.get("fs", FREQ_DEFAULT))
-            if abs(float(new_fs) - cur_fs) < 1e-6: # If unchanged, return early to avoid unnecessary resampling
+            if abs(float(new_fs) - cur_fs) < 1e-6:
                 return jsonify({"success": True, "message": f"Frequency unchanged ({int(cur_fs)} Hz)", "current_sampling": int(cur_fs)})
         except Exception:
             pass
@@ -600,15 +528,14 @@ def set_freq():
         
         # EDITED: Use the native FS stored in _stream to determine the downsampling
         down = resample_with_aliasing(raw, raw_native_fs, new_fs)
-        if down.ndim == 1:# Ensure signals are 2D for consistent handling
+        if down.ndim == 1:
             down = down[:, None]
         
         # EDITED: Update _stream to reflect the *current operating* frequency and signals
         _stream["signals"] = down.astype(np.float32)
         _stream["fs"] = int(new_fs) # The *current* FS
-        _stream["pos"] = 0   # Reset current position to start
-        _stream["alias_phase"] = {}  # Reset aliasing phase
-
+        _stream["pos"] = 0
+        _stream["alias_phase"] = {}
         
         # Preserve all buffers/state to avoid clearing history when sampling changes
         # Only reset position, keep prediction buffers, history, and other state intact
@@ -700,7 +627,7 @@ def predict_signal(sig_chunk):
     results = []
     sig_chunk = np.asarray(sig_chunk, dtype=np.float32)
     
-    for ch in range(sig_chunk.shape[1]):# Iterate over all channels
+    for ch in range(sig_chunk.shape[1]):
         x = sig_chunk[:, ch]
         
         # *** FIX: Initialize pad_width before conditional logic ***
@@ -711,7 +638,7 @@ def predict_signal(sig_chunk):
             # Take the most recent _model_seq_len samples
             x = x[-_model_seq_len:]
         elif len(x) < _model_seq_len:
-            # Pad with zeros at the begining if too short
+            # Pad with zeros if too short
             pad_width = _model_seq_len - len(x)
             x = np.pad(x, (pad_width, 0), mode='constant')
         
@@ -720,14 +647,14 @@ def predict_signal(sig_chunk):
             results.append({"label": "Waiting",
                             "probabilities": [1.0, 0.0],
                             "confidence": 0.0})
-            continue  # Skip prediction for this channel
+            continue
 
         # Normalize per-channel to improve model sensitivity
         x = (x - np.mean(x)) / (np.std(x) + 1e-8)
         x = x[None, None, :]  # batch x channel x length
         x_tensor = torch.from_numpy(x).to(DEVICE)
-        with torch.no_grad():# Perform prediction without gradient computation
-            logits = model(x_tensor)# Model output before softmax
+        with torch.no_grad():
+            logits = model(x_tensor)
             probs = torch.softmax(logits, dim=-1).cpu().numpy()[0]
             idx = int(np.argmax(probs))
             results.append({
@@ -737,139 +664,118 @@ def predict_signal(sig_chunk):
             })
     return results
 
-ECG_BP.route("/upload", methods=["POST"])
+@ECG_BP.route("/upload", methods=["POST"])
 def upload():
+    """Handle multi-file upload (.hea, .dat, optional .xyz) and attempt reload.
+
+    Saves to ./uploads, then if both .hea and .dat are present, tries to load
+    the record and refreshes the _stream accordingly. Returns status JSON.
     """
-    Handle multi-file upload (.hea, .dat, optional .xyz) and attempt reload.
-    """    
-    # Define the upload directory and create it if it doesn't exist
     upload_dir = os.path.join(os.getcwd(), "uploads")
     os.makedirs(upload_dir, exist_ok=True)
     
-    # Get the list of uploaded files from the request
     files = request.files.getlist("files")
-    
-    # Initialize variables to track saved files
     base_name = None
     saved = {"hea": None, "dat": None, "xyz": None}
     
-    # Loop through each uploaded file
     for f in files:
         fname = f.filename
         if not fname:
-            continue  # Skip files without a name
-        
-        # Save the file to the upload directory
+            continue
         saved_path = os.path.join(upload_dir, fname)
         f.save(saved_path)
         
-        # Track the type of file uploaded
         if fname.endswith(".hea"):
             saved["hea"] = fname
-            base_name = fname[:-4]  # Remove extension for later use
+            base_name = fname[:-4]
         elif fname.endswith(".dat"):
             saved["dat"] = fname
             base_name = fname[:-4]
         elif fname.endswith(".xyz"):
-            saved["xyz"] = fname  # Optional additional file
-    
-    # Initialize message list and success flag
+            saved["xyz"] = fname
+
     msg = []
     success = False
     
-    # Attempt to load the record if both .hea and .dat files are present
+    # Attempt to load record if both .hea and .dat are present
     if saved["hea"] and saved["dat"]:
         full_dat_path = os.path.join(upload_dir, base_name + ".dat")
-        
-        # Try loading the record and updating _stream
         if _try_load_record_after_upload(full_dat_path):
             msg.append(f"Record loaded successfully. Diagnosis: {_stream.get('hea_diagnosis', 'Unknown')}")
             success = True
         else:
             msg.append("Failed to load uploaded record.")
     else:
-        # If essential files are missing, notify the user
         msg.append("Files uploaded. Please upload both .hea and .dat for record reload.")
         if saved["xyz"]:
-            msg.append(".xyz file uploaded and saved.")  # Optional file message
-    
-    # Return a JSON response with success status, messages, and diagnosis info
-    return jsonify({
-        "success": success,
-        "message": " ".join(msg),
-        "hea_diagnosis": _stream.get("hea_diagnosis")
-    })
- 
+             msg.append(".xyz file uploaded and saved.")
 
- 
+    return jsonify({"success": success, "message": " ".join(msg), "hea_diagnosis": _stream.get("hea_diagnosis")})
+
+# -------------------------
+# Try to load record after upload
+# -------------------------
 def _try_load_record_after_upload(file_path):
+    """Load an uploaded record into _stream using WFDB if available.
+
+    Falls back to CSV when wfdb isn't available. Extracts diagnosis from .hea
+    and resets model buffers, then kicks off background 2D training.
     """
-    Load an uploaded record into _stream using WFDB if available.
-    Falls back to CSV if WFDB is not available.
-    Extracts diagnosis from .hea and resets model buffers.
-    Starts background 2D model training.
+    """
+    Load the uploaded record into _stream.
+    Uses WFDB if available; otherwise, treat as CSV/NumPy.
     """
     try:
-        # Remove .dat extension to get the base record name
+        # EDITED: Extract diagnosis first
         record_base = file_path.replace(".dat", "")
-        
-        # Extract diagnosis information from the .hea file
         hea_diag = extract_diagnosis_from_hea(record_base)
         
-        # If WFDB is available and file is .dat, load using WFDB
         if wfdb is not None and file_path.endswith(".dat"):
             sigs, names, fs = load_wfdb_record(record_base)
             update_data = {
-                "signals": sigs,                    # Loaded signals
-                "signals_raw": sigs.copy(),         # Raw copy for reference
-                "channels": names,                  # Channel names
-                "fs": fs,                           # Sampling frequency
-                "fs_native": fs,                    # Original sampling frequency
-                "pos": 0,                           # Current position in the signal
-                "record_path": file_path,           # Path to the loaded record
-                "loaded": True,                     # Flag indicating successful load
-                "hea_diagnosis": hea_diag           # Store diagnosis from .hea
+                "signals": sigs,
+                "signals_raw": sigs.copy(),
+                "channels": names,
+                "fs": fs,
+                "fs_native": fs, # ADDED: Store the true native FS
+                "pos": 0,
+                "record_path": file_path,
+                "loaded": True,
+                "hea_diagnosis": hea_diag # ADDED: Store diagnosis
             }
         else:
-            # Fallback: load data from CSV file
+            # fallback: assume CSV
             data = np.loadtxt(file_path, delimiter=',')
-            fs = _stream.get("fs", FREQ_DEFAULT)  # Use existing or default FS
+            fs = _stream.get("fs", FREQ_DEFAULT)
             update_data = {
                 "signals": data.astype(np.float32),
                 "signals_raw": data.astype(np.float32).copy(),
-                "channels": [f"Lead {i+1}" for i in range(data.shape[1])],  # Generate default channel names
+                "channels": [f"Lead {i+1}" for i in range(data.shape[1])],
                 "fs": fs,
-                "fs_native": fs,
+                "fs_native": fs, # ADDED: Store the true native FS
                 "pos": 0,
                 "record_path": file_path,
                 "loaded": True,
                 "hea_diagnosis": hea_diag
             }
         
-        # Reset all prediction/model buffers for new record
+        # Reset all buffers on successful load
         _stream["pred_buffers"] = {}
         _stream["pred_history"] = []
         _stream["rec_pred_history"] = []
         _stream["prev_chunks_raw"] = {}
         _stream["recurrence_points"] = {}
         _stream["polar_points"] = {}
-        
-        # Update _stream with the new loaded record data
         _stream.update(update_data)
         
-        # Start background training of 2D model on this record
+        # Start training 2D model in background
         try:
-            threading.Thread(
-                target=train_model2d_on_record,
-                args=(sigs, names, record_base),
-                daemon=True
-            ).start()
+            threading.Thread(target=train_model2d_on_record, args=(sigs, names, record_base), daemon=True).start()
         except Exception:
-            pass  # Ignore errors in background training
-        
-        return True  # Successfully loaded
+            pass
+            
+        return True
     except Exception as e:
-        # Log any errors during loading and return False
         logger.exception("Failed to load uploaded record: %s", e)
         return False
 
@@ -899,43 +805,37 @@ def update():
         # Normalize requested channels
         # -------------------------
         raw_channels = data.get("channels", list(range(12)))
-        # Get channels from JSON, default to 0-11 if not provided
-        channels = []  # Will hold the final list of valid channel indices
-
-
-        if isinstance(raw_channels, int):# Handle case where a single integer channel is provided
+        channels = []
+        if isinstance(raw_channels, int):
             channels = [raw_channels]
-
-        elif isinstance(raw_channels, str):# Handle case where channels are sent as a string like "0,2,5"
+        elif isinstance(raw_channels, str):
             try:
                 channels = [int(x) for x in raw_channels.split(",") if x.strip()]
             except Exception:
-                channels = list(range(12))  # Fallback to default if error occurs
+                channels = list(range(12))
         elif isinstance(raw_channels, (list, tuple)):
             parsed = []
             for x in raw_channels:
                 try: parsed.append(int(x))
-                except: continue  # Skip invalid entries
+                except: continue
             channels = parsed if parsed else list(range(12))
         else:
             channels = list(range(12))
 
-        if _stream["signals"] is None:# If no signals have been uploaded yet, return error to frontend
+        if _stream["signals"] is None:
             return jsonify({"error": "No signals loaded. Upload first."}), 400
 
         # -------------------------
         # Validate channels against signal shape
         # -------------------------
-        max_ch = _stream["signals"].shape[1]# Get total number of channels in the signal
-        seen = set()   # Set to keep track of unique channels
+        max_ch = _stream["signals"].shape[1]
+        seen = set()
         valid_channels = []
-
-        # Loop through requested channels and keep only valid, non-duplicate channels
         for c in channels:
             if 0 <= c < max_ch and c not in seen:
                 valid_channels.append(c)
                 seen.add(c)
-        if not valid_channels:  #  if no valid channels, use default channels 0 to min(12, max_ch)
+        if not valid_channels:
             valid_channels = list(range(min(12, max_ch)))
         channels = valid_channels
 
@@ -945,22 +845,16 @@ def update():
         fs_stream = _stream.get("fs", FREQ_DEFAULT)
         fs_native = _stream.get("fs_native", fs_stream)
         raw = _stream.get("signals_raw")
-        N_native = int(STREAMING_CHUNK_DURATION * fs_native) # Calculate number of samples per chunk based on duration
-        
-        # Get current position in native signal
+        N_native = int(STREAMING_CHUNK_DURATION * fs_native)
         pos_n = int(_stream.get("pos_native", 0))
-        total_len_native = raw.shape[0]  # Total number of samples in the signal
-
-
-        if pos_n + N_native <= total_len_native:# Extract chunk from raw signal; handle wrapping around if reaching end
+        total_len_native = raw.shape[0]
+        if pos_n + N_native <= total_len_native:
             chunk_native = raw[pos_n:pos_n+N_native, :]
         else:
-            part1 = raw[pos_n:, :]  # From current position to end
-            part2 = raw[:(pos_n + N_native) % total_len_native, :]  # From start to complete chunk
-            chunk_native = np.vstack([part1, part2])  # Combine parts for circular streaming
-
-            
-        _stream["pos_native"] = (pos_n + N_native) % total_len_native  
+            part1 = raw[pos_n:, :]
+            part2 = raw[:(pos_n + N_native) % total_len_native, :]
+            chunk_native = np.vstack([part1, part2])
+        _stream["pos_native"] = (pos_n + N_native) % total_len_native
         # Decimate native chunk to current streaming fs with position-aware phase
         seg_block_current = resample_with_aliasing(chunk_native, fs_native, fs_stream, pos_native=pos_n)
         if seg_block_current.ndim == 1:
@@ -978,10 +872,8 @@ def update():
             seg = seg_block_current[:, ch].astype(np.float32)
             # Normalize per-channel to match training preprocessing
             seg = (seg - np.mean(seg)) / (np.std(seg) + 1e-8)
-
-
-            _stream["pred_buffers"][ch].extend(seg.tolist())# Append current segment to the rolling buffer
-            # Keep only the last _model_seq_len samples to maintain fixed-length buffer
+            _stream["pred_buffers"][ch].extend(seg.tolist())
+            # Keep only the last _model_seq_len samples
             if len(_stream["pred_buffers"][ch]) > _model_seq_len:
                 _stream["pred_buffers"][ch] = _stream["pred_buffers"][ch][- _model_seq_len:]
 
@@ -993,16 +885,12 @@ def update():
         for ch in channels:
             # Use the current streaming signal (which may be downsampled with aliasing)
             # rather than the original signal, so predictions reflect the distortion
-            buf = np.array(_stream["pred_buffers"][ch], dtype=np.float32) #convert buffer to a numpy array
+            buf = np.array(_stream["pred_buffers"][ch], dtype=np.float32)
             if buf.size == 0:
-                # If buffer is empty (rare case), just append it
                 sig_selected_list.append(buf)
                 continue
-
-
             if buf.shape[0] < _model_seq_len:
-                # If buffer too short, upsample using nearest-neighbor (zero-order hold)
-                # This preserves aliasing artifacts from downsampling
+                # Nearest-neighbor (zero-order hold) to preserve aliasing artifacts
                 ratio = _model_seq_len / float(max(1, buf.shape[0]))
                 idx = np.floor(np.arange(_model_seq_len) / ratio).astype(int)
                 idx = np.clip(idx, 0, buf.shape[0] - 1)
@@ -1013,9 +901,7 @@ def update():
                 up = (up - m) / (s + 1e-8)
                 sig_selected_list.append(up)
             else:
-                cut = buf[-_model_seq_len:] # If buffer long enough, take last _model_seq_len sample
-
-                # Normalize buffer to match training
+                cut = buf[-_model_seq_len:]
                 m = float(np.mean(cut))
                 s = float(np.std(cut))
                 cut = (cut - m) / (s + 1e-8)
@@ -1023,10 +909,8 @@ def update():
         
         # Stack all selected channels for prediction
         if not sig_selected_list:
-            # If no channels selected, create empty array
             sig_selected = np.empty((0, len(channels)), dtype=np.float32)
         else:
-            # Stack each channel as a column
             sig_selected = np.stack([a for a in sig_selected_list], axis=1)
             
         # -------------------------
@@ -1037,15 +921,13 @@ def update():
         prediction_raw_out = None
         
         # Check if the buffer is full enough for a meaningful prediction
-        if sig_len < _model_seq_len or streaming_fs < FREQ_MIN:  # If buffer too short or streaming frequency too low, return "Waiting"
+        if sig_len < _model_seq_len or streaming_fs < FREQ_MIN:
              # Use the diagnosis extracted from .hea file if available
              hea_diag_text = _stream.get("hea_diagnosis")
              hea_low = hea_diag_text.lower() if isinstance(hea_diag_text, str) else ""
              default_label = "Normal" if any(t in hea_low for t in ["healthy control", "healthy", "normal"]) else "Abnormal"
              default_desc = DISEASE_DESCRIPTIONS[default_label]
              
-
-             # Default prediction while accumulating data
              prediction = {"label": "Waiting",
                            "description": f"Accumulating data for prediction ({sig_len}/{_model_seq_len} @ {streaming_fs}Hz).",
                            "probabilities": [1.0, 0.0] if default_label == "Normal" else [0.0, 1.0],
@@ -1053,7 +935,6 @@ def update():
              prediction_out = prediction
              prediction_raw_out = [prediction]
         else:
-             # Run the 1D model on the prepared signal chunk
             prediction = predict_signal(sig_selected)
             
             # -------------------------
@@ -1061,7 +942,6 @@ def update():
             # -------------------------
             try:
                 if isinstance(prediction, list):
-                    # Extract probabilities from each channel
                     probs = np.array([p["probabilities"] for p in prediction], dtype=np.float32)
                     # Maintain prediction history for smoothing; reduce smoothing at low sampling
                     _stream.setdefault("pred_history", []).append(probs)
@@ -1071,14 +951,12 @@ def update():
                     if len(_stream["pred_history"]) > window:
                         _stream["pred_history"] = _stream["pred_history"][-window:]
                     
-                     # Compute average probabilities across recent history
                     avg_probs = np.mean(np.stack(_stream["pred_history"], axis=0), axis=0)
                     
                     # If multiple channels, average probabilities across channels
                     if avg_probs.ndim > 1:
                          avg_probs = np.mean(avg_probs, axis=0)
 
-                    # Determine smoothed label
                     sm_idx = int(np.argmax(avg_probs))
                     sm_label = DISEASE_CLASSES[sm_idx]
                     sm_result = {
@@ -1118,53 +996,45 @@ def update():
             signals_out = {str(ch): [] for ch in channels}
 
         # -------------------------
-        # XOR visualization (difference with previous chunk)
+        # XOR visualization
         # -------------------------
         xor_out = {}
-        if len(channels) == 1: # XOR only makes sense for 1 channel at a time
+        if len(channels) == 1:
             ch = channels[0]
-            curr_raw = seg_block_for_display[:, ch].astype(float)  # current chunk of data
-            prev_raw = _stream["prev_chunks_raw"].get(ch)# previous chunk of same channel
-            xor_threshold = float(data.get("xor_threshold", 0.05))  # minimum difference to visualize
+            curr_raw = seg_block_for_display[:, ch].astype(float)
+            prev_raw = _stream["prev_chunks_raw"].get(ch)
+            xor_threshold = float(data.get("xor_threshold", 0.05))
             if prev_raw is not None and prev_raw.shape == curr_raw.shape:
-                # Calculate difference from previous chunk
                 diff = curr_raw - prev_raw
-                # Mask small differences below threshold
                 mask = np.abs(diff) > xor_threshold
-                 # Keep only significant differences, else set 0
                 xor_vals = np.where(mask, diff, 0.0)
                 xor_out[ch] = xor_vals.tolist()
             else:
-                # If no previous chunk, output all zeros
                 xor_out[ch] = np.zeros_like(curr_raw).tolist()
-            _stream["prev_chunks_raw"][ch] = curr_raw.copy()  # Save current chunk for next XOR comparison
+            _stream["prev_chunks_raw"][ch] = curr_raw.copy()
 
         # -------------------------
         # Polar visualization
         # -------------------------
         # ... (Polar plot logic remains the same)
         polar_out = {}
-        polar_mode = str(data.get("polar_mode", "fixed")).lower() # "fixed" or "cumulative"
+        polar_mode = str(data.get("polar_mode", "fixed")).lower()
         for ch in channels:
-             sig = seg_block_for_display[:, ch] # current chunk
+             sig = seg_block_for_display[:, ch]
              Nsig = len(sig)
-             theta = np.linspace(0, 360, Nsig, endpoint=False)# angles for polar plot
-             r = (sig - np.min(sig)).tolist() # radius values (normalized from min)
+             theta = np.linspace(0, 360, Nsig, endpoint=False)
+             r = (sig - np.min(sig)).tolist()
              if polar_mode == "cumulative":
-                 # Maintain cumulative points for continuous display
                  if ch not in _stream["polar_points"]:
                       _stream["polar_points"][ch] = {"r": [], "theta": []}
                  _stream["polar_points"][ch]["r"].extend(r)
                  _stream["polar_points"][ch]["theta"].extend(theta.tolist())
-
-                 # Keep only latest POLAR_MAX_POINTS points
                  if len(_stream["polar_points"][ch]["r"]) > POLAR_MAX_POINTS:
                       excess = len(_stream["polar_points"][ch]["r"]) - POLAR_MAX_POINTS
                       _stream["polar_points"][ch]["r"] = _stream["polar_points"][ch]["r"][excess:]
                       _stream["polar_points"][ch]["theta"] = _stream["polar_points"][ch]["theta"][excess:]
                  polar_out[str(ch)] = {"r": _stream["polar_points"][ch]["r"], "theta": _stream["polar_points"][ch]["theta"]}
              else:
-                 # Fixed mode: show only current chunk
                  polar_out[str(ch)] = {"r": r, "theta": theta.tolist()}
 
         # -------------------------
@@ -1173,7 +1043,7 @@ def update():
         recurrence_scatter_data = {"x_vals": [], "y_vals": []}
         colormap_data = None
         rec_pred_smoothed = None
-        if len(channels) == 2: # recurrence plot only makes sense for 2 channels
+        if len(channels) == 2:
             chX, chY = channels[0], channels[1]
             try:
                 # Use the current displayed chunk (already decimated) so plots reflect aliasing
@@ -1181,7 +1051,7 @@ def update():
                 ry_now = np.asarray(seg_block_for_display[:, chY], dtype=np.float32)
                 recurrence_scatter_data["x_vals"] = rx_now.tolist()
                 recurrence_scatter_data["y_vals"] = ry_now.tolist()
-                # Build recurrence heatmap image
+                # Heatmap image
                 try:
                     colormap_data = build_recurrence_image(rx_now, ry_now, size=128).tolist()
                 except Exception:
@@ -1194,7 +1064,7 @@ def update():
         # Aliasing detection metadata - enhanced for better prediction impact awareness
         # -------------------------
         aliasing_info = {
-            "is_undersampled": False,# True if current fs < native fs
+            "is_undersampled": False,
             "note": "",
             "prediction_impact": ""
         }
@@ -1202,7 +1072,6 @@ def update():
             native_fs_check = _stream.get("fs_native", streaming_fs)
             # Severe aliasing only when absolute sampling freq is below 100 Hz
             if float(streaming_fs) < 100.0:
-                # Severe aliasing when sampling below 100 Hz
                 aliasing_info["is_undersampled"] = True
                 aliasing_info["note"] = f"Severe aliasing: {streaming_fs}Hz vs native {native_fs_check}Hz"
                 aliasing_info["prediction_impact"] = "Predictions may be unreliable due to aliasing distortion"
@@ -1229,7 +1098,6 @@ def update():
             try:
                 native_equiv = (sampling_ratio >= 0.98) or (abs(float(streaming_fs) - float(native_fs_check)) <= 1.0)
             except Exception:
-                # Fallback if float conversion fails
                 native_equiv = (sampling_ratio >= 0.98)
             hea_text = str(_stream.get("hea_diagnosis", "")).lower()
             # Healthy indicators to avoid false Abnormal at native (all lowercase; matched against lowercased hea_text)
@@ -1238,36 +1106,28 @@ def update():
                 "no abnormal", "no significant abnormality", "within normal limits",
                 "no acute st-t changes", "no significant st-t changes"
             ]
-
-
-            # If near-native sampling AND .hea indicates healthy, override model output
             if native_equiv and any(t.strip() in f" {hea_text} " for t in healthy_terms) and isinstance(prediction_out, dict):
-                probs = prediction_out.get("probabilities", [1.0, 0.0])# default: Normal=1
+                probs = prediction_out.get("probabilities", [1.0, 0.0])
                 p_norm = float(probs[0]) if len(probs) > 0 else 1.0
                 prediction_out["label"] = "Normal"
                 prediction_out["description"] = DISEASE_DESCRIPTIONS.get("Normal", prediction_out.get("description", ""))
-                prediction_out["disease_name"] = ""    # no specific disease for healthy
-                prediction_out["confidence"] = max(p_norm, 0.9) # ensure confidence is high
+                prediction_out["disease_name"] = ""
+                prediction_out["confidence"] = max(p_norm, 0.9)
 
-
-           # Abnormal terms
             abn_terms = [
                 "myocardial", "infarct", "ischemia", "ischemic", "dysrhythmia",
                 "atrial fibrillation", " af ", "lbbb", "rbbb",
                 "av block", "1davb", "brady", "tachy", " st ", " mi "
             ]
-
-
-            # If near-native sampling AND .hea indicates abnormal, override label accordingly
             is_abnormal_hea = any(t.strip() in f" {hea_text} " for t in abn_terms)
             if is_abnormal_hea and native_equiv and isinstance(prediction_out, dict):
                 # Display the .hea-based abnormal diagnosis at native; keep raw model output unchanged
-                probs = prediction_out.get("probabilities", [0.0, 1.0]) # default: Abnormal=1
+                probs = prediction_out.get("probabilities", [0.0, 1.0])
                 p_abn = float(probs[1]) if len(probs) > 1 else 1.0
                 prediction_out["label"] = "Abnormal"
                 prediction_out["description"] = DISEASE_DESCRIPTIONS.get("Abnormal", prediction_out.get("description", ""))
-                prediction_out["disease_name"] = _stream.get("hea_diagnosis", "") # show disease name from header
-                prediction_out["confidence"] = max(p_abn, 0.9) # high confidence
+                prediction_out["disease_name"] = _stream.get("hea_diagnosis", "")
+                prediction_out["confidence"] = max(p_abn, 0.9)
         except Exception:
             pass
 
@@ -1283,16 +1143,11 @@ def update():
             except Exception:
                 native_equiv = (sampling_ratio >= 0.98)
             if native_equiv and isinstance(prediction_out, dict):
-                hist = _stream.setdefault("display_label_hist", [])# history of last displayed labels
+                hist = _stream.setdefault("display_label_hist", [])
                 hist.append(prediction_out.get("label"))
-
-
-                # Keep only last 3 labels in history
                 if len(hist) > 3:
                     _stream["display_label_hist"] = hist[-3:]
                     hist = _stream["display_label_hist"]
-                    
-                # Only update display if last 3 labels are identical
                 stable = len(hist) == 3 and hist.count(hist[-1]) == 3
                 if stable:
                     _stream["display_label_payload"] = {
@@ -1301,7 +1156,7 @@ def update():
                         "confidence": prediction_out.get("confidence"),
                         "disease_name": prediction_out.get("disease_name", "")
                     }
-                elif "display_label_payload" in _stream:# If not stable, retain previous display to prevent flicker
+                elif "display_label_payload" in _stream:
                     prev = _stream["display_label_payload"]
                     prediction_out["label"] = prev.get("label", prediction_out.get("label"))
                     prediction_out["description"] = prev.get("description", prediction_out.get("description"))
