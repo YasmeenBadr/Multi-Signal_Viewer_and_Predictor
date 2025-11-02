@@ -20,9 +20,7 @@ c = 343.0
 TEMP_DIR = tempfile.gettempdir()
 
 # Path to pre-trained neural network model for speed estimation
-MODEL_PATH = r"F:\Multi-Signal_Viewer_and_Predictor\results\speed_estimations\speed_estimations_NN_1000-200-50-10-1_reg1e-3_lossMSE.h5"
-
-
+MODEL_PATH = r"D:\DSP\Multi-Signal_Viewer_and_Predictor\results\speed_estimations\speed_estimations_NN_1000-200-50-10-1_reg1e-3_lossMSE.h5"
 # Helper Functions
 def normalize_audio(data):
     """
