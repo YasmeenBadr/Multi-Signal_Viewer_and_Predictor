@@ -92,7 +92,7 @@ def decimate_with_aliasing(signal: np.ndarray, native_fs: float,
     indices = []
     current_pos = phase
     while current_pos < n_samples:
-        indices.append(int(current_pos))
+        indices.append(int(current_pos)) #flooring
         current_pos += decimation_factor
     
     # Update phase for next call (continuous streaming)
